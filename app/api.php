@@ -80,6 +80,18 @@ function me_payload() {
             'email' => $_SESSION['email'] ?? ''];
 }
 
+// Cek kekuatan password — kembalikan pesan JELAS apa yang kurang (UMKM: harus gamblang), '' bila lolos.
+function pw_problem($pass) {
+    $pass = (string)$pass;
+    $len = mb_strlen($pass);
+    if ($len < 8) return 'Password terlalu pendek — minimal 8 karakter (punyamu baru ' . $len . '). Tambah ' . (8 - $len) . ' karakter lagi.';
+    if (preg_match('/^(.)\1+$/u', $pass)) return 'Password jangan satu karakter diulang terus (mis. "aaaaaaaa"). Campur huruf dan angka biar aman.';
+    if (preg_match('/^(0123456789|123456789|12345678|1234567890|9876543210|87654321|abcdefgh|abcdefghij)$/i', $pass)) return 'Password jangan berurutan (mis. "12345678"). Buat kombinasi yang acak.';
+    $common = ['12345678','123456789','1234567890','password','password1','passw0rd','qwerty123','qwertyui','11111111','00000000','iloveyou','admin123','racikin123','88888888','asdfasdf','1q2w3e4r','123123123','sayang123'];
+    if (in_array(strtolower($pass), $common, true)) return 'Password ini terlalu umum & gampang ditebak orang. Pilih yang lebih unik (campur huruf, angka, atau simbol).';
+    return '';
+}
+
 function handle_auth($action, $in) {
     global $DB_HOST, $DB_USER, $DB_PASS;
     $m = master_pdo();
@@ -130,7 +142,7 @@ function handle_auth($action, $in) {
         if ($name === '' || $user === '') { http_response_code(400); echo json_encode(['error' => 'Nama usaha & nama user wajib diisi.']); return; }
         if (!valid_alias($alias)) { http_response_code(400); echo json_encode(['error' => 'Kode usaha harus 2–24 huruf kecil/angka tanpa spasi.']); return; }
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) { http_response_code(400); echo json_encode(['error' => 'Email tidak valid.']); return; }
-        if (strlen($pass) < 6) { http_response_code(400); echo json_encode(['error' => 'Password minimal 6 karakter.']); return; }
+        if (($pe = pw_problem($pass)) !== '') { http_response_code(400); echo json_encode(['error' => $pe]); return; }
         // atomik: kalau salah satu insert gagal, semua batal (alias tak terkunci). DB tenant dibuat lazy saat bootstrap.
         try {
             $m->beginTransaction();
@@ -155,7 +167,7 @@ function handle_auth($action, $in) {
         $b = current_business();
         if (!$b) { http_response_code(401); echo json_encode(['error' => 'Belum login.']); return; }
         $old = (string)($in['oldPassword'] ?? ''); $new = (string)($in['newPassword'] ?? '');
-        if (strlen($new) < 6) { http_response_code(400); echo json_encode(['error' => 'Password baru minimal 6 karakter.']); return; }
+        if (($pe = pw_problem($new)) !== '') { http_response_code(400); echo json_encode(['error' => $pe]); return; }
         $email = $_SESSION['email'] ?? '';
         $u = $m->prepare("SELECT * FROM users WHERE alias=? AND email=?"); $u->execute([$b['alias'], $email]); $u = $u->fetch();
         if (!$u || !password_verify($old, $u['pass_hash'])) { http_response_code(400); echo json_encode(['error' => 'Password lama salah.']); return; }
@@ -188,7 +200,7 @@ function handle_auth($action, $in) {
     // ---- konfirmasi reset (set password baru dari link email) ----
     if ($action === 'authResetConfirm') {
         $raw = (string)($in['token'] ?? ''); $new = (string)($in['password'] ?? '');
-        if (strlen($new) < 6) { http_response_code(400); echo json_encode(['error' => 'Password baru minimal 6 karakter.']); return; }
+        if (($pe = pw_problem($new)) !== '') { http_response_code(400); echo json_encode(['error' => $pe]); return; }
         $parts = explode('.', $raw, 2);
         if (count($parts) !== 2 || $parts[0] === '' || $parts[1] === '') { http_response_code(400); echo json_encode(['error' => 'Link reset tidak valid.']); return; }
         [$selector, $token] = $parts;
@@ -220,12 +232,12 @@ function handle_auth($action, $in) {
             $x = $m->prepare("SELECT * FROM users WHERE alias=? AND email=?"); $x->execute([$alias, $email]); $ex = $x->fetch();
             if ($ex) {
                 if (($ex['role'] ?? '') === 'owner') { http_response_code(400); echo json_encode(['error' => 'Akun pemilik tak bisa diubah dari sini.']); return; }
-                if ($pass !== '' && strlen($pass) < 6) { http_response_code(400); echo json_encode(['error' => 'Password minimal 6 karakter.']); return; }
+                if ($pass !== '' && ($pe = pw_problem($pass)) !== '') { http_response_code(400); echo json_encode(['error' => $pe]); return; }
                 if ($pass !== '') $m->prepare("UPDATE users SET name=?, perms=?, pass_hash=? WHERE id=?")->execute([$name, $perms, password_hash($pass, PASSWORD_DEFAULT), $ex['id']]);
                 else $m->prepare("UPDATE users SET name=?, perms=? WHERE id=?")->execute([$name, $perms, $ex['id']]);
                 echo json_encode(['ok' => true]); return;
             }
-            if (strlen($pass) < 6) { http_response_code(400); echo json_encode(['error' => 'Password staf minimal 6 karakter.']); return; }
+            if (($pe = pw_problem($pass)) !== '') { http_response_code(400); echo json_encode(['error' => $pe]); return; }
             $m->prepare("INSERT INTO users (alias,email,name,pass_hash,role,perms,created) VALUES (?,?,?,?,'staff',?,NOW())")
               ->execute([$alias, $email, $name, password_hash($pass, PASSWORD_DEFAULT), $perms]);
             echo json_encode(['ok' => true]); return;
@@ -243,14 +255,23 @@ function handle_auth($action, $in) {
 }
 
 // ---- kirim email reset password (pakai mail() bawaan; di shared hosting umumnya jalan) ----
+// Host kanonik yang tepercaya — cegah Host-header injection pada link reset (CWE-640).
+// Override di config.php: define('APP_HOSTS', ['login.usahamu.com', ...]);
+function app_host() {
+    $allow = defined('APP_HOSTS') ? APP_HOSTS : ['login.racikin.com', 'racikin.com', 'localhost', '127.0.0.1'];
+    $raw  = strtolower((string)($_SERVER['HTTP_HOST'] ?? ''));
+    $bare = preg_replace('/:\d+$/', '', $raw);              // buang port utk pencocokan
+    // host asing (mis. dari Host header dipalsukan) → paksa ke host kanonik pertama
+    return in_array($bare, $allow, true) ? $raw : $allow[0];
+}
 function app_base_url() {
-    if (defined('APP_URL') && APP_URL) return rtrim(APP_URL, '/');
+    if (defined('APP_URL') && APP_URL) return rtrim(APP_URL, '/');   // paling utama: host eksplisit dari config
     $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
-    return ($https ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
+    return ($https ? 'https' : 'http') . '://' . app_host();          // jaring pengaman: hanya host di allowlist
 }
 function send_reset_email($to, $name, $alias, $tokenStr) {
     $link = app_base_url() . '/?reset=' . $tokenStr;
-    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    $host = preg_replace('/:\d+$/', '', app_host());                  // From juga pakai host tepercaya, bukan HTTP_HOST mentah
     $from = defined('RESET_FROM') && RESET_FROM ? RESET_FROM : ('noreply@' . preg_replace('/^www\./', '', $host));
     $subject = 'Reset Password Racikin';
     $body = "Halo" . ($name ? ' ' . $name : '') . ",\n\n"

@@ -24,5 +24,11 @@ define('DB_ALLOW_CREATE', false);
 define('ADMIN_PASS', 'GANTI_PASSWORD_ADMIN');
 
 // ---- Email reset password ----
-define('APP_URL', 'https://login.racikin.com');       // untuk link di email ('' = auto dari domain)
+// PENTING (keamanan): APP_URL WAJIB diisi host aslimu. Kalau kosong, link reset
+// memakai Host dari request yang bisa dipalsukan penyerang (Host-header injection).
+define('APP_URL', 'https://login.racikin.com');       // host aplikasi (dipakai untuk link di email)
 define('RESET_FROM', 'noreply@racikin.com');          // buat email ini di cPanel > Email Accounts
+
+// Daftar host yang diizinkan — jaring pengaman bila APP_URL kosong (cegah Host-header injection).
+// Ganti kalau domainmu berbeda. Boleh biarkan bila sudah set APP_URL di atas.
+define('APP_HOSTS', ['login.racikin.com', 'racikin.com']);

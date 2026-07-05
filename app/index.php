@@ -445,6 +445,13 @@ label.f{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;font-w
 const rp=n=>"Rp"+Math.round(n||0).toLocaleString("id-ID");
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 const today=()=>new Date().toISOString().slice(0,10);
+// Cek kekuatan password (cermin dari server) — pesan jelas apa kurangnya, "" bila lolos.
+function pwProblem(p){p=String(p||"");const n=[...p].length;
+  if(n<8)return `Password terlalu pendek — minimal 8 karakter (baru ${n}). Tambah ${8-n} lagi.`;
+  if(/^(.)\1+$/u.test(p))return 'Password jangan satu karakter diulang terus (mis. "aaaaaaaa"). Campur huruf & angka.';
+  if(/^(0123456789|123456789|12345678|1234567890|9876543210|87654321|abcdefgh|abcdefghij)$/i.test(p))return 'Password jangan berurutan (mis. "12345678"). Buat yang acak.';
+  if(["12345678","123456789","1234567890","password","password1","passw0rd","qwerty123","qwertyui","11111111","00000000","iloveyou","admin123","racikin123","88888888","asdfasdf","1q2w3e4r","123123123","sayang123"].includes(p.toLowerCase()))return "Password ini terlalu umum & gampang ditebak. Pilih yang lebih unik (campur huruf, angka, atau simbol).";
+  return "";}
 const fmtDate=s=>s?new Date(s+"T00:00").toLocaleDateString("id-ID",{day:"2-digit",month:"short",year:"numeric"}):"-";
 const esc=s=>(s==null?"":String(s)).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 let S={products:[],stores:[],materials:[],batches:[],notas:[],cashOut:[],profile:{}};
@@ -1661,7 +1668,7 @@ function editUser(u){
   const checks=GRANT_VIEWS.map(([v,ic,lbl])=>`<label class="permchk"><input type="checkbox" value="${v}" ${(u.perms||[]).includes(v)?"checked":""}> ${ic} ${lbl}</label>`).join("");
   openModal(`<button class="close" onclick="closeModal()">×</button><h3>${isEdit?"Edit":"Tambah"} Pengguna</h3>
     <div class="grid2" style="margin-bottom:12px"><div><label class="f">Nama</label><input id="uName" value="${esc(u.name||"")}" placeholder="nama staf"></div><div><label class="f">Email (untuk login)</label><input id="uEmail" type="email" value="${esc(u.email||"")}" ${isEdit?"readonly style='background:#f4f4f4'":""} placeholder="email@staf.com" autocapitalize="none"></div></div>
-    <label class="f">Password ${isEdit?"<span class='mini'>(kosongkan kalau tak diubah)</span>":"(min 6)"}</label><input id="uPass" type="password" placeholder="${isEdit?"••••••":"buat password staf"}" style="margin-bottom:14px">
+    <label class="f">Password ${isEdit?"<span class='mini'>(kosongkan kalau tak diubah)</span>":"(min 8 karakter)"}</label><input id="uPass" type="password" placeholder="${isEdit?"••••••":"buat password staf"}" style="margin-bottom:14px">
     <label class="f">Boleh akses menu:</label>
     <div class="permgrid">${checks}</div>
     <div style="margin-top:16px;text-align:right"><button class="btn gray" onclick="closeModal()">Batal</button> <button class="btn" onclick="saveUser(${isEdit?"true":"false"})">Simpan</button></div>`);
@@ -1672,7 +1679,7 @@ async function saveUser(isEdit){
   const password=document.getElementById("uPass").value;
   const perms=[...document.querySelectorAll(".permgrid input:checked")].map(c=>c.value);
   if(!email){toast("Email wajib.");return;}
-  if(!isEdit&&password.length<6){toast("Password minimal 6 karakter.");return;}
+  if((!isEdit||password!=="")){const pe=pwProblem(password);if(pe){toast(pe);return;}}
   try{await api("userSave",{email,name,password,perms});await closeModal();toast("Pengguna tersimpan ✓");rUsers();}catch(e){}
 }
 async function delUser(email){if(confirm("Hapus pengguna "+email+"?")){await api("userDelete",{email});toast("Pengguna dihapus.");rUsers();}}
@@ -1706,13 +1713,14 @@ function rProfile(){
     <div style="text-align:right;margin-top:16px"><button class="btn" onclick="saveProfile()">💾 Simpan Profil</button></div>
   </div>
   <div class="panel" style="max-width:600px"><h3>🔒 Keamanan</h3>
-    <div class="grid2" style="margin-bottom:12px"><div><label class="f">Password Lama</label><input id="cpOld" type="password" placeholder="password sekarang"></div><div><label class="f">Password Baru (min 6)</label><input id="cpNew" type="password" placeholder="password baru"></div></div>
+    <div class="grid2" style="margin-bottom:12px"><div><label class="f">Password Lama</label><input id="cpOld" type="password" placeholder="password sekarang"></div><div><label class="f">Password Baru (min 8 karakter)</label><input id="cpNew" type="password" placeholder="password baru"></div></div>
     <div style="text-align:right"><button class="btn ghost" onclick="doChangePassword()">Ubah Password</button></div>
   </div>`;
 }
 async function doChangePassword(){
   const o=document.getElementById("cpOld").value,n=document.getElementById("cpNew").value;
-  if(!o||n.length<6){toast("Isi password lama & password baru (min 6).");return;}
+  if(!o){toast("Isi password lama dulu.");return;}
+  {const pe=pwProblem(n);if(pe){toast(pe);return;}}
   try{await api("authChangePassword",{oldPassword:o,newPassword:n});toast("Password diubah ✓");document.getElementById("cpOld").value="";document.getElementById("cpNew").value="";}catch(e){}
 }
 function qrisCheck(v){v=(v||"").replace(/[\r\n\t]+/g,"").trim();const el=document.getElementById("qrisMsg");if(!el)return;
@@ -1788,7 +1796,7 @@ function renderLogin(mode){
     form=`<div class="lerr" id="lerr"></div>
       <h3 style="text-align:center;margin-bottom:4px">Buat Password Baru</h3>
       <p class="lsub" style="margin-bottom:16px">Masukkan password baru untuk akunmu.</p>
-      <div class="lfield"><label>Password Baru (min 6)</label><input id="rpNew" type="password" placeholder="password baru"></div>
+      <div class="lfield"><label>Password Baru (min 8 karakter)</label><input id="rpNew" type="password" placeholder="password baru"></div>
       <div class="lfield"><label>Ulangi Password</label><input id="rpNew2" type="password" placeholder="ulangi password"></div>
       <button class="btn" style="width:100%;margin-top:6px" onclick="doResetConfirm()">Simpan Password</button>`;
   } else {
@@ -1798,7 +1806,7 @@ function renderLogin(mode){
       <div class="lfield"><label>Kode Usaha <span style="font-weight:400">(huruf kecil/angka, tanpa spasi)</span></label><input id="rCode" placeholder="mis. anna" autocapitalize="none"></div>
       <div class="lfield"><label>Nama Kamu</label><input id="rUser" placeholder="mis. Anna"></div>
       <div class="lfield"><label>Email</label><input id="rEmail" type="email" placeholder="email@usaha.com" autocapitalize="none"></div>
-      <div class="lfield"><label>Password (min 6)</label><input id="rPass" type="password" placeholder="buat password"></div>
+      <div class="lfield"><label>Password (min 8 karakter)</label><input id="rPass" type="password" placeholder="buat password"></div>
       <label class="lremember"><input type="checkbox" id="rRemember" checked> Ingat saya (tetap masuk 30 hari)</label>
       <button class="btn" style="width:100%;margin-top:6px" onclick="doRegister()">Daftar &amp; Masuk</button>`
     :`${tab}<div class="lfield"><label>Kode Usaha</label><input id="lCode" placeholder="mis. anna" autocapitalize="none"></div>
@@ -1818,7 +1826,7 @@ async function doForgot(){
 }
 async function doResetConfirm(){
   const p1=document.getElementById("rpNew").value,p2=document.getElementById("rpNew2").value;
-  if(p1.length<6){loginErr("Password minimal 6 karakter.");return;}
+  {const pe=pwProblem(p1);if(pe){loginErr(pe);return;}}
   if(p1!==p2){loginErr("Password tidak sama.");return;}
   try{
     await api("authResetConfirm",{token:window._resetToken,password:p1},{silent:true});
@@ -1829,6 +1837,7 @@ async function doResetConfirm(){
 function loginErr(m){const e=document.getElementById("lerr");if(e){e.textContent=m;e.style.display="block";}}
 async function doLogin(){const code=document.getElementById("lCode").value.trim().toLowerCase(),email=document.getElementById("lEmail").value.trim().toLowerCase(),password=document.getElementById("lPass").value,remember=document.getElementById("lRemember").checked;if(!code||!email||!password){loginErr("Isi kode usaha, email & password.");return;}try{BIZ=await api("authLogin",{code,email,password,remember},{silent:true});document.getElementById("loginScreen").style.display="none";await bootApp();}catch(e){loginErr(e.message||"Gagal masuk.");}}
 async function doRegister(){const name=document.getElementById("rName").value.trim(),code=document.getElementById("rCode").value.trim().toLowerCase(),user=document.getElementById("rUser").value.trim(),email=document.getElementById("rEmail").value.trim().toLowerCase(),password=document.getElementById("rPass").value;if(!name||!code||!user||!email||!password){loginErr("Lengkapi semua kolom.");return;}
+  {const pe=pwProblem(password);if(pe){loginErr(pe);return;}}
   try{const r=await api("authRegister",{name,code,user,email,password},{silent:true});
     document.getElementById("loginBox").innerHTML=`<img class="lgo" src="icons/logo-bowl.png" alt=""><img class="lword" src="icons/logo-word.png" alt="Racikin"><div style="text-align:center;padding:6px 0"><div style="font-size:42px">⏳</div><h3 style="margin:8px 0 6px">Pendaftaran Berhasil!</h3><p class="lsub">Usaha <b>${esc(r.name||name)}</b> (kode: <b>${esc(r.alias||code)}</b>) sudah terdaftar. Akunmu akan <b>aktif setelah pembayaran dikonfirmasi</b> — kami hubungi via WhatsApp. 🙏</p><button class="btn ghost" style="width:100%;margin-top:16px" onclick="renderLogin('login')">Kembali ke Masuk</button></div>`;
   }catch(e){loginErr(e.message||"Gagal daftar.");}}

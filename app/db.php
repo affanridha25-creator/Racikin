@@ -12,9 +12,11 @@ if (!defined('DB_PREFIX'))       define('DB_PREFIX', defined('DB_TENANT_PREFIX')
 if (!defined('ALLOW_DB_CREATE')) define('ALLOW_DB_CREATE', defined('DB_ALLOW_CREATE') ? (bool)DB_ALLOW_CREATE : true);
 // =========================================================
 
-// Cookie sesi lebih aman: HttpOnly (tak bisa dibaca JS) + SameSite=Lax (bantu cegah CSRF).
+// Cookie sesi lebih aman: HttpOnly (tak bisa dibaca JS) + SameSite=Lax (bantu cegah CSRF)
+// + Secure saat HTTPS (cookie tak ikut terkirim lewat http → cegah pencurian sesi saat MITM).
 if (session_status() !== PHP_SESSION_ACTIVE) {
-    @session_set_cookie_params(['lifetime' => 0, 'path' => '/', 'httponly' => true, 'samesite' => 'Lax']);
+    $_sec = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+    @session_set_cookie_params(['lifetime' => 0, 'path' => '/', 'httponly' => true, 'samesite' => 'Lax', 'secure' => $_sec]);
 }
 
 function _pdo_opt() { return [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]; }
