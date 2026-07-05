@@ -262,7 +262,7 @@ function send_reset_email($to, $name, $alias, $tokenStr) {
 }
 
 // Daftar tabel dipakai bersama oleh reset & importAll (urutan: anak dulu, induk belakangan)
-const TABLES = ['payments','distributions','notas','cash_out','batch_materials','batch_ops','batch_outputs','batches','material_prices','materials','products','profile'];
+const TABLES = ['payments','distributions','notas','register_sessions','cash_out','batch_materials','batch_ops','batch_outputs','batches','material_prices','materials','products','profile'];
 const BATCH_CHILDREN = ['batch_materials','batch_ops','batch_outputs'];
 
 function gid($p) { return $p . bin2hex(random_bytes(5)); }
@@ -276,6 +276,7 @@ if (($_SESSION['role'] ?? 'owner') !== 'owner') {
     $NEED = [
         'saveBatch'=>['produksi'], 'deleteBatch'=>['produksi'],
         'saveNota'=>['pos','distribusi'], 'deleteNota'=>['pos','distribusi'],
+        'openRegister'=>['pos'], 'closeRegister'=>['pos'],
         'addPayment'=>['pos','pembayaran'], 'deletePayment'=>['pembayaran'],
         'saveCashOut'=>['keuangan'], 'deleteCashOut'=>['keuangan'],
         'saveProduct'=>['produk'], 'deleteProduct'=>['produk'],
@@ -369,11 +370,19 @@ try {
                 }
             }
             $pdo->beginTransaction();
-            // catat kasir/pembuat: pertahankan pembuat asli saat edit, isi user aktif saat baru
-            $oc = $pdo->prepare("SELECT created_by FROM notas WHERE id=?"); $oc->execute([$id]); $oc = $oc->fetchColumn();
-            $creator = ($oc === false) ? ($_SESSION['email'] ?? '') : $oc;   // nota baru → kasir aktif; nota lama → pertahankan pembuat asli
-            $pdo->prepare("REPLACE INTO notas (id,nota_no,ndate,store_id,created_by) VALUES (?,?,?,?,?)")
-                ->execute([$id, $n['notaNo'] ?? '', $date, $storeId, $creator]);
+            // catat kasir/pembuat + sesi kasir + metode bayar: pertahankan nilai asli saat edit, isi baru saat pertama
+            $ex = $pdo->prepare("SELECT created_by, session_id, pay_method FROM notas WHERE id=?"); $ex->execute([$id]); $ex = $ex->fetch();
+            if ($ex === false) {   // nota baru
+                $creator   = $_SESSION['email'] ?? '';
+                $sessionId = safe_id($n['sessionId'] ?? '') ?: null;
+                $payMethod = in_array(($n['payMethod'] ?? ''), ['Tunai','Transfer','QRIS'], true) ? $n['payMethod'] : '';
+            } else {               // edit → pertahankan pembuat/sesi/metode asli
+                $creator   = $ex['created_by'];
+                $sessionId = $ex['session_id'];
+                $payMethod = $ex['pay_method'];
+            }
+            $pdo->prepare("REPLACE INTO notas (id,nota_no,ndate,store_id,created_by,session_id,pay_method) VALUES (?,?,?,?,?,?,?)")
+                ->execute([$id, $n['notaNo'] ?? '', $date, $storeId, $creator, $sessionId, $payMethod]);
             $pdo->prepare("DELETE FROM distributions WHERE nota_id=?")->execute([$id]);
             $ins = $pdo->prepare("INSERT INTO distributions (id,nota_id,ddate,store_id,product_id,qty,harga,hpp,kind) VALUES (?,?,?,?,?,?,?,?,?)");
             foreach ($clean as $it)
@@ -391,6 +400,35 @@ try {
             $pdo->prepare("DELETE FROM notas WHERE id=?")->execute([$id]);
             $pdo->commit();
             echo json_encode(['ok' => true]);
+            break;
+        }
+
+        case 'openRegister': {
+            $open = $pdo->query("SELECT id FROM register_sessions WHERE status='open' LIMIT 1")->fetchColumn();
+            if ($open) { http_response_code(409); echo json_encode(['error' => 'Kasir sudah dibuka. Tutup dulu sebelum membuka sesi baru.']); break; }
+            $float = max(0, intval($in['openingFloat'] ?? 0));
+            $id = gid('rs');
+            $pdo->prepare("INSERT INTO register_sessions (id,opened_by,opened_at,opening_float,note,status) VALUES (?,?,NOW(),?,?, 'open')")
+                ->execute([$id, $_SESSION['email'] ?? '', $float, mb_substr((string)($in['note'] ?? ''), 0, 255)]);
+            echo json_encode(['ok' => true, 'id' => $id]);
+            break;
+        }
+
+        case 'closeRegister': {
+            $s = $pdo->query("SELECT * FROM register_sessions WHERE status='open' LIMIT 1")->fetch();
+            if (!$s) { http_response_code(409); echo json_encode(['error' => 'Tidak ada sesi kasir yang terbuka.']); break; }
+            $t = session_totals($pdo, $s['id']);           // dihitung ulang di server (otoritatif)
+            $opening  = intval($s['opening_float']);
+            $expected = $opening + $t['cash'];             // kas seharusnya di laci = modal awal + penjualan tunai
+            $closing  = max(0, intval($in['closingCash'] ?? 0));
+            $pdo->prepare("UPDATE register_sessions SET status='closed', closed_by=?, closed_at=NOW(), closing_cash=?, expected_cash=?, cash_sales=?, noncash_sales=?, txn_count=?, note=CONCAT(note, ?) WHERE id=?")
+                ->execute([$_SESSION['email'] ?? '', $closing, $expected, $t['cash'], $t['noncash'], $t['count'],
+                    (($in['note'] ?? '') !== '') ? (' | tutup: ' . mb_substr((string)$in['note'], 0, 200)) : '', $s['id']]);
+            echo json_encode(['ok' => true, 'summary' => [
+                'openedBy' => $s['opened_by'], 'openedAt' => $s['opened_at'], 'openingFloat' => $opening,
+                'cashSales' => $t['cash'], 'noncashSales' => $t['noncash'], 'count' => $t['count'],
+                'expected' => $expected, 'closing' => $closing, 'diff' => $closing - $expected,
+            ]]);
             break;
         }
 
@@ -662,6 +700,20 @@ function recompute_product_hpp($pdo, $productIds) {
     }
 }
 
+// Total penjualan sebuah sesi kasir, dipecah tunai vs non-tunai (dari nilai item nota)
+function session_totals($pdo, $sid) {
+    $rows = $pdo->prepare("SELECT n.pay_method AS pm, COALESCE(SUM(d.qty*d.harga),0) AS tot
+        FROM notas n LEFT JOIN distributions d ON d.nota_id=n.id
+        WHERE n.session_id=? GROUP BY n.id, n.pay_method");
+    $rows->execute([$sid]);
+    $cash = 0; $noncash = 0; $count = 0;
+    foreach ($rows as $r) {
+        $t = intval($r['tot']); $count++;
+        if (($r['pm'] ?? '') === 'Tunai') $cash += $t; else $noncash += $t;
+    }
+    return ['cash' => $cash, 'noncash' => $noncash, 'count' => $count];
+}
+
 function bootstrap($pdo) {
     $products = $pdo->query("SELECT id,name,cat,gram,harga,hpp FROM products ORDER BY name")->fetchAll();
     foreach ($products as &$p) { $p['gram']=intval($p['gram']); $p['harga']=intval($p['harga']); $p['hpp']=intval($p['hpp']); } unset($p);
@@ -694,7 +746,7 @@ function bootstrap($pdo) {
     foreach ($pdo->query("SELECT id,nota_id AS notaId,pdate AS date,amount,note FROM payments ORDER BY pdate,id") as $r) {
         $r['amount']=intval($r['amount']); $pay[$r['notaId']][] = $r;
     }
-    $notas = $pdo->query("SELECT id,nota_no AS notaNo,ndate AS date,store_id AS storeId,created_by AS createdBy FROM notas ORDER BY ndate DESC,id DESC")->fetchAll();
+    $notas = $pdo->query("SELECT id,nota_no AS notaNo,ndate AS date,store_id AS storeId,created_by AS createdBy,session_id AS sessionId,pay_method AS payMethod FROM notas ORDER BY ndate DESC,id DESC")->fetchAll();
     foreach ($notas as &$n) { $n['items']=$items[$n['id']]??[]; $n['payments']=$pay[$n['id']]??[]; } unset($n);
 
     // Kas keluar (termasuk prive pemilik) hanya untuk pemilik / staf ber-akses Keuangan
@@ -704,8 +756,18 @@ function bootstrap($pdo) {
 
     $profile = $pdo->query("SELECT address,phone,whatsapp,instagram,facebook,tiktok,logo,qris FROM profile WHERE id=1")->fetch() ?: [];
 
+    // sesi kasir yang sedang terbuka (kalau ada) + riwayat sesi tertutup
+    $register = $pdo->query("SELECT id,opened_by AS openedBy,opened_at AS openedAt,opening_float AS openingFloat FROM register_sessions WHERE status='open' LIMIT 1")->fetch() ?: null;
+    if ($register) $register['openingFloat'] = intval($register['openingFloat']);
+    $registerLog = [];
+    foreach ($pdo->query("SELECT id,opened_by AS openedBy,opened_at AS openedAt,closed_by AS closedBy,closed_at AS closedAt,opening_float AS openingFloat,cash_sales AS cashSales,noncash_sales AS noncashSales,txn_count AS txnCount,expected_cash AS expected,closing_cash AS closing FROM register_sessions WHERE status='closed' ORDER BY closed_at DESC LIMIT 60") as $r) {
+        foreach (['openingFloat','cashSales','noncashSales','txnCount','expected','closing'] as $k) $r[$k] = intval($r[$k]);
+        $r['diff'] = $r['closing'] - $r['expected'];
+        $registerLog[] = $r;
+    }
+
     $biz = current_business();
-    return compact('products','stores','materials','batches','notas','cashOut','profile')
+    return compact('products','stores','materials','batches','notas','cashOut','profile','register','registerLog')
         + ['biz' => ['name'=>$biz['name']??'', 'alias'=>$biz['alias']??'', 'user'=>$_SESSION['user_name']??($biz['user_name']??'')],
            'me' => me_payload()];
 }

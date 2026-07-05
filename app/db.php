@@ -208,6 +208,27 @@ function init_schema($pdo) {
         INDEX(store_id)
     ) ENGINE=InnoDB");
     ensure_column($pdo, 'notas', 'created_by', "created_by VARCHAR(160) DEFAULT ''");
+    // sesi kasir & metode bayar (khusus penjualan POS; distribusi biasa kosong)
+    ensure_column($pdo, 'notas', 'session_id', "session_id VARCHAR(32) DEFAULT NULL");
+    ensure_column($pdo, 'notas', 'pay_method', "pay_method VARCHAR(16) DEFAULT ''");
+
+    // Sesi kasir (buka/tutup laci): modal awal, siapa yang buka, rekonsiliasi saat tutup
+    $pdo->exec("CREATE TABLE IF NOT EXISTS register_sessions (
+        id VARCHAR(32) PRIMARY KEY,
+        opened_by VARCHAR(160) DEFAULT '',
+        opened_at DATETIME DEFAULT NULL,
+        opening_float INT DEFAULT 0,
+        closed_by VARCHAR(160) DEFAULT '',
+        closed_at DATETIME DEFAULT NULL,
+        closing_cash INT DEFAULT NULL,
+        expected_cash INT DEFAULT NULL,
+        cash_sales INT DEFAULT NULL,
+        noncash_sales INT DEFAULT NULL,
+        txn_count INT DEFAULT NULL,
+        note VARCHAR(255) DEFAULT '',
+        status VARCHAR(10) DEFAULT 'open',
+        INDEX(status)
+    ) ENGINE=InnoDB");
 
     // Item distribusi (baris produk dalam sebuah nota)
     $pdo->exec("CREATE TABLE IF NOT EXISTS distributions (
