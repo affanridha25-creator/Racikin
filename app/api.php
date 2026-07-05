@@ -34,9 +34,10 @@ function set_remember_cookie($value, $expires) {
 function issue_remember_token($m, $alias, $email) {
     $selector = bin2hex(random_bytes(12));    // 24 char, publik (dipakai lookup)
     $validator = bin2hex(random_bytes(32));   // 64 char, rahasia (cookie only; DB simpan hash)
-    $exp = time() + REMEMBER_DAYS * 86400;
-    $m->prepare("INSERT INTO remember_tokens (alias,email,selector,validator_hash,expires) VALUES (?,?,?,?,?)")
-      ->execute([$alias, $email, $selector, hash('sha256', $validator), date('Y-m-d H:i:s', $exp)]);
+    $exp = time() + REMEMBER_DAYS * 86400;   // untuk cookie: epoch nyata (dibaca browser)
+    // expires di DB pakai NOW() MySQL (bukan waktu PHP) — konsisten walau timezone PHP≠MySQL
+    $m->prepare("INSERT INTO remember_tokens (alias,email,selector,validator_hash,expires) VALUES (?,?,?,?, DATE_ADD(NOW(), INTERVAL ? DAY))")
+      ->execute([$alias, $email, $selector, hash('sha256', $validator), REMEMBER_DAYS]);
     set_remember_cookie($selector . ':' . $validator, $exp);
 }
 function clear_remember($m) {
@@ -188,8 +189,9 @@ function handle_auth($action, $in) {
             $selector = bin2hex(random_bytes(10));   // 20 char
             $token = bin2hex(random_bytes(32));
             $m->prepare("DELETE FROM password_resets WHERE alias=? AND email=?")->execute([$alias, $email]);
-            $m->prepare("INSERT INTO password_resets (alias,email,selector,token_hash,expires) VALUES (?,?,?,?,?)")
-              ->execute([$alias, $email, $selector, hash('sha256', $token), date('Y-m-d H:i:s', time() + 3600)]);
+            // expires dihitung di sisi MySQL (NOW()) — hindari mismatch timezone PHP vs MySQL yang bikin token lahir "kadaluarsa"
+            $m->prepare("INSERT INTO password_resets (alias,email,selector,token_hash,expires) VALUES (?,?,?,?, DATE_ADD(NOW(), INTERVAL 1 HOUR))")
+              ->execute([$alias, $email, $selector, hash('sha256', $token)]);
             send_reset_email($email, $u['name'] ?? '', $alias, $selector . '.' . $token);
         } else {
             $m->prepare("INSERT INTO login_attempts (ip,ts) VALUES (?,NOW())")->execute([$ip]);
