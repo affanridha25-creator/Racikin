@@ -1483,16 +1483,16 @@ async function rRekap(){
   const el=document.getElementById("v-rekap");
   if(rows.length===0){el.innerHTML=`<h2 class="title">Rekap Kasir</h2><div class="desc">Penjualan per kasir/pengguna.</div>${monthBar()}<div class="empty">Belum ada transaksi pada periode ini.</div>`;return;}
   if(isMobile()){
-    const cards=rows.map(r=>crow({icon:"🧑‍💼",title:esc(kasirName(r.k)),sub:`${r.n} transaksi · terbayar ${rp(r.bayar)}`,amt:rp(r.omzet),badges:`<div class="csub">Laba ${rp(r.laba)}</div>`})).join("");
+    const cards=rows.map(r=>crow({icon:"🧑‍💼",title:esc(kasirName(r.k)),sub:`${r.n} transaksi · terbayar ${rp(r.bayar)}`,amt:rp(r.omzet),badges:(r.omzet-r.bayar>0?`<div class="csub">Piutang ${rp(r.omzet-r.bayar)}</div>`:"")})).join("");
     el.innerHTML=`<h2 class="title">Rekap Kasir</h2><div class="desc">Penjualan per kasir/pengguna.</div>${monthBar()}
       <div class="card accent" style="margin-bottom:14px"><div class="lbl">Total Omzet · ${monthLabelFull(FILTER_MONTH)}</div><div class="val">${rp(tot.omzet)}</div></div>
       <div class="clist">${cards}</div>`;
     return;
   }
-  const trs=rows.map(r=>`<tr><td>${esc(kasirName(r.k))}</td><td class="num">${r.n}</td><td class="num">${rp(r.omzet)}</td><td class="num" style="color:var(--green)">${rp(r.bayar)}</td><td class="num" style="color:var(--amber)">${rp(r.omzet-r.bayar)}</td><td class="num">${rp(r.laba)}</td></tr>`).join("");
+  const trs=rows.map(r=>`<tr><td>${esc(kasirName(r.k))}</td><td class="num">${r.n}</td><td class="num">${rp(r.omzet)}</td><td class="num" style="color:var(--green)">${rp(r.bayar)}</td><td class="num" style="color:var(--amber)">${rp(r.omzet-r.bayar)}</td></tr>`).join("");
   el.innerHTML=`<h2 class="title">Rekap Penjualan per Kasir</h2><div class="desc">Ringkasan transaksi tiap kasir/pengguna pada periode terpilih.</div>${monthBar()}
-    <div class="panel"><table><thead><tr><th>Kasir</th><th class="num">Transaksi</th><th class="num">Omzet</th><th class="num">Terbayar</th><th class="num">Piutang</th><th class="num">Laba</th></tr></thead>
-    <tbody>${trs}<tr class="tot" style="font-weight:700;border-top:2px solid var(--line)"><td>TOTAL</td><td class="num">${tot.n}</td><td class="num">${rp(tot.omzet)}</td><td class="num">${rp(tot.bayar)}</td><td class="num">${rp(tot.omzet-tot.bayar)}</td><td class="num">${rp(tot.laba)}</td></tr></tbody></table></div>
+    <div class="panel"><table><thead><tr><th>Kasir</th><th class="num">Transaksi</th><th class="num">Omzet</th><th class="num">Terbayar</th><th class="num">Piutang</th></tr></thead>
+    <tbody>${trs}<tr class="tot" style="font-weight:700;border-top:2px solid var(--line)"><td>TOTAL</td><td class="num">${tot.n}</td><td class="num">${rp(tot.omzet)}</td><td class="num">${rp(tot.bayar)}</td><td class="num">${rp(tot.omzet-tot.bayar)}</td></tr></tbody></table></div>
     <p class="mini" style="padding:0 4px">Kasir dicatat otomatis dari user yang membuat nota (POS &amp; distribusi).</p>`;
 }
 
