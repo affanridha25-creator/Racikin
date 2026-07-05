@@ -1,13 +1,17 @@
-# Rahasia & konfigurasi lokal
+# Rahasia & konfigurasi lokal (berisi password DB & admin)
+app/config.php
 config.php
-# Build output & dump data (berisi data usaha + hash password)
+
+# Dump data & bundle lama (berisi data usaha + hash password) — jangan ke repo publik
 deploy/
+_sql/
 *.sql.gz
-*.bak-*
+
 # Artefak & editor
 .DS_Store
 .mcp.json
 .playwright-mcp/
+*.bak-*
 *.code-workspace
 .vscode/
 .idea/

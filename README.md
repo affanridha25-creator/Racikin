@@ -1,51 +1,44 @@
-# ANNA Manager — Sistem Produksi, Distribusi & Pembayaran
+# Racikin — Aplikasi Produksi, Jualan & Keuangan UMKM
 
-Aplikasi web berbasis **PHP + MySQL** untuk ANNA Snack & Kitchen. Berjalan lokal
-di **XAMPP**, dengan database sungguhan (bukan lagi penyimpanan browser).
+SaaS multi-usaha (PHP + MySQL) untuk UMKM produksi rumahan: **HPP per batch, distribusi/nota,
+POS + QRIS, piutang, laba rugi, multi-user, rekap kasir**. Plus landing page.
 
-## Fitur
+## Struktur repo (deploy sekali `git pull`)
 
-- **Dashboard** — omzet, laba, piutang, stok, grafik omzet per produk & piutang per toko.
-- **Produksi** — input bahan baku (harga otomatis dari master) + biaya operasional → tentukan produk jadi & qty → **HPP per batch dihitung otomatis** (dibagi per bobot gram antar produk). Botol jadi otomatis menambah stok.
-- **Distribusi** — catat pengiriman ke toko; stok berkurang otomatis; laba per transaksi terhitung.
-- **Pembayaran** — lacak tagihan tiap toko, bisa dicicil (Belum → Sebagian → Lunas), sisa piutang otomatis.
-- **Bahan Baku** — master bahan + **riwayat harga**, lengkap dengan indikator naik/turun (%) untuk membandingkan perubahan harga dari waktu ke waktu.
-- **Produk** & **Toko** — master data.
-- **Backup** — export/restore .json, dan export CSV (batch, distribusi, pembayaran, harga bahan) untuk dibuka di Excel.
-
-## Cara Pasang (XAMPP)
-
-1. **Salin folder** `anna-manager` ini ke folder `htdocs` XAMPP:
-   - Windows: `C:\xampp\htdocs\anna-manager`
-   - macOS: `/Applications/XAMPP/htdocs/anna-manager` (atau `.../xamppfiles/htdocs/anna-manager`)
-2. Buka **XAMPP Control Panel**, klik **Start** pada **Apache** dan **MySQL**.
-3. Buka browser ke: **http://localhost/anna-manager/**
-4. Selesai. Database `anna_manager` dan semua tabel dibuat **otomatis** saat pertama dibuka,
-   sudah terisi contoh produk & bahan baku.
-
-## Konfigurasi Database (opsional)
-
-Default sudah cocok dengan XAMPP standar (user `root`, password kosong).
-Kalau setup MySQL kamu berbeda, ubah bagian atas file **`db.php`**:
-
-```php
-$DB_HOST = '127.0.0.1';
-$DB_USER = 'root';
-$DB_PASS = '';        // isi kalau MySQL kamu pakai password
-$DB_NAME = 'anna_manager';
+```
+app/       -> aplikasi PHP  (docroot subdomain login.racikin.com)
+public/    -> landing page  (docroot domain  racikin.com)
 ```
 
-## Struktur File
+Satu repo, dua docroot. Sekali `git pull` memperbarui website & aplikasi sekaligus.
 
-| File | Fungsi |
-|------|--------|
-| `index.php` | Tampilan aplikasi (frontend) |
-| `api.php` | Backend — semua operasi data (JSON) |
-| `db.php` | Koneksi + pembuatan database & tabel otomatis + data awal |
-| `schema.sql` | Referensi skema tabel (tidak perlu diimpor manual) |
+## Deploy di cPanel (shared hosting)
 
-## Catatan
+1. **cPanel → Git™ Version Control → Create** → clone repo ini ke sebuah folder (mis. `~/racikin`).
+2. **Domain `racikin.com`** → set Document Root ke `~/racikin/public`.
+3. **Subdomain `login.racikin.com`** → buat, set Document Root ke `~/racikin/app`.
+4. **Database** (cPanel → MySQL Databases): buat DB registry `NAMACPANEL_master` + user MySQL, assign (ALL PRIVILEGES). Buat juga DB usaha pertama (mis. `NAMACPANEL_anna`).
+5. **Konfigurasi**: salin `app/config.example.php` → `app/config.php`, isi kredensial + `ADMIN_PASS`.
+6. **Import data** awal (sekali): dump DB ANNA via phpMyAdmin (file dump dikirim terpisah, tidak ada di repo publik).
+7. **SSL** (AutoSSL/Let's Encrypt) untuk kedua domain — wajib (app pakai cookie login).
+8. Update berikutnya: cukup **Pull** dari cPanel Git (atau `git pull`). `app/config.php` & data tidak tertimpa.
 
-- Data tersimpan permanen di MySQL. Tetap disarankan **Download Backup (.json)** berkala dari menu Backup.
-- HPP produk diperbarui otomatis mengikuti batch produksi terakhir, tapi tetap bisa diubah manual di menu Produk.
-- Ingin diakses dari HP / beberapa komputer dalam satu jaringan? Bisa — cukup akses `http://<IP-komputer>/anna-manager/` dari device lain di jaringan yang sama (pastikan firewall mengizinkan). Untuk akses internet publik perlu langkah tambahan (hosting/port-forwarding).
+## Panel Admin (aktivasi berbayar)
+
+Model: pengguna **Daftar** → akun *pending* → kamu buat DB di cPanel + **Aktifkan** di panel admin
+setelah pembayaran. Buka **`login.racikin.com/admin.php`**, login dengan `ADMIN_PASS`.
+DB tiap usaha = `DB_TENANT_PREFIX` + kode usaha.
+
+## Jalan lokal (XAMPP)
+
+1. Taruh repo di `htdocs`, Start Apache + MySQL.
+2. Buka `http://localhost/anna-manager/app/`.
+3. Tanpa `config.php`, pakai default XAMPP (root, tanpa password); DB & tabel dibuat otomatis.
+
+## Fitur utama
+
+Dashboard kokpit · Kasir (POS) + QRIS dinamis · Distribusi/Nota · Pembayaran & piutang ·
+Keuangan (laba rugi + kas) · Bahan baku + tren harga · Produk · Toko · Profil (logo di struk) ·
+Multi-user + hak akses per-user · Rekap penjualan per kasir · Backup · Reset password via email · PWA (installable).
+
+> Aplikasi asal dari klien tunggal "ANNA Snack & Kitchen", kini jadi produk multi-tenant **Racikin**.

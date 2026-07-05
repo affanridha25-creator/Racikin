@@ -62,7 +62,7 @@ function try_remember_login($m) {
     }
     $b = $m->prepare("SELECT * FROM businesses WHERE alias=?"); $b->execute([$t['alias']]); $b = $b->fetch();
     $u = $m->prepare("SELECT * FROM users WHERE alias=? AND email=?"); $u->execute([$t['alias'], $t['email']]); $u = $u->fetch();
-    if (!$b || !$u) { $m->prepare("DELETE FROM remember_tokens WHERE selector=?")->execute([$selector]); set_remember_cookie('', time() - 3600); return false; }
+    if (!$b || !$u || (int)($b['active'] ?? 1) === 0) { $m->prepare("DELETE FROM remember_tokens WHERE selector=?")->execute([$selector]); set_remember_cookie('', time() - 3600); return false; }
     // rotasi: buang token lama, terbitkan baru (pemakaian ulang token lama → terdeteksi di cabang di atas)
     $m->prepare("DELETE FROM remember_tokens WHERE selector=?")->execute([$selector]);
     if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
@@ -116,6 +116,7 @@ function handle_auth($action, $in) {
             http_response_code(400); echo json_encode(['error' => 'Kode usaha, email, atau password salah.']); return;
         }
         $m->prepare("DELETE FROM login_attempts WHERE ip=?")->execute([$ip]);   // sukses → reset counter
+        if ((int)($b['active'] ?? 1) === 0) { http_response_code(403); echo json_encode(['error' => 'Akun belum aktif — menunggu aktivasi admin setelah pembayaran.', 'pending' => true]); return; }
         if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
         session_regenerate_id(true);
         $_SESSION['alias'] = $alias; $_SESSION['user_name'] = $u['name']; $_SESSION['email'] = $email;
@@ -135,7 +136,7 @@ function handle_auth($action, $in) {
             $m->beginTransaction();
             $q = $m->prepare("SELECT COUNT(*) FROM businesses WHERE alias=?"); $q->execute([$alias]);
             if ($q->fetchColumn()) { $m->rollBack(); http_response_code(400); echo json_encode(['error' => 'Kode usaha "'.$alias.'" sudah dipakai, pilih yang lain.']); return; }
-            $m->prepare("INSERT INTO businesses (alias,name,db_name,user_name,created) VALUES (?,?,?,?,NOW())")
+            $m->prepare("INSERT INTO businesses (alias,name,db_name,user_name,active,created) VALUES (?,?,?,?,0,NOW())")
               ->execute([$alias, $name, DB_PREFIX . $alias, $user]);
             $m->prepare("INSERT INTO users (alias,email,name,pass_hash,role,perms,created) VALUES (?,?,?,?,'owner','',NOW())")
               ->execute([$alias, $email, $user, password_hash($pass, PASSWORD_DEFAULT)]);
@@ -146,10 +147,8 @@ function handle_auth($action, $in) {
         }
         if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
         session_regenerate_id(true);
-        $_SESSION['alias'] = $alias; $_SESSION['user_name'] = $user; $_SESSION['email'] = $email;
-        $_SESSION['role'] = 'owner'; $_SESSION['perms'] = '';
-        if (!empty($in['remember'])) issue_remember_token($m, $alias, $email);
-        echo json_encode(['ok'=>true, 'name'=>$name, 'alias'=>$alias, 'user'=>$user, 'email'=>$email] + me_payload()); return;
+        // akun dibuat sebagai PENDING — tidak auto-login; tunggu aktivasi admin (setelah bayar)
+        echo json_encode(['ok'=>true, 'pending'=>true, 'name'=>$name, 'alias'=>$alias]); return;
     }
     // ---- ganti password (sedang login) ----
     if ($action === 'authChangePassword') {

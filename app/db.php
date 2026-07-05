@@ -38,8 +38,12 @@ function master_pdo() {
         db_name VARCHAR(64),
         user_name VARCHAR(120),
         pin_hash VARCHAR(255),
+        active TINYINT(1) DEFAULT 1,
         created DATETIME
     ) ENGINE=InnoDB");
+    // active: 0 = pending (menunggu aktivasi admin setelah bayar), 1 = aktif.
+    // DEFAULT 1 supaya usaha yang sudah ada tetap aktif; registrasi baru di-set 0.
+    ensure_column($p, 'businesses', 'active', "active TINYINT(1) DEFAULT 1");
     // user per usaha: login = kode usaha (alias) + email + password
     // role: owner (pemilik, akses penuh) / staff (akses sesuai perms)
     // perms: daftar menu yang boleh diakses staff (CSV), mis. "pos,distribusi,pembayaran"
