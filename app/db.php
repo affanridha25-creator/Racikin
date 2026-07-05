@@ -6,9 +6,10 @@
 $DB_HOST = $DB_HOST ?? '127.0.0.1';
 $DB_USER = $DB_USER ?? 'root';
 $DB_PASS = $DB_PASS ?? '';
-if (!defined('MASTER_DB'))      define('MASTER_DB', $DB_MASTER ?? 'racikin_master'); // DB registry (daftar usaha)
-if (!defined('DB_PREFIX'))      define('DB_PREFIX', $DB_TENANT_PREFIX ?? 'racikin_'); // prefix DB tiap usaha
-if (!defined('ALLOW_DB_CREATE')) define('ALLOW_DB_CREATE', $DB_ALLOW_CREATE ?? true); // shared hosting: set false (DB dibuat manual di cPanel)
+// Terima konstanta (DB_MASTER dst dari config.php) ATAU variabel ($DB_MASTER) — biar tak salah nama.
+if (!defined('MASTER_DB'))       define('MASTER_DB', defined('DB_MASTER') ? DB_MASTER : ($DB_MASTER ?? 'racikin_master'));
+if (!defined('DB_PREFIX'))       define('DB_PREFIX', defined('DB_TENANT_PREFIX') ? DB_TENANT_PREFIX : ($DB_TENANT_PREFIX ?? 'racikin_'));
+if (!defined('ALLOW_DB_CREATE')) define('ALLOW_DB_CREATE', defined('DB_ALLOW_CREATE') ? (bool)DB_ALLOW_CREATE : ($DB_ALLOW_CREATE ?? true));
 // =========================================================
 
 // Cookie sesi lebih aman: HttpOnly (tak bisa dibaca JS) + SameSite=Lax (bantu cegah CSRF).
