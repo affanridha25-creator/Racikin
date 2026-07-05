@@ -6,10 +6,10 @@
 $DB_HOST = $DB_HOST ?? '127.0.0.1';
 $DB_USER = $DB_USER ?? 'root';
 $DB_PASS = $DB_PASS ?? '';
-// Terima konstanta (DB_MASTER dst dari config.php) ATAU variabel ($DB_MASTER) — biar tak salah nama.
-if (!defined('MASTER_DB'))       define('MASTER_DB', defined('DB_MASTER') ? DB_MASTER : ($DB_MASTER ?? 'racikin_master'));
-if (!defined('DB_PREFIX'))       define('DB_PREFIX', defined('DB_TENANT_PREFIX') ? DB_TENANT_PREFIX : ($DB_TENANT_PREFIX ?? 'racikin_'));
-if (!defined('ALLOW_DB_CREATE')) define('ALLOW_DB_CREATE', defined('DB_ALLOW_CREATE') ? (bool)DB_ALLOW_CREATE : ($DB_ALLOW_CREATE ?? true));
+// Bentuk kanonik: config.php mendefinisikan konstanta DB_MASTER / DB_TENANT_PREFIX / DB_ALLOW_CREATE.
+if (!defined('MASTER_DB'))       define('MASTER_DB', defined('DB_MASTER') ? DB_MASTER : 'racikin_master');
+if (!defined('DB_PREFIX'))       define('DB_PREFIX', defined('DB_TENANT_PREFIX') ? DB_TENANT_PREFIX : 'racikin_');
+if (!defined('ALLOW_DB_CREATE')) define('ALLOW_DB_CREATE', defined('DB_ALLOW_CREATE') ? (bool)DB_ALLOW_CREATE : true);
 // =========================================================
 
 // Cookie sesi lebih aman: HttpOnly (tak bisa dibaca JS) + SameSite=Lax (bantu cegah CSRF).
@@ -100,7 +100,10 @@ function current_business() {
     if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
     if (empty($_SESSION['alias'])) return null;
     $q = master_pdo()->prepare("SELECT * FROM businesses WHERE alias=?"); $q->execute([$_SESSION['alias']]);
-    return $q->fetch() ?: null;
+    $b = $q->fetch();
+    // usaha nonaktif (belum bayar / disetop) = seperti belum login → memutus sesi yang sudah berjalan
+    if ($b && (int)($b['active'] ?? 1) === 0) return null;
+    return $b ?: null;
 }
 
 // koneksi ke database usaha yang sedang login

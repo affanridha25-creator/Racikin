@@ -16,17 +16,18 @@ $msg = ''; $err = '';
 $do = $_POST['do'] ?? '';
 
 if ($do === 'login') {
-    $ip = $_SERVER['REMOTE_ADDR'] ?? '?';
+    // kunci ber-prefix "adm:" supaya rate-limit admin TERPISAH dari brute-force login tenant
+    $ipk = 'adm:' . ($_SERVER['REMOTE_ADDR'] ?? '?');
     $ac = $m->prepare("SELECT COUNT(*) FROM login_attempts WHERE ip=? AND ts > (NOW() - INTERVAL 10 MINUTE)");
-    $ac->execute([$ip]);
+    $ac->execute([$ipk]);
     if ($ac->fetchColumn() >= 10) $err = 'Terlalu banyak percobaan. Coba lagi dalam 10 menit.';
     elseif (!$adminConfigured) $err = 'Admin belum dikonfigurasi. Set ADMIN_PASS (yang kuat) di config.php.';
     elseif (hash_equals(ADMIN_PASS, (string)($_POST['pass'] ?? ''))) {
         session_regenerate_id(true); $_SESSION['admin'] = true;
-        $m->prepare("DELETE FROM login_attempts WHERE ip=?")->execute([$ip]);
+        $m->prepare("DELETE FROM login_attempts WHERE ip=?")->execute([$ipk]);
         header('Location: admin.php'); exit;
     } else {
-        $m->prepare("INSERT INTO login_attempts (ip,ts) VALUES (?,NOW())")->execute([$ip]);
+        $m->prepare("INSERT INTO login_attempts (ip,ts) VALUES (?,NOW())")->execute([$ipk]);
         $err = 'Password admin salah.';
     }
 }

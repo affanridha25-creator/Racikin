@@ -270,6 +270,23 @@ function today() { return date('Y-m-d'); }
 // id dari klien harus alfanumerik saja (cegah XSS lewat interpolasi id ke handler onclick)
 function safe_id($id) { $id = (string)$id; return preg_match('/^[A-Za-z0-9_-]{1,40}$/', $id) ? $id : ''; }
 
+// ---- Otorisasi per-aksi: pemilik (owner) lolos semua; staf hanya aksi yang menunya diizinkan ----
+if (($_SESSION['role'] ?? 'owner') !== 'owner') {
+    $OWNER_ONLY = ['reset', 'importAll', 'saveProfile'];   // hapus/timpa data & identitas usaha (incl. QRIS) = khusus pemilik
+    $NEED = [
+        'saveBatch'=>['produksi'], 'deleteBatch'=>['produksi'],
+        'saveNota'=>['pos','distribusi'], 'deleteNota'=>['pos','distribusi'],
+        'addPayment'=>['pos','pembayaran'], 'deletePayment'=>['pembayaran'],
+        'saveCashOut'=>['keuangan'], 'deleteCashOut'=>['keuangan'],
+        'saveProduct'=>['produk'], 'deleteProduct'=>['produk'],
+        'saveStore'=>['pos','toko'], 'deleteStore'=>['toko'],
+        'saveMaterial'=>['bahan'], 'deleteMaterial'=>['bahan'], 'deletePricePoint'=>['bahan'], 'resyncPrices'=>['bahan'],
+    ];
+    $perms = array_filter(explode(',', $_SESSION['perms'] ?? ''));
+    if (in_array($action, $OWNER_ONLY, true)) { http_response_code(403); echo json_encode(['error' => 'Akses ditolak — khusus pemilik usaha.']); exit; }
+    if (isset($NEED[$action]) && !array_intersect($NEED[$action], $perms)) { http_response_code(403); echo json_encode(['error' => 'Kamu tak punya akses untuk aksi ini.']); exit; }
+}
+
 try {
     switch ($action) {
 
@@ -354,7 +371,7 @@ try {
             $pdo->beginTransaction();
             // catat kasir/pembuat: pertahankan pembuat asli saat edit, isi user aktif saat baru
             $oc = $pdo->prepare("SELECT created_by FROM notas WHERE id=?"); $oc->execute([$id]); $oc = $oc->fetchColumn();
-            $creator = ($oc !== false && $oc !== '') ? $oc : ($_SESSION['email'] ?? '');
+            $creator = ($oc === false) ? ($_SESSION['email'] ?? '') : $oc;   // nota baru → kasir aktif; nota lama → pertahankan pembuat asli
             $pdo->prepare("REPLACE INTO notas (id,nota_no,ndate,store_id,created_by) VALUES (?,?,?,?,?)")
                 ->execute([$id, $n['notaNo'] ?? '', $date, $storeId, $creator]);
             $pdo->prepare("DELETE FROM distributions WHERE nota_id=?")->execute([$id]);
@@ -680,8 +697,10 @@ function bootstrap($pdo) {
     $notas = $pdo->query("SELECT id,nota_no AS notaNo,ndate AS date,store_id AS storeId,created_by AS createdBy FROM notas ORDER BY ndate DESC,id DESC")->fetchAll();
     foreach ($notas as &$n) { $n['items']=$items[$n['id']]??[]; $n['payments']=$pay[$n['id']]??[]; } unset($n);
 
+    // Kas keluar (termasuk prive pemilik) hanya untuk pemilik / staf ber-akses Keuangan
+    $seeKeu = (($_SESSION['role'] ?? 'owner') === 'owner') || in_array('keuangan', array_filter(explode(',', $_SESSION['perms'] ?? '')), true);
     $cashOut = [];
-    foreach ($pdo->query("SELECT id,cdate AS date,category,amount,note FROM cash_out ORDER BY cdate DESC,id DESC") as $r) { $r['amount']=intval($r['amount']); $cashOut[] = $r; }
+    if ($seeKeu) foreach ($pdo->query("SELECT id,cdate AS date,category,amount,note FROM cash_out ORDER BY cdate DESC,id DESC") as $r) { $r['amount']=intval($r['amount']); $cashOut[] = $r; }
 
     $profile = $pdo->query("SELECT address,phone,whatsapp,instagram,facebook,tiktok,logo,qris FROM profile WHERE id=1")->fetch() ?: [];
 

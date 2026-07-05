@@ -1067,7 +1067,36 @@ function posSuccess(id,total,bayar,kembali,method){
   openModal(`<div class="pos-done"><div class="ok">✓</div><h3 style="margin-bottom:6px">Transaksi Berhasil</h3>
     <div class="mini" style="margin-bottom:14px">Total ${rp(total)} · ${esc(method)}</div>
     ${method==="Tunai"?`<div class="poskembali" style="justify-content:center;gap:14px;margin-bottom:16px">Kembalian <b>${rp(kembali)}</b></div>`:""}
-    <div style="display:flex;gap:8px"><button class="btn ghost" style="flex:1" onclick="printReceipt('${id}',${bayar},${kembali},'${esc(method)}')">🖨 Struk</button><button class="btn" style="flex:1" onclick="closeModal();rPOS()">+ Transaksi Baru</button></div></div>`);
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button class="btn" onclick="printRawBT(posReceiptText('${id}',${bayar},${kembali},'${esc(method)}'))">🖨 Cetak Struk (Printer Bluetooth)</button>
+      <div style="display:flex;gap:8px"><button class="btn ghost" style="flex:1" onclick="printReceipt('${id}',${bayar},${kembali},'${esc(method)}')">Struk PDF/biasa</button><button class="btn" style="flex:1;background:var(--green)" onclick="closeModal();rPOS()">+ Transaksi Baru</button></div>
+      <div class="mini" style="text-align:center;margin-top:2px">Printer Bluetooth perlu app <b>RawBT</b> (Android).</div>
+    </div></div>`);
+}
+// Struk teks 58mm (32 kolom) untuk printer thermal
+function posReceiptText(id,bayar,kembali,method){
+  const n=S.notas.find(x=>x.id===id);if(!n)return "";
+  const p=S.profile||{},W=32;
+  const cut=s=>String(s).slice(0,W);
+  const ctr=s=>{s=cut(s);return " ".repeat(Math.max(0,Math.floor((W-s.length)/2)))+s;};
+  const lr=(l,r)=>{l=String(l);r=String(r);if(l.length+r.length>=W)l=l.slice(0,Math.max(0,W-r.length-1));return l+" ".repeat(Math.max(1,W-l.length-r.length))+r;};
+  const dash="-".repeat(W);
+  let t=ctr((BIZ.name||"Racikin").toUpperCase())+"\n";
+  if(p.address)t+=ctr(p.address)+"\n";
+  const kontak=[p.phone,p.whatsapp].filter(Boolean).join(" / ");if(kontak)t+=ctr(kontak)+"\n";
+  t+=dash+"\n";
+  if(n.notaNo)t+=cut(n.notaNo)+"\n";
+  t+=lr(fmtDate(n.date),"Kasir: "+(BIZ.user||"-"))+"\n"+dash+"\n";
+  notaItems(n).forEach(it=>{const pr=prod(it.productId)||{};t+=cut(pr.name||"?")+"\n"+lr("  "+it.qty+" x "+rp(it.harga),rp((+it.qty||0)*(+it.harga||0)))+"\n";});
+  t+=dash+"\n"+lr("TOTAL",rp(notaTotal(n)))+"\n";
+  if(method){t+=lr("Bayar ("+method+")",rp(bayar))+"\n";if(method==="Tunai")t+=lr("Kembalian",rp(kembali||0))+"\n";}
+  t+=dash+"\n"+ctr("Terima kasih :)")+"\n"+ctr("-- "+(BIZ.name||"Racikin")+" --")+"\n\n\n\n";
+  return t;
+}
+// Kirim struk ke app RawBT (Android) → cetak ke printer thermal Bluetooth 58mm
+function printRawBT(text){
+  if(!text){toast("Struk kosong.");return;}
+  try{window.location.href="rawbt:"+text;}catch(e){toast("Gagal buka RawBT. Pastikan app RawBT terpasang.");}
 }
 function printReceipt(id,bayar,kembali,method){
   const n=S.notas.find(x=>x.id===id);if(!n){toast("Nota tak ditemukan.");return;}
@@ -1443,7 +1472,9 @@ async function delStore(id){if(S.notas.some(n=>n.storeId===id)){toast("Toko puny
 // ================= REKAP KASIR =================
 let _userNames={};   // email -> nama (dari daftar pengguna)
 function kasirName(email){return _userNames[email]||email||"(tak tercatat)";}
-function rRekap(){
+async function rRekap(){
+  // ambil nama pengguna sekali (biar tampil nama, bukan email) — owner-only, sudah dijaga server
+  if(Object.keys(_userNames).length===0){try{const r=await api("usersList");(r.users||[]).forEach(u=>_userNames[u.email]=u.name);}catch(e){}}
   const fnotas=S.notas.filter(n=>inMonth(n.date));
   const by={};
   fnotas.forEach(n=>{const k=n.createdBy||"";if(!by[k])by[k]={omzet:0,laba:0,bayar:0,n:0};by[k].omzet+=notaTotal(n);by[k].laba+=notaProfit(n);by[k].bayar+=notaPaid(n);by[k].n++;});
