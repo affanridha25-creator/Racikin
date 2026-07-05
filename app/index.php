@@ -23,7 +23,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-s
 .sidebar .brand .logo{width:52px;height:52px;border-radius:14px;background:#ffffff14;border:2px solid rgba(255,255,255,.5);display:flex;align-items:center;justify-content:center;overflow:hidden}
 .sidebar .brand .logo img{width:100%;height:100%;object-fit:contain;padding:3px}
 .sidebar .brand .brand-word{height:30px;object-fit:contain}
-#nav{display:flex;flex-direction:column;gap:4px;flex:1}
+#nav{display:flex;flex-direction:column;gap:4px;flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;margin:0 -4px;padding:2px 4px;scrollbar-width:thin;scrollbar-color:#ffffff5c transparent}
+#nav::-webkit-scrollbar{width:5px}
+#nav::-webkit-scrollbar-thumb{background:#ffffff5c;border-radius:3px}
+#nav button{flex-shrink:0}
 #nav button{display:flex;align-items:center;gap:12px;background:none;border:none;color:#ffffffcc;padding:12px 16px;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;text-align:left;width:100%;transition:.15s}
 #nav button .ic{font-size:16px;width:20px;text-align:center}
 #nav button:hover{background:#ffffff1f;color:#fff}
@@ -288,7 +291,10 @@ label.f{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;font-w
 .pcard .pp{font-weight:800;color:var(--red);font-size:15px}
 .pcard .ps{font-size:11px;color:var(--muted);margin-top:2px}
 .pcard .qbadge{position:absolute;top:-7px;right:-7px;background:var(--red);color:#fff;font-size:12px;font-weight:800;min-width:24px;height:24px;border-radius:12px;display:grid;place-items:center;padding:0 6px;box-shadow:0 4px 10px rgba(213,62,15,.4)}
-.posbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(88px + env(safe-area-inset-bottom));width:min(560px,calc(100% - 28px));z-index:30;background:linear-gradient(150deg,var(--orange),var(--red));color:#fff;border-radius:18px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;box-shadow:0 14px 34px rgba(213,62,15,.42);cursor:pointer}
+.posbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(88px + env(safe-area-inset-bottom));width:min(560px,calc(100% - 28px));z-index:30;background:linear-gradient(150deg,var(--orange),var(--red));color:#fff;border-radius:18px;padding:10px 12px;display:flex;align-items:center;gap:10px;box-shadow:0 14px 34px rgba(213,62,15,.42)}
+.posbar .posbarmain{flex:1;display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;padding:2px 4px}
+.posbar .posclr{background:#ffffff2b;border:none;color:#fff;font-size:17px;width:44px;height:44px;border-radius:13px;cursor:pointer;flex-shrink:0}
+.posbar .posclr:active{transform:scale(.94)}
 .posbar .pc{font-size:12.5px;opacity:.92;font-weight:600}
 .posbar .pv{font-size:19px;font-weight:800}
 .posbar .go{background:#ffffff2b;padding:9px 16px;border-radius:12px;font-weight:800;font-size:14px}
@@ -1037,7 +1043,7 @@ function rPOS(){
     </div>
     <input class="possearch" id="posSearch" placeholder="🔎 Cari produk…" oninput="posFilterGrid(this.value)" value="${esc(POS.q)}">
     ${S.products.length===0?'<div class="empty">Belum ada produk. Tambah dulu di menu Produk.</div>':`<div class="posgrid" id="posGrid">${grid}</div>`}
-    ${cnt>0?`<div class="posbar" onclick="posCheckoutModal()"><div><div class="pc">${cnt} item</div><div class="pv">${rp(tot)}</div></div><div class="go">Bayar →</div></div>`:""}`;
+    ${cnt>0?`<div class="posbar"><button class="posclr" onclick="event.stopPropagation();posClear()" title="Kosongkan">🗑</button><div class="posbarmain" onclick="posCheckoutModal()"><div><div class="pc">${cnt} item</div><div class="pv">${rp(tot)}</div></div><div class="go">Bayar →</div></div></div>`:""}`;
   if(POS.q)posFilterGrid(POS.q);
 }
 function openRegisterModal(){
@@ -1125,6 +1131,7 @@ function posCheckoutModal(){
   comboReset();
   const custCombo=combo(S.stores.filter(s=>s.name!==POS_NAME).map(s=>({id:s.id,label:s.name})),POS.customer,(id)=>{POS.customer=id;},"Umum / pelanggan langsung");
   openModal(`<button class="close" onclick="closeModal()">×</button><h3>Pembayaran</h3>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><span class="mini">${posCount()} item</span><button class="btn sm del" onclick="posClear()">🗑 Kosongkan</button></div>
     <div style="max-height:32vh;overflow:auto;margin-bottom:8px">${lines}</div>
     <div class="crt" style="border:none;font-weight:800;font-size:16px"><div class="cn">Total</div><div>${rp(tot)}</div></div>
     <label class="f" style="margin-top:10px">Pelanggan <span class="mini">(opsional)</span></label>${custCombo}
@@ -1134,6 +1141,7 @@ function posCheckoutModal(){
     <div class="poskembali"><span>Kembalian</span><b id="posKembali">${rp(kembali)}</b></div>`:`<p class="mini" style="margin-top:6px">Pembayaran ${esc(POS.method)} dianggap pas — ${rp(tot)}.</p>`}
     <div style="margin-top:16px;display:flex;gap:8px"><button class="btn gray" onclick="closeModal()">Batal</button><button class="btn" style="flex:1" onclick="posCheckout()">✓ Selesaikan · ${rp(tot)}</button></div>`);
 }
+function posClear(){if(posCount()===0)return;if(!confirm("Kosongkan keranjang?"))return;POS.cart={};POS.bayar="";closeModal();rPOS();toast("Keranjang dikosongkan.");}
 function posSetMethod(m){POS.method=m;if(m!=="Tunai")POS.bayar="";posCheckoutModal();}
 function posBayarInput(el){el.value=grp(el.value);POS.bayar=digits(el.value);const k=Math.max(0,(+POS.bayar||0)-posTotal());const kb=document.getElementById("posKembali");if(kb)kb.textContent=rp(k);}
 async function ensurePosStore(){let s=posStore();if(s)return s.id;await api("saveStore",{store:{id:null,name:POS_NAME,contact:"",address:"Penjualan langsung / kasir"}});await reload();s=posStore();return s?s.id:"";}
