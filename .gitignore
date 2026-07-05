@@ -1,0 +1,13 @@
+# Rahasia & konfigurasi lokal
+config.php
+# Build output & dump data (berisi data usaha + hash password)
+deploy/
+*.sql.gz
+*.bak-*
+# Artefak & editor
+.DS_Store
+.mcp.json
+.playwright-mcp/
+*.code-workspace
+.vscode/
+.idea/

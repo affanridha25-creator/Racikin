@@ -1,0 +1,9 @@
+# Racikin — blokir akses langsung ke file sensitif
+<FilesMatch "\.(sql|code-workspace|log|md)$">
+  Require all denied
+</FilesMatch>
+
+# Blokir dotfiles (.mcp.json, .htaccess, .git, dll)
+<FilesMatch "^\.">
+  Require all denied
+</FilesMatch>
