@@ -170,7 +170,7 @@ main{flex:1;padding:16px 30px 60px}
   body{display:block}
   .sidebar{display:none}
   .content{min-height:100vh}
-  .topbar{position:sticky;top:0;background:rgba(255,244,236,.82);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);z-index:15;padding:18px 18px 8px;align-items:center}
+  .topbar{position:sticky;top:0;background:rgba(255,244,236,.82);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);z-index:15;padding:calc(18px + env(safe-area-inset-top)) 18px 8px;align-items:center}
   .topbar .t-title{font-size:22px;font-weight:800;color:var(--ink)}
   .topbar .t-right{display:none}
   .t-word-img{display:block;height:25px;object-fit:contain;margin-left:auto}
