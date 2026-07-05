@@ -41,15 +41,21 @@ function master_pdo() {
         created DATETIME
     ) ENGINE=InnoDB");
     // user per usaha: login = kode usaha (alias) + email + password
+    // role: owner (pemilik, akses penuh) / staff (akses sesuai perms)
+    // perms: daftar menu yang boleh diakses staff (CSV), mis. "pos,distribusi,pembayaran"
     $p->exec("CREATE TABLE IF NOT EXISTS users (
         id INT AUTO_INCREMENT PRIMARY KEY,
         alias VARCHAR(32),
         email VARCHAR(160),
         name VARCHAR(120),
         pass_hash VARCHAR(255),
+        role VARCHAR(16) DEFAULT 'owner',
+        perms TEXT,
         created DATETIME,
         UNIQUE KEY uq_alias_email (alias, email)
     ) ENGINE=InnoDB");
+    ensure_column($p, 'users', 'role', "role VARCHAR(16) DEFAULT 'owner'");
+    ensure_column($p, 'users', 'perms', "perms TEXT");
     // rate-limit login (anti brute-force) — 1 baris per percobaan gagal
     $p->exec("CREATE TABLE IF NOT EXISTS login_attempts (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -190,8 +196,10 @@ function init_schema($pdo) {
         nota_no VARCHAR(64) DEFAULT '',
         ndate DATE,
         store_id VARCHAR(32),
+        created_by VARCHAR(160) DEFAULT '',
         INDEX(store_id)
     ) ENGINE=InnoDB");
+    ensure_column($pdo, 'notas', 'created_by', "created_by VARCHAR(160) DEFAULT ''");
 
     // Item distribusi (baris produk dalam sebuah nota)
     $pdo->exec("CREATE TABLE IF NOT EXISTS distributions (

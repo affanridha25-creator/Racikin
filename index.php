@@ -111,6 +111,10 @@ main{flex:1;padding:16px 30px 60px}
 @media(max-width:560px){.hero3{grid-template-columns:1fr}}
 .pchart{overflow-x:auto}
 .pchart svg{display:block}
+.permgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
+.permchk{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;background:var(--bg);border-radius:10px;padding:9px 11px;cursor:pointer}
+.permchk input{width:auto;min-width:0;margin:0;flex-shrink:0}
+@media(max-width:560px){.permgrid{grid-template-columns:1fr}}
 /* ---- dashboard mobile (redesign v2) ---- */
 .dgreet{padding:8px 4px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px}
 .dgreet h2{font-size:21px;font-weight:800;line-height:1.15}
@@ -356,6 +360,8 @@ label.f{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;font-w
     <button data-v="bahan" data-label="Bahan Baku"><span class="ic">🧂</span> Bahan Baku</button>
     <button data-v="produk" data-label="Produk"><span class="ic">🫙</span> Produk</button>
     <button data-v="toko" data-label="Toko"><span class="ic">🏪</span> Toko</button>
+    <button data-v="rekap" data-label="Rekap Kasir"><span class="ic">🧾</span> Rekap Kasir</button>
+    <button data-v="users" data-label="Pengguna"><span class="ic">👥</span> Pengguna</button>
     <button data-v="profile" data-label="Profil Usaha"><span class="ic">🏷️</span> Profil Usaha</button>
     <button data-v="backup" data-label="Backup"><span class="ic">💾</span> Backup</button>
   </nav>
@@ -374,6 +380,8 @@ label.f{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;font-w
     <section id="v-bahan" class="view"></section>
     <section id="v-produk" class="view"></section>
     <section id="v-toko" class="view"></section>
+    <section id="v-rekap" class="view"></section>
+    <section id="v-users" class="view"></section>
     <section id="v-profile" class="view"></section>
     <section id="v-backup" class="view"></section>
   </main>
@@ -398,6 +406,8 @@ label.f{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;font-w
     <button onclick="go('bahan')"><span>🧂</span> Bahan Baku</button>
     <button onclick="go('produk')"><span>🫙</span> Produk</button>
     <button onclick="go('toko')"><span>🏪</span> Toko</button>
+    <button onclick="go('rekap')"><span>🧾</span> Rekap Kasir</button>
+    <button onclick="go('users')"><span>👥</span> Pengguna</button>
     <button onclick="go('profile')"><span>🏷️</span> Profil Usaha</button>
     <button onclick="go('backup')"><span>💾</span> Backup</button>
     <button onclick="closeMore();doLogout()" style="color:var(--red)"><span>⏻</span> Keluar</button>
@@ -441,7 +451,18 @@ async function api(action,payload={},opts={}){
   return j;
 }
 let BIZ={};
-async function reload(){S=await api("bootstrap");_stockCache=null;if(S.biz)BIZ=S.biz;updateBizUI();}
+async function reload(){S=await api("bootstrap");_stockCache=null;if(S.biz)BIZ={...S.biz,...(S.me||{})};updateBizUI();applyPerms();}
+// ---- hak akses per-user ----
+const GRANT_VIEWS=[["dashboard","📊","Dashboard"],["pos","🛒","Kasir (POS)"],["distribusi","🚚","Distribusi"],["pembayaran","💰","Pembayaran"],["keuangan","💹","Keuangan"],["produksi","🏭","Produksi"],["bahan","🧂","Bahan Baku"],["produk","🫙","Produk"],["toko","🏪","Toko"]];
+const OWNER_ONLY=["rekap","users","profile","backup"];
+const isOwner=()=>(BIZ.role||"owner")==="owner";
+function canView(v){if(isOwner())return true;if(OWNER_ONLY.includes(v))return false;return (BIZ.perms||[]).includes(v);}
+function applyPerms(){
+  document.querySelectorAll('#nav button[data-v]').forEach(b=>{b.style.display=canView(b.dataset.v)?"":"none";});
+  document.querySelectorAll('.botnav button[data-v]').forEach(b=>{b.style.display=canView(b.dataset.v)?"":"none";});
+  document.querySelectorAll('.sheet button[onclick]').forEach(b=>{const mm=(b.getAttribute('onclick')||"").match(/go\('([^']+)'\)/);if(mm)b.style.display=canView(mm[1])?"":"none";});
+  if(curView&&!canView(curView)){const f=[...document.querySelectorAll('#nav button[data-v]')].find(b=>canView(b.dataset.v));if(f)f.click();}
+}
 function updateBizUI(){const r=document.querySelector(".sidebar .role");if(r)r.textContent=BIZ.name||"";const t=document.querySelector(".topbar .t-right");if(t)t.innerHTML=`👋 Halo, <b>${esc(BIZ.user||"")}</b>`;applyLogos();}
 // logo usaha (kalau sudah upload di Profil) menggantikan logo Racikin; kalau belum → default bowl
 function applyLogos(){
@@ -600,6 +621,7 @@ function matStat(m){
 
 // ---------- nav ----------
 document.querySelectorAll("#nav button").forEach(btn=>btn.onclick=()=>{
+  if(!canView(btn.dataset.v)){toast("Kamu tak punya akses ke menu ini.");return;}
   document.querySelectorAll("#nav button").forEach(b=>b.classList.remove("active"));
   btn.classList.add("active");
   document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
@@ -629,7 +651,7 @@ function crow(o){return `<div class="crow"${o.onclick?` onclick="${o.onclick}"`:
   +`<div class="cright">${o.amt!=null&&o.amt!==""?`<div class="camt"${o.amtColor?` style="color:${o.amtColor}"`:""}>${o.amt}</div>`:""}${o.status?`<span class="pill ${o.status}">${o.status.toUpperCase()}</span>`:""}${o.acts||""}</div>`
   +`${o.del?`<button class="crow-del" onclick="event.stopPropagation();${o.del}">✕</button>`:""}`
   +`</div>`;}
-function renderCur(){({dashboard:rDash,pos:rPOS,produksi:rProduksi,distribusi:rDistribusi,pembayaran:rPembayaran,keuangan:rKeuangan,bahan:rBahan,produk:rProduk,toko:rToko,profile:rProfile,backup:rBackup}[curView])();}
+function renderCur(){({dashboard:rDash,pos:rPOS,produksi:rProduksi,distribusi:rDistribusi,pembayaran:rPembayaran,keuangan:rKeuangan,bahan:rBahan,produk:rProduk,toko:rToko,rekap:rRekap,users:rUsers,profile:rProfile,backup:rBackup}[curView])();}
 
 // ---------- modal ----------
 const mBg=document.getElementById("modalBg"),mEl=document.getElementById("modal");
@@ -1418,6 +1440,77 @@ async function saveStore(id){const o={id:id||null,name:document.getElementById("
   if(!o.name){toast("Nama toko wajib.");return;}await api("saveStore",{store:o});await reload();closeModal();toast("Toko tersimpan ✓");rToko();}
 async function delStore(id){if(S.notas.some(n=>n.storeId===id)){toast("Toko punya nota/distribusi.");return;}if(confirm("Hapus toko ini?")){await api("deleteStore",{id});await reload();rToko();}}
 
+// ================= REKAP KASIR =================
+let _userNames={};   // email -> nama (dari daftar pengguna)
+function kasirName(email){return _userNames[email]||email||"(tak tercatat)";}
+function rRekap(){
+  const fnotas=S.notas.filter(n=>inMonth(n.date));
+  const by={};
+  fnotas.forEach(n=>{const k=n.createdBy||"";if(!by[k])by[k]={omzet:0,laba:0,bayar:0,n:0};by[k].omzet+=notaTotal(n);by[k].laba+=notaProfit(n);by[k].bayar+=notaPaid(n);by[k].n++;});
+  const rows=Object.entries(by).map(([k,v])=>({k,...v})).sort((a,b)=>b.omzet-a.omzet);
+  const tot=rows.reduce((a,r)=>({omzet:a.omzet+r.omzet,laba:a.laba+r.laba,bayar:a.bayar+r.bayar,n:a.n+r.n}),{omzet:0,laba:0,bayar:0,n:0});
+  const el=document.getElementById("v-rekap");
+  if(rows.length===0){el.innerHTML=`<h2 class="title">Rekap Kasir</h2><div class="desc">Penjualan per kasir/pengguna.</div>${monthBar()}<div class="empty">Belum ada transaksi pada periode ini.</div>`;return;}
+  if(isMobile()){
+    const cards=rows.map(r=>crow({icon:"🧑‍💼",title:esc(kasirName(r.k)),sub:`${r.n} transaksi · terbayar ${rp(r.bayar)}`,amt:rp(r.omzet),badges:`<div class="csub">Laba ${rp(r.laba)}</div>`})).join("");
+    el.innerHTML=`<h2 class="title">Rekap Kasir</h2><div class="desc">Penjualan per kasir/pengguna.</div>${monthBar()}
+      <div class="card accent" style="margin-bottom:14px"><div class="lbl">Total Omzet · ${monthLabelFull(FILTER_MONTH)}</div><div class="val">${rp(tot.omzet)}</div></div>
+      <div class="clist">${cards}</div>`;
+    return;
+  }
+  const trs=rows.map(r=>`<tr><td>${esc(kasirName(r.k))}</td><td class="num">${r.n}</td><td class="num">${rp(r.omzet)}</td><td class="num" style="color:var(--green)">${rp(r.bayar)}</td><td class="num" style="color:var(--amber)">${rp(r.omzet-r.bayar)}</td><td class="num">${rp(r.laba)}</td></tr>`).join("");
+  el.innerHTML=`<h2 class="title">Rekap Penjualan per Kasir</h2><div class="desc">Ringkasan transaksi tiap kasir/pengguna pada periode terpilih.</div>${monthBar()}
+    <div class="panel"><table><thead><tr><th>Kasir</th><th class="num">Transaksi</th><th class="num">Omzet</th><th class="num">Terbayar</th><th class="num">Piutang</th><th class="num">Laba</th></tr></thead>
+    <tbody>${trs}<tr class="tot" style="font-weight:700;border-top:2px solid var(--line)"><td>TOTAL</td><td class="num">${tot.n}</td><td class="num">${rp(tot.omzet)}</td><td class="num">${rp(tot.bayar)}</td><td class="num">${rp(tot.omzet-tot.bayar)}</td><td class="num">${rp(tot.laba)}</td></tr></tbody></table></div>
+    <p class="mini" style="padding:0 4px">Kasir dicatat otomatis dari user yang membuat nota (POS &amp; distribusi).</p>`;
+}
+
+// ================= PENGGUNA (multi-user, khusus pemilik) =================
+async function rUsers(){
+  const el=document.getElementById("v-users");
+  el.innerHTML=`<h2 class="title">Pengguna</h2><div class="desc">Kelola akun staf/kasir untuk usahamu.</div><div class="empty">Memuat…</div>`;
+  let users=[];
+  try{const r=await api("usersList");users=r.users||[];}catch(e){el.innerHTML=`<div class="empty">Gagal memuat pengguna.</div>`;return;}
+  _userNames={};users.forEach(u=>_userNames[u.email]=u.name);
+  const permLabel=p=>{const g=GRANT_VIEWS.find(x=>x[0]===p);return g?g[2]:p;};
+  const rows=users.map(u=>{
+    const isOwn=u.role==="owner";
+    const akses=isOwn?'<span class="pill lunas">Semua (Pemilik)</span>':(u.perms&&u.perms.length?u.perms.map(p=>`<span class="tag-cat">${esc(permLabel(p))}</span>`).join(" "):'<span class="mini">belum ada akses</span>');
+    const acts=isOwn?'':`<div class="acts"><button class="btn sm gray" onclick="editUserE('${esc(u.email)}')">Edit</button><button class="btn sm del" onclick="delUser('${esc(u.email)}')">✕</button></div>`;
+    if(isMobile())return crow({icon:isOwn?"👑":"🧑‍💼",title:esc(u.name),sub:esc(u.email),badges:`<div style="margin-top:4px">${akses}</div>`,acts,onclick:isOwn?"":`editUserE('${esc(u.email)}')`});
+    return `<tr><td>${esc(u.name)}${isOwn?' 👑':''}</td><td>${esc(u.email)}</td><td>${akses}</td><td class="num">${acts||'<span class="mini">—</span>'}</td></tr>`;
+  }).join("");
+  window._usersCache=users;
+  if(isMobile()){
+    el.innerHTML=`<div class="desc">Kelola akun staf/kasir.</div><button class="btn" style="width:100%;margin-bottom:14px" onclick="editUser()">+ Tambah Pengguna</button><div class="clist">${rows}</div>`;
+    return;
+  }
+  el.innerHTML=`<h2 class="title">Pengguna</h2><div class="desc">Pemilik akses penuh. Staf hanya menu yang dicentang. Tiap staf login pakai <b>kode usaha sama</b> + email &amp; password sendiri.</div>
+    <div class="flexbtns"><button class="btn" onclick="editUser()">+ Tambah Pengguna</button></div>
+    <div class="panel"><table><thead><tr><th>Nama</th><th>Email</th><th>Akses</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+function editUserE(email){const u=(window._usersCache||[]).find(x=>x.email===email);if(u)editUser(u);}
+function editUser(u){
+  const isEdit=!!u; u=u||{email:"",name:"",perms:[]};
+  const checks=GRANT_VIEWS.map(([v,ic,lbl])=>`<label class="permchk"><input type="checkbox" value="${v}" ${(u.perms||[]).includes(v)?"checked":""}> ${ic} ${lbl}</label>`).join("");
+  openModal(`<button class="close" onclick="closeModal()">×</button><h3>${isEdit?"Edit":"Tambah"} Pengguna</h3>
+    <div class="grid2" style="margin-bottom:12px"><div><label class="f">Nama</label><input id="uName" value="${esc(u.name||"")}" placeholder="nama staf"></div><div><label class="f">Email (untuk login)</label><input id="uEmail" type="email" value="${esc(u.email||"")}" ${isEdit?"readonly style='background:#f4f4f4'":""} placeholder="email@staf.com" autocapitalize="none"></div></div>
+    <label class="f">Password ${isEdit?"<span class='mini'>(kosongkan kalau tak diubah)</span>":"(min 6)"}</label><input id="uPass" type="password" placeholder="${isEdit?"••••••":"buat password staf"}" style="margin-bottom:14px">
+    <label class="f">Boleh akses menu:</label>
+    <div class="permgrid">${checks}</div>
+    <div style="margin-top:16px;text-align:right"><button class="btn gray" onclick="closeModal()">Batal</button> <button class="btn" onclick="saveUser(${isEdit?"true":"false"})">Simpan</button></div>`);
+}
+async function saveUser(isEdit){
+  const email=document.getElementById("uEmail").value.trim().toLowerCase();
+  const name=document.getElementById("uName").value.trim();
+  const password=document.getElementById("uPass").value;
+  const perms=[...document.querySelectorAll(".permgrid input:checked")].map(c=>c.value);
+  if(!email){toast("Email wajib.");return;}
+  if(!isEdit&&password.length<6){toast("Password minimal 6 karakter.");return;}
+  try{await api("userSave",{email,name,password,perms});await closeModal();toast("Pengguna tersimpan ✓");rUsers();}catch(e){}
+}
+async function delUser(email){if(confirm("Hapus pengguna "+email+"?")){await api("userDelete",{email});toast("Pengguna dihapus.");rUsers();}}
+
 // ================= PROFIL USAHA =================
 let _prof={};
 function rProfile(){
@@ -1574,7 +1667,9 @@ async function doLogout(){if(!confirm("Keluar dari "+(BIZ.name||"usaha")+"?"))re
 async function bootApp(){
   try{await reload();
     const v=(()=>{try{return localStorage.getItem("anna_view");}catch(e){return null;}})()||"dashboard";
-    (document.querySelector(`#nav button[data-v="${v}"]`)||document.querySelector("#nav button")).click();
+    const btn=document.querySelector(`#nav button[data-v="${v}"]`);
+    if(btn&&canView(v))btn.click();
+    else{const f=[...document.querySelectorAll('#nav button[data-v]')].find(b=>canView(b.dataset.v));(f||document.querySelector("#nav button")).click();}
   }catch(e){document.getElementById("loginScreen").style.display="none";document.getElementById("v-dashboard").innerHTML='<div class="panel"><h3>Gagal terhubung ke database</h3><p class="mini">Pastikan Apache &amp; MySQL di XAMPP sudah <b>Start</b>, lalu refresh.</p></div>';}
 }
 (async()=>{

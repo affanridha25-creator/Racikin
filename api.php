@@ -18,7 +18,7 @@ if (!is_array($in)) $in = [];
 $action = $in['action'] ?? 'bootstrap';   // JANGAN ambil dari $_GET (cegah CSRF via navigasi)
 
 // ---- AUTENTIKASI (tak butuh login dulu) ----
-if (in_array($action, ['authStatus','authLogin','authRegister','authLogout','authResetRequest','authResetConfirm','authChangePassword'], true)) {
+if (in_array($action, ['authStatus','authLogin','authRegister','authLogout','authResetRequest','authResetConfirm','authChangePassword','usersList','userSave','userDelete'], true)) {
     try { handle_auth($action, $in); }
     catch (Exception $e) { error_log('auth: '.$e->getMessage()); http_response_code(500); echo json_encode(['error' => 'Terjadi kesalahan pada server.']); }
     exit;
@@ -68,8 +68,16 @@ function try_remember_login($m) {
     if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
     session_regenerate_id(true);
     $_SESSION['alias'] = $t['alias']; $_SESSION['user_name'] = $u['name']; $_SESSION['email'] = $t['email'];
+    $_SESSION['role'] = $u['role'] ?? 'owner'; $_SESSION['perms'] = $u['perms'] ?? '';
     issue_remember_token($m, $t['alias'], $t['email']);
-    return ['name'=>$b['name'], 'alias'=>$t['alias'], 'user'=>$u['name'], 'email'=>$t['email']];
+    return ['name'=>$b['name'], 'alias'=>$t['alias'], 'user'=>$u['name'], 'email'=>$t['email']] + me_payload();
+}
+// payload user aktif (role + daftar menu yg boleh diakses)
+function me_payload() {
+    $perms = trim($_SESSION['perms'] ?? '');
+    return ['role' => $_SESSION['role'] ?? 'owner',
+            'perms' => $perms === '' ? [] : array_values(array_filter(explode(',', $perms))),
+            'email' => $_SESSION['email'] ?? ''];
 }
 
 function handle_auth($action, $in) {
@@ -82,7 +90,7 @@ function handle_auth($action, $in) {
             if ($r) { echo json_encode(['loggedIn'=>true] + $r); return; }
             echo json_encode(['loggedIn'=>false]); return;
         }
-        echo json_encode(['loggedIn'=>true, 'name'=>$b['name'], 'alias'=>$b['alias'], 'user'=>($_SESSION['user_name'] ?? ''), 'email'=>($_SESSION['email'] ?? '')]);
+        echo json_encode(['loggedIn'=>true, 'name'=>$b['name'], 'alias'=>$b['alias'], 'user'=>($_SESSION['user_name'] ?? '')] + me_payload());
         return;
     }
     if ($action === 'authLogout') {
@@ -111,8 +119,9 @@ function handle_auth($action, $in) {
         if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
         session_regenerate_id(true);
         $_SESSION['alias'] = $alias; $_SESSION['user_name'] = $u['name']; $_SESSION['email'] = $email;
+        $_SESSION['role'] = $u['role'] ?? 'owner'; $_SESSION['perms'] = $u['perms'] ?? '';
         if (!empty($in['remember'])) issue_remember_token($m, $alias, $email);
-        echo json_encode(['ok'=>true, 'name'=>$b['name'], 'alias'=>$alias, 'user'=>$u['name'], 'email'=>$email]); return;
+        echo json_encode(['ok'=>true, 'name'=>$b['name'], 'alias'=>$alias, 'user'=>$u['name'], 'email'=>$email] + me_payload()); return;
     }
     if ($action === 'authRegister') {
         $name = trim($in['name'] ?? ''); $alias = strtolower(trim($in['code'] ?? $in['alias'] ?? ''));
@@ -128,7 +137,7 @@ function handle_auth($action, $in) {
             if ($q->fetchColumn()) { $m->rollBack(); http_response_code(400); echo json_encode(['error' => 'Kode usaha "'.$alias.'" sudah dipakai, pilih yang lain.']); return; }
             $m->prepare("INSERT INTO businesses (alias,name,db_name,user_name,created) VALUES (?,?,?,?,NOW())")
               ->execute([$alias, $name, DB_PREFIX . $alias, $user]);
-            $m->prepare("INSERT INTO users (alias,email,name,pass_hash,created) VALUES (?,?,?,?,NOW())")
+            $m->prepare("INSERT INTO users (alias,email,name,pass_hash,role,perms,created) VALUES (?,?,?,?,'owner','',NOW())")
               ->execute([$alias, $email, $user, password_hash($pass, PASSWORD_DEFAULT)]);
             $m->commit();
         } catch (Exception $e) {
@@ -138,8 +147,9 @@ function handle_auth($action, $in) {
         if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
         session_regenerate_id(true);
         $_SESSION['alias'] = $alias; $_SESSION['user_name'] = $user; $_SESSION['email'] = $email;
+        $_SESSION['role'] = 'owner'; $_SESSION['perms'] = '';
         if (!empty($in['remember'])) issue_remember_token($m, $alias, $email);
-        echo json_encode(['ok'=>true, 'name'=>$name, 'alias'=>$alias, 'user'=>$user, 'email'=>$email]); return;
+        echo json_encode(['ok'=>true, 'name'=>$name, 'alias'=>$alias, 'user'=>$user, 'email'=>$email] + me_payload()); return;
     }
     // ---- ganti password (sedang login) ----
     if ($action === 'authChangePassword') {
@@ -190,6 +200,46 @@ function handle_auth($action, $in) {
         $m->prepare("DELETE FROM password_resets WHERE alias=? AND email=?")->execute([$t['alias'], $t['email']]);
         $m->prepare("DELETE FROM remember_tokens WHERE alias=? AND email=?")->execute([$t['alias'], $t['email']]);
         echo json_encode(['ok' => true]); return;
+    }
+    // ---- kelola pengguna (khusus pemilik) ----
+    if (in_array($action, ['usersList','userSave','userDelete'], true)) {
+        $b = current_business();
+        if (!$b) { http_response_code(401); echo json_encode(['error' => 'Belum login.']); return; }
+        if (($_SESSION['role'] ?? '') !== 'owner') { http_response_code(403); echo json_encode(['error' => 'Hanya pemilik yang boleh kelola pengguna.']); return; }
+        $alias = $b['alias'];
+        if ($action === 'usersList') {
+            $q = $m->prepare("SELECT email,name,role,perms FROM users WHERE alias=? ORDER BY (role='owner') DESC, name");
+            $q->execute([$alias]); $rows = $q->fetchAll();
+            foreach ($rows as &$r) { $r['perms'] = $r['perms'] ? array_values(array_filter(explode(',', $r['perms']))) : []; } unset($r);
+            echo json_encode(['users' => $rows]); return;
+        }
+        if ($action === 'userSave') {
+            $email = strtolower(trim($in['email'] ?? '')); $name = trim($in['name'] ?? ''); $pass = (string)($in['password'] ?? '');
+            $perms = is_array($in['perms'] ?? null) ? implode(',', array_filter(array_map(function($p){ return preg_replace('/[^a-z]/', '', (string)$p); }, $in['perms']))) : '';
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) { http_response_code(400); echo json_encode(['error' => 'Email tidak valid.']); return; }
+            if ($name === '') $name = strstr($email, '@', true) ?: $email;
+            $x = $m->prepare("SELECT * FROM users WHERE alias=? AND email=?"); $x->execute([$alias, $email]); $ex = $x->fetch();
+            if ($ex) {
+                if (($ex['role'] ?? '') === 'owner') { http_response_code(400); echo json_encode(['error' => 'Akun pemilik tak bisa diubah dari sini.']); return; }
+                if ($pass !== '' && strlen($pass) < 6) { http_response_code(400); echo json_encode(['error' => 'Password minimal 6 karakter.']); return; }
+                if ($pass !== '') $m->prepare("UPDATE users SET name=?, perms=?, pass_hash=? WHERE id=?")->execute([$name, $perms, password_hash($pass, PASSWORD_DEFAULT), $ex['id']]);
+                else $m->prepare("UPDATE users SET name=?, perms=? WHERE id=?")->execute([$name, $perms, $ex['id']]);
+                echo json_encode(['ok' => true]); return;
+            }
+            if (strlen($pass) < 6) { http_response_code(400); echo json_encode(['error' => 'Password staf minimal 6 karakter.']); return; }
+            $m->prepare("INSERT INTO users (alias,email,name,pass_hash,role,perms,created) VALUES (?,?,?,?,'staff',?,NOW())")
+              ->execute([$alias, $email, $name, password_hash($pass, PASSWORD_DEFAULT), $perms]);
+            echo json_encode(['ok' => true]); return;
+        }
+        if ($action === 'userDelete') {
+            $email = strtolower(trim($in['email'] ?? ''));
+            if ($email === ($_SESSION['email'] ?? '')) { http_response_code(400); echo json_encode(['error' => 'Tak bisa hapus diri sendiri.']); return; }
+            $x = $m->prepare("SELECT role FROM users WHERE alias=? AND email=?"); $x->execute([$alias, $email]);
+            if ($x->fetchColumn() === 'owner') { http_response_code(400); echo json_encode(['error' => 'Akun pemilik tak bisa dihapus.']); return; }
+            $m->prepare("DELETE FROM users WHERE alias=? AND email=? AND role<>'owner'")->execute([$alias, $email]);
+            $m->prepare("DELETE FROM remember_tokens WHERE alias=? AND email=?")->execute([$alias, $email]);
+            echo json_encode(['ok' => true]); return;
+        }
     }
 }
 
@@ -303,8 +353,11 @@ try {
                 }
             }
             $pdo->beginTransaction();
-            $pdo->prepare("REPLACE INTO notas (id,nota_no,ndate,store_id) VALUES (?,?,?,?)")
-                ->execute([$id, $n['notaNo'] ?? '', $date, $storeId]);
+            // catat kasir/pembuat: pertahankan pembuat asli saat edit, isi user aktif saat baru
+            $oc = $pdo->prepare("SELECT created_by FROM notas WHERE id=?"); $oc->execute([$id]); $oc = $oc->fetchColumn();
+            $creator = ($oc !== false && $oc !== '') ? $oc : ($_SESSION['email'] ?? '');
+            $pdo->prepare("REPLACE INTO notas (id,nota_no,ndate,store_id,created_by) VALUES (?,?,?,?,?)")
+                ->execute([$id, $n['notaNo'] ?? '', $date, $storeId, $creator]);
             $pdo->prepare("DELETE FROM distributions WHERE nota_id=?")->execute([$id]);
             $ins = $pdo->prepare("INSERT INTO distributions (id,nota_id,ddate,store_id,product_id,qty,harga,hpp,kind) VALUES (?,?,?,?,?,?,?,?,?)");
             foreach ($clean as $it)
@@ -625,7 +678,7 @@ function bootstrap($pdo) {
     foreach ($pdo->query("SELECT id,nota_id AS notaId,pdate AS date,amount,note FROM payments ORDER BY pdate,id") as $r) {
         $r['amount']=intval($r['amount']); $pay[$r['notaId']][] = $r;
     }
-    $notas = $pdo->query("SELECT id,nota_no AS notaNo,ndate AS date,store_id AS storeId FROM notas ORDER BY ndate DESC,id DESC")->fetchAll();
+    $notas = $pdo->query("SELECT id,nota_no AS notaNo,ndate AS date,store_id AS storeId,created_by AS createdBy FROM notas ORDER BY ndate DESC,id DESC")->fetchAll();
     foreach ($notas as &$n) { $n['items']=$items[$n['id']]??[]; $n['payments']=$pay[$n['id']]??[]; } unset($n);
 
     $cashOut = [];
@@ -635,7 +688,8 @@ function bootstrap($pdo) {
 
     $biz = current_business();
     return compact('products','stores','materials','batches','notas','cashOut','profile')
-        + ['biz' => ['name'=>$biz['name']??'', 'alias'=>$biz['alias']??'', 'user'=>$biz['user_name']??'']];
+        + ['biz' => ['name'=>$biz['name']??'', 'alias'=>$biz['alias']??'', 'user'=>$_SESSION['user_name']??($biz['user_name']??'')],
+           'me' => me_payload()];
 }
 
 function import_all($pdo, $data) {
