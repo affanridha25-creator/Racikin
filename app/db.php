@@ -192,6 +192,20 @@ function init_schema($pdo) {
         unit VARCHAR(50) DEFAULT 'kg',
         price INT DEFAULT 0
     ) ENGINE=InnoDB");
+    // stok minimum utk alert "menipis" (0 = tak dipakai). Stok bahan OPSIONAL — tak wajib & tak memblokir produksi.
+    ensure_column($pdo, 'materials', 'min_stock', "min_stock DECIMAL(12,3) DEFAULT 0");
+
+    // Pembelian/stok masuk bahan baku (opsional). Stok = SUM(pembelian) − SUM(pemakaian di batch produksi).
+    $pdo->exec("CREATE TABLE IF NOT EXISTS material_purchases (
+        id VARCHAR(32) PRIMARY KEY,
+        material_id VARCHAR(32),
+        pdate DATE,
+        qty DECIMAL(12,3) DEFAULT 0,
+        price INT DEFAULT 0,
+        note VARCHAR(255) DEFAULT '',
+        created DATETIME DEFAULT NULL,
+        INDEX(material_id)
+    ) ENGINE=InnoDB");
 
     // Riwayat harga bahan baku (untuk bandingkan naik/turun)
     // ref = id batch sumber (kalau source='batch') → tampilkan "dari batch X" di riwayat

@@ -656,7 +656,10 @@ function batchCalc(b){
   Object.keys(qtyByProd).forEach(pid=>{const q=qtyByProd[pid];const fromPool=wsum>0?pool*wByProd[pid]/wsum/q:(bottles>0?pool/bottles:0);const fromAssigned=q>0?(assigned[pid]||0)/q:0;per[pid]=fromPool+fromAssigned;});
   return{mat,ops,total,bottles,wsum,perProduct:per,avg:bottles>0?total/bottles:0};
 }
-function srcLabel(s){return {seed:"awal",manual:"manual",batch:"dari batch"}[s]||esc(s||"-");}
+function srcLabel(s){return {seed:"awal",manual:"manual",batch:"dari batch",beli:"dari pembelian"}[s]||esc(s||"-");}
+// ---- stok bahan (opsional) ----
+function fmtQty(q){q=+q||0;return (Math.round(q*1000)/1000).toLocaleString("id-ID");}
+function matStockInfo(m){const bought=+m.bought||0,used=+m.used||0,min=+m.minStock||0;const tracked=bought>0;const stock=bought-used;return{tracked,bought,used,stock,min,low:tracked&&min>0&&stock<=min};}
 function chgBadge(frac,nullText){
   if(frac==null)return nullText;
   if(frac>0)return `<span class="up">▲ ${(frac*100).toFixed(1)}%</span>`;
@@ -1513,31 +1516,51 @@ function waTagih(id){
 // ================= BAHAN BAKU =================
 function rBahan(){
   if(isMobile()){
-    const rows=S.materials.map(m=>{const s=matStat(m);
+    const rows=S.materials.map(m=>{const s=matStat(m);const si=matStockInfo(m);
       const chg=s.chg==null?"":(s.chg>0?`<span class="up">▲ ${(s.chg*100).toFixed(0)}%</span>`:s.chg<0?`<span class="down">▼ ${(Math.abs(s.chg)*100).toFixed(0)}%</span>`:"");
-      const acts=`<div class="cacts"><button class="btn sm gray" onclick="event.stopPropagation();editMat('${m.id}')">✏️</button></div>`;
-      return crow({icon:"🧂",title:esc(m.name),sub:`per ${esc(m.unit)} · ${s.updates}× update · 📈 lihat tren`,badges:chg?`<div style="margin-top:2px">${chg}</div>`:"",amt:rp(m.cur??m.price),acts,onclick:`matHist('${m.id}')`,del:`delMat('${m.id}')`});}).join("");
+      const stok=si.tracked?`<span style="${si.low?'color:var(--red);font-weight:700':''}">Stok ${fmtQty(si.stock)} ${esc(m.unit)}${si.low?' ⚠️':''}</span>`:'<span class="mini">stok belum dilacak</span>';
+      const acts=`<div class="cacts"><button class="btn sm wa" style="background:#1E8449" onclick="event.stopPropagation();matBeli('${m.id}')">📦</button><button class="btn sm gray" onclick="event.stopPropagation();editMat('${m.id}')">✏️</button></div>`;
+      return crow({icon:"🧂",title:esc(m.name),sub:stok,badges:chg?`<div style="margin-top:2px">${chg}</div>`:"",amt:rp(m.cur??m.price),acts,onclick:`matHist('${m.id}')`,del:`delMat('${m.id}')`});}).join("");
     document.getElementById("v-bahan").innerHTML=`<div class="desc">Ketuk bahan untuk lihat grafik tren harga &amp; riwayat; tombol ✏️ untuk ubah harga.</div><button class="btn" style="width:100%;margin-bottom:14px" onclick="editMat()">+ Bahan Baru</button>${S.materials.length===0?'<div class="empty">Belum ada bahan.</div>':`<div class="clist">${rows}</div>`}`;
     return;
   }
-  const rows=S.materials.map(m=>{const s=matStat(m);
+  const rows=S.materials.map(m=>{const s=matStat(m);const si=matStockInfo(m);
     const chg=chgBadge(s.chg,'<span class="flat">—</span>');
-    return `<tr><td><a href="#" onclick="matHist('${m.id}');return false" style="color:var(--red);font-weight:600;text-decoration:none">${esc(m.name)}</a></td><td>${esc(m.unit)}</td><td class="num"><b>${rp(m.cur??m.price)}</b></td><td class="num">${s.prev!=null?rp(s.prev):"-"}</td><td class="num">${chg}</td><td class="num muted">${s.updates}×</td><td class="num"><div class="acts"><button class="btn sm" onclick="editMat('${m.id}')">Ubah Harga</button><button class="btn sm gray" onclick="matHist('${m.id}')">📈 Grafik</button><button class="btn sm del" onclick="delMat('${m.id}')">✕</button></div></td></tr>`;}).join("");
-  document.getElementById("v-bahan").innerHTML=`<h2 class="title">Master Bahan Baku &amp; Tren Harga</h2>
-  <div class="desc">Klik nama bahan untuk lihat grafik tren harga &amp; riwayat. Tiap harga berubah, klik "Ubah Harga" — riwayat tersimpan otomatis.</div>
+    const stok=si.tracked?`<b style="${si.low?'color:var(--red)':''}">${fmtQty(si.stock)} ${esc(m.unit)}</b>${si.low?' <span class="pill belum">menipis</span>':''}`:'<span class="mini">belum dilacak</span>';
+    return `<tr><td><a href="#" onclick="matHist('${m.id}');return false" style="color:var(--red);font-weight:600;text-decoration:none">${esc(m.name)}</a></td><td>${esc(m.unit)}</td><td class="num"><b>${rp(m.cur??m.price)}</b></td><td class="num">${stok}</td><td class="num">${chg}</td><td class="num"><div class="acts"><button class="btn sm wa" style="background:#1E8449" onclick="matBeli('${m.id}')">📦 Beli</button><button class="btn sm" onclick="editMat('${m.id}')">Ubah Harga</button><button class="btn sm gray" onclick="matHist('${m.id}')">📈</button><button class="btn sm del" onclick="delMat('${m.id}')">✕</button></div></td></tr>`;}).join("");
+  document.getElementById("v-bahan").innerHTML=`<h2 class="title">Master Bahan Baku &amp; Stok</h2>
+  <div class="desc">Klik nama bahan untuk grafik tren harga. Tombol <b>📦 Beli</b> untuk catat stok masuk (opsional — stok tak wajib diisi, produksi tetap jalan).</div>
   <div class="flexbtns"><button class="btn" onclick="editMat()">+ Bahan Baru</button></div>
-  <div class="panel">${S.materials.length===0?'<div class="empty">Belum ada bahan.</div>':`<table><thead><tr><th>Bahan</th><th>Satuan</th><th class="num">Harga Sekarang</th><th class="num">Harga Lalu</th><th class="num">Perubahan</th><th class="num">Update</th><th></th></tr></thead><tbody>${rows}</tbody></table>`}</div>`;
+  <div class="panel">${S.materials.length===0?'<div class="empty">Belum ada bahan.</div>':`<table><thead><tr><th>Bahan</th><th>Satuan</th><th class="num">Harga</th><th class="num">Stok</th><th class="num">Perubahan</th><th></th></tr></thead><tbody>${rows}</tbody></table>`}</div>`;
 }
-function editMat(id){const m=id?S.materials.find(x=>x.id===id):{id:null,name:"",unit:"kg",price:""};
+function editMat(id){const m=id?S.materials.find(x=>x.id===id):{id:null,name:"",unit:"kg",price:"",minStock:0};
   openModal(`<button class="close" onclick="closeModal()">×</button><h3>${id?"Ubah Harga":"Tambah"} Bahan</h3>
   <label class="f">Nama bahan</label><input id="mn" value="${esc(m.name)}">
   <div class="grid2" style="margin:12px 0"><div><label class="f">Satuan</label><input id="mu" value="${esc(m.unit||"kg")}"></div><div><label class="f">Harga / satuan</label><input id="mp" inputmode="numeric" value="${m.price?grp(m.price):""}" oninput="this.value=grp(this.value)"></div></div>
-  <div><label class="f">Tanggal berlaku</label><input id="md" type="date" value="${today()}"></div>
-  <p class="mini" style="margin-top:8px">Kalau harga berubah, perubahan otomatis tercatat di riwayat.</p>
+  <div class="grid2" style="margin-bottom:12px"><div><label class="f">Tanggal berlaku</label><input id="md" type="date" value="${today()}"></div><div><label class="f">Stok minimum <span class="mini">(opsional)</span></label><input id="mms" inputmode="decimal" value="${m.minStock||""}" placeholder="0 = tak dipakai"></div></div>
+  <p class="mini">Kalau harga berubah, otomatis tercatat di riwayat. Stok minimum untuk peringatan "menipis" (kosongkan kalau tak butuh).</p>
   <div style="margin-top:16px;text-align:right"><button class="btn gray" onclick="closeModal()">Batal</button> <button class="btn" onclick="saveMat('${id||""}')">Simpan</button></div>`);}
-async function saveMat(id){const o={id:id||null,name:document.getElementById("mn").value.trim(),unit:document.getElementById("mu").value.trim()||"kg",price:+digits(document.getElementById("mp").value)||0};
+async function saveMat(id){const o={id:id||null,name:document.getElementById("mn").value.trim(),unit:document.getElementById("mu").value.trim()||"kg",price:+digits(document.getElementById("mp").value)||0,minStock:parseFloat((document.getElementById("mms").value||"0").replace(",","."))||0};
   if(!o.name){toast("Nama wajib.");return;}await api("saveMaterial",{material:o,date:document.getElementById("md").value});await reload();closeModal();toast("Bahan tersimpan ✓");rBahan();}
 async function delMat(id){if(confirm("Hapus bahan ini beserta riwayat harganya?")){await api("deleteMaterial",{id});await reload();rBahan();}}
+// ---- catat pembelian / stok masuk bahan ----
+function matBeli(id){const m=S.materials.find(x=>x.id===id);if(!m){toast("Bahan tak ditemukan.");return;}const si=matStockInfo(m);
+  const hist=(m.purchases||[]).slice(0,8).map(p=>`<tr><td>${fmtDate(p.date)}</td><td class="num">${fmtQty(p.qty)} ${esc(m.unit)}</td><td class="num">${p.price?rp(p.price):"-"}</td><td>${esc(p.note||"")}</td><td class="num"><button class="btn sm gray" onclick="delMatBeli('${p.id}','${id}')">×</button></td></tr>`).join("");
+  openModal(`<button class="close" onclick="closeModal()">×</button><h3>📦 Stok Masuk — ${esc(m.name)}</h3>
+  <div class="regsum" style="background:var(--bg);border-radius:12px;padding:6px 14px;margin-bottom:14px">
+    <div style="display:flex;justify-content:space-between;padding:6px 0"><span>Total dibeli</span><b>${fmtQty(si.bought)} ${esc(m.unit)}</b></div>
+    <div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--line)"><span>Terpakai (produksi)</span><b>${fmtQty(si.used)} ${esc(m.unit)}</b></div>
+    <div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--line);font-weight:800"><span>Stok saat ini</span><b style="${si.low?'color:var(--red)':'color:var(--green)'}">${si.tracked?fmtQty(si.stock)+" "+esc(m.unit):"belum dilacak"}</b></div>
+  </div>
+  <div class="grid2" style="margin-bottom:10px"><div><label class="f">Jumlah beli (${esc(m.unit)})</label><input id="mbq" inputmode="decimal" placeholder="mis. 5"></div><div><label class="f">Tanggal</label><input id="mbd" type="date" value="${today()}"></div></div>
+  <div class="grid2" style="margin-bottom:10px"><div><label class="f">Harga/${esc(m.unit)} <span class="mini">(opsional)</span></label><input id="mbp" inputmode="numeric" value="${m.price?grp(m.price):""}" oninput="this.value=grp(this.value)"></div><div><label class="f">Catatan</label><input id="mbn" placeholder="mis. beli di pasar"></div></div>
+  <button class="btn" style="width:100%" onclick="saveMatBeli('${id}')">+ Catat Stok Masuk</button>
+  ${hist?`<h4 style="margin:16px 0 6px;font-size:14px">Riwayat Pembelian</h4><div class="panel" style="padding:0"><table><thead><tr><th>Tgl</th><th class="num">Jumlah</th><th class="num">Harga</th><th>Catatan</th><th></th></tr></thead><tbody>${hist}</tbody></table></div>`:""}
+  <p class="mini" style="margin-top:12px">Stok bahan opsional — kalau kamu langsung beli-produksi tanpa nyetok, abaikan saja. Produksi tetap jalan.</p>`);}
+async function saveMatBeli(id){const qty=parseFloat((document.getElementById("mbq").value||"").replace(",","."));if(!(qty>0)){toast("Jumlah beli harus lebih dari 0.");return;}
+  const purchase={materialId:id,qty,price:+digits(document.getElementById("mbp").value)||0,date:document.getElementById("mbd").value,note:document.getElementById("mbn").value.trim()};
+  await api("saveMatPurchase",{purchase});await reload();closeModal();toast("Stok masuk dicatat ✓");rBahan();}
+async function delMatBeli(pid,id){if(confirm("Hapus catatan pembelian ini?")){await api("deleteMatPurchase",{id:pid});await reload();matBeli(id);}}
 // nama batch yang enak dibaca: catatan → produk yang dihasilkan → tanggal
 function batchName(b){
   if(b.note)return b.note;

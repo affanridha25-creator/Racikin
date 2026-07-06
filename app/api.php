@@ -347,7 +347,7 @@ function send_reset_email($to, $name, $alias, $tokenStr) {
 }
 
 // Daftar tabel dipakai bersama oleh reset & importAll (urutan: anak dulu, induk belakangan)
-const TABLES = ['payments','distributions','notas','register_sessions','cash_out','batch_materials','batch_ops','batch_outputs','batches','material_prices','materials','products','profile'];
+const TABLES = ['payments','distributions','notas','register_sessions','cash_out','batch_materials','batch_ops','batch_outputs','batches','material_purchases','material_prices','materials','products','profile'];
 const BATCH_CHILDREN = ['batch_materials','batch_ops','batch_outputs'];
 
 function gid($p) { return $p . bin2hex(random_bytes(5)); }
@@ -367,6 +367,7 @@ if (($_SESSION['role'] ?? 'owner') !== 'owner') {
         'saveProduct'=>['produk'], 'deleteProduct'=>['produk'],
         'saveStore'=>['pos','toko'], 'deleteStore'=>['toko'],
         'saveMaterial'=>['bahan'], 'deleteMaterial'=>['bahan'], 'deletePricePoint'=>['bahan'], 'resyncPrices'=>['bahan'],
+        'saveMatPurchase'=>['bahan'], 'deleteMatPurchase'=>['bahan'],
     ];
     $perms = array_filter(explode(',', $_SESSION['perms'] ?? ''));
     if (in_array($action, $OWNER_ONLY, true)) { http_response_code(403); echo json_encode(['error' => 'Akses ditolak — khusus pemilik usaha.']); exit; }
@@ -595,8 +596,9 @@ try {
                 $old = $pdo->prepare("SELECT price FROM materials WHERE id=?");
                 $old->execute([$id]); $old = $old->fetchColumn();
             }
-            $pdo->prepare("REPLACE INTO materials (id,name,unit,price) VALUES (?,?,?,?)")
-                ->execute([$id, $m['name'], $m['unit'] ?: 'kg', $newPrice]);
+            $minStock = max(0, (float)($m['minStock'] ?? 0));
+            $pdo->prepare("REPLACE INTO materials (id,name,unit,price,min_stock) VALUES (?,?,?,?,?)")
+                ->execute([$id, $m['name'], $m['unit'] ?: 'kg', $newPrice, $minStock]);
             // catat riwayat harga kalau baru atau harga berubah
             if ($old === null || $old === false || intval($old) !== $newPrice) {
                 $pdo->prepare("INSERT INTO material_prices (material_id,pdate,price,source) VALUES (?,?,?,'manual')")
@@ -614,6 +616,34 @@ try {
 
         case 'deletePricePoint':
             $pdo->prepare("DELETE FROM material_prices WHERE id=?")->execute([intval($in['id'])]);
+            echo json_encode(['ok' => true]);
+            break;
+
+        case 'saveMatPurchase': {
+            $p = $in['purchase'] ?? [];
+            $mid = safe_id($p['materialId'] ?? '');
+            if ($mid === '') { http_response_code(400); echo json_encode(['error' => 'Bahan tidak valid.']); break; }
+            $qty = (float)($p['qty'] ?? 0);
+            if ($qty <= 0) { http_response_code(400); echo json_encode(['error' => 'Jumlah pembelian harus lebih dari 0.']); break; }
+            $price = max(0, intval($p['price'] ?? 0));
+            $date = $p['date'] ?: today();
+            $id = gid('mp');
+            $pdo->prepare("INSERT INTO material_purchases (id,material_id,pdate,qty,price,note,created) VALUES (?,?,?,?,?,?,NOW())")
+                ->execute([$id, $mid, $date, $qty, $price, mb_substr((string)($p['note'] ?? ''), 0, 255)]);
+            // harga pembelian = harga terkini → kalau beda dari master, update + catat riwayat
+            if ($price > 0) {
+                $cur = $pdo->prepare("SELECT price FROM materials WHERE id=?"); $cur->execute([$mid]); $cur = $cur->fetchColumn();
+                if ($cur !== false && intval($cur) !== $price) {
+                    $pdo->prepare("UPDATE materials SET price=? WHERE id=?")->execute([$price, $mid]);
+                    $pdo->prepare("INSERT INTO material_prices (material_id,pdate,price,source) VALUES (?,?,?,'beli')")->execute([$mid, $date, $price]);
+                }
+            }
+            echo json_encode(['ok' => true, 'id' => $id]);
+            break;
+        }
+
+        case 'deleteMatPurchase':
+            $pdo->prepare("DELETE FROM material_purchases WHERE id=?")->execute([safe_id($in['id'] ?? '')]);
             echo json_encode(['ok' => true]);
             break;
 
@@ -806,13 +836,22 @@ function bootstrap($pdo) {
     $stores = $pdo->query("SELECT id,name,contact,address FROM stores ORDER BY name")->fetchAll();
 
     // materials + history
-    $materials = $pdo->query("SELECT id,name,unit,price FROM materials ORDER BY name")->fetchAll();
+    $materials = $pdo->query("SELECT id,name,unit,price,min_stock FROM materials ORDER BY name")->fetchAll();
     $hist = [];
     foreach ($pdo->query("SELECT id,material_id,pdate AS date,price,source,ref FROM material_prices ORDER BY pdate,id") as $h) {
         $h['price']=intval($h['price']);
         $hist[$h['material_id']][] = $h;
     }
-    foreach ($materials as &$m) { $m['price']=intval($m['price']); $m['history']=$hist[$m['id']] ?? []; } unset($m);
+    // stok bahan OPSIONAL: total beli, total pakai (dari batch), + riwayat pembelian
+    $bought = []; foreach ($pdo->query("SELECT material_id, COALESCE(SUM(qty),0) AS q FROM material_purchases GROUP BY material_id") as $r) $bought[$r['material_id']] = (float)$r['q'];
+    $used = []; foreach ($pdo->query("SELECT material_id, COALESCE(SUM(qty),0) AS q FROM batch_materials WHERE material_id IS NOT NULL GROUP BY material_id") as $r) $used[$r['material_id']] = (float)$r['q'];
+    $purch = []; foreach ($pdo->query("SELECT id,material_id,pdate AS date,qty,price,note FROM material_purchases ORDER BY pdate DESC,id DESC") as $r) { $r['qty']=(float)$r['qty']; $r['price']=intval($r['price']); $purch[$r['material_id']][] = $r; }
+    foreach ($materials as &$m) {
+        $m['price']=intval($m['price']); $m['history']=$hist[$m['id']] ?? [];
+        $m['minStock']=(float)$m['min_stock']; unset($m['min_stock']);
+        $m['bought']=$bought[$m['id']] ?? 0; $m['used']=$used[$m['id']] ?? 0;
+        $m['purchases']=$purch[$m['id']] ?? [];
+    } unset($m);
 
     // batches nested
     $batches = $pdo->query("SELECT id,bdate AS date,note FROM batches ORDER BY bdate DESC,id DESC")->fetchAll();
