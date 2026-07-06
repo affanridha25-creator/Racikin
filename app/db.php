@@ -278,6 +278,8 @@ function init_schema($pdo) {
     // sesi kasir & metode bayar (khusus penjualan POS; distribusi biasa kosong)
     ensure_column($pdo, 'notas', 'session_id', "session_id VARCHAR(32) DEFAULT NULL");
     ensure_column($pdo, 'notas', 'pay_method', "pay_method VARCHAR(16) DEFAULT ''");
+    // diskon/potongan nota (Rp) — mengurangi nilai jual & laba
+    ensure_column($pdo, 'notas', 'discount', "discount INT DEFAULT 0");
 
     // Sesi kasir (buka/tutup laci): modal awal, siapa yang buka, rekonsiliasi saat tutup
     $pdo->exec("CREATE TABLE IF NOT EXISTS register_sessions (

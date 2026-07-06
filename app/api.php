@@ -470,8 +470,11 @@ try {
                 $sessionId = $ex['session_id'];
                 $payMethod = $ex['pay_method'];
             }
-            $pdo->prepare("REPLACE INTO notas (id,nota_no,ndate,store_id,created_by,session_id,pay_method) VALUES (?,?,?,?,?,?,?)")
-                ->execute([$id, $n['notaNo'] ?? '', $date, $storeId, $creator, $sessionId, $payMethod]);
+            // diskon (Rp), dibatasi 0..subtotal item jual
+            $sub = 0; foreach ($clean as $it) $sub += $it['qty'] * $it['harga'];
+            $discount = max(0, min(intval($n['discount'] ?? 0), $sub));
+            $pdo->prepare("REPLACE INTO notas (id,nota_no,ndate,store_id,created_by,session_id,pay_method,discount) VALUES (?,?,?,?,?,?,?,?)")
+                ->execute([$id, $n['notaNo'] ?? '', $date, $storeId, $creator, $sessionId, $payMethod, $discount]);
             $pdo->prepare("DELETE FROM distributions WHERE nota_id=?")->execute([$id]);
             $ins = $pdo->prepare("INSERT INTO distributions (id,nota_id,ddate,store_id,product_id,qty,harga,hpp,kind) VALUES (?,?,?,?,?,?,?,?,?)");
             foreach ($clean as $it)
@@ -524,9 +527,12 @@ try {
         case 'addPayment': {
             $notaId = $in['notaId'];
             $amount = intval($in['amount']);
-            // batasi ke sisa tagihan nota supaya piutang tak bisa jadi negatif
+            // batasi ke sisa tagihan nota (subtotal − diskon) supaya piutang tak jadi negatif/palsu
             $q = $pdo->prepare("SELECT COALESCE(SUM(qty*harga),0) FROM distributions WHERE nota_id=?");
-            $q->execute([$notaId]); $total = intval($q->fetchColumn());
+            $q->execute([$notaId]); $sub = intval($q->fetchColumn());
+            $q = $pdo->prepare("SELECT COALESCE(discount,0) FROM notas WHERE id=?");
+            $q->execute([$notaId]); $disc = intval($q->fetchColumn());
+            $total = max(0, $sub - $disc);
             $q = $pdo->prepare("SELECT COALESCE(SUM(amount),0) FROM payments WHERE nota_id=?");
             $q->execute([$notaId]); $paid = intval($q->fetchColumn());
             $remaining = max(0, $total - $paid);
@@ -904,8 +910,8 @@ function bootstrap($pdo) {
     foreach ($pdo->query("SELECT id,nota_id AS notaId,pdate AS date,amount,note FROM payments ORDER BY pdate,id") as $r) {
         $r['amount']=intval($r['amount']); $pay[$r['notaId']][] = $r;
     }
-    $notas = $pdo->query("SELECT id,nota_no AS notaNo,ndate AS date,store_id AS storeId,created_by AS createdBy,session_id AS sessionId,pay_method AS payMethod FROM notas ORDER BY ndate DESC,id DESC")->fetchAll();
-    foreach ($notas as &$n) { $n['items']=$items[$n['id']]??[]; $n['payments']=$pay[$n['id']]??[]; } unset($n);
+    $notas = $pdo->query("SELECT id,nota_no AS notaNo,ndate AS date,store_id AS storeId,created_by AS createdBy,session_id AS sessionId,pay_method AS payMethod,discount FROM notas ORDER BY ndate DESC,id DESC")->fetchAll();
+    foreach ($notas as &$n) { $n['discount']=intval($n['discount']); $n['items']=$items[$n['id']]??[]; $n['payments']=$pay[$n['id']]??[]; } unset($n);
 
     // Kas keluar (termasuk prive pemilik) hanya untuk pemilik / staf ber-akses Keuangan
     $seeKeu = (($_SESSION['role'] ?? 'owner') === 'owner') || in_array('keuangan', array_filter(explode(',', $_SESSION['perms'] ?? '')), true);

@@ -630,8 +630,10 @@ function stock(pid){
   return _stockCache[pid]||0;
 }
 // ringkasan per NOTA (gabungan semua item)
-const notaTotal=n=>notaItems(n).reduce((a,it)=>a+(+it.qty||0)*(+it.harga||0),0);
-const notaProfit=n=>notaItems(n).reduce((a,it)=>a+(+it.qty||0)*((+it.harga||0)-(+it.hpp||0)),0);
+const notaSubtotal=n=>notaItems(n).reduce((a,it)=>a+(+it.qty||0)*(+it.harga||0),0);
+const notaDisc=n=>Math.max(0,Math.min(+n.discount||0,notaSubtotal(n)));
+const notaTotal=n=>notaSubtotal(n)-notaDisc(n);
+const notaProfit=n=>notaItems(n).reduce((a,it)=>a+(+it.qty||0)*((+it.harga||0)-(+it.hpp||0)),0)-notaDisc(n);
 const notaQty=n=>notaItems(n).reduce((a,it)=>a+(+it.qty||0),0);
 const notaPaid=n=>(n.payments||[]).reduce((a,p)=>a+(+p.amount||0),0);
 const notaDue=n=>notaTotal(n)-notaPaid(n);
@@ -1039,9 +1041,11 @@ function renderQR(canvas,text){
 
 // ================= POS / KASIR =================
 const POS_NAME="Umum (Kasir)";
-let POS={cart:{},bayar:"",method:"Tunai",customer:"",q:""};
+let POS={cart:{},bayar:"",method:"Tunai",customer:"",q:"",disc:0};
 function posStore(){return S.stores.find(s=>s.name===POS_NAME);}
-function posTotal(){return Object.entries(POS.cart).reduce((a,[pid,q])=>a+q*((prod(pid)||{}).harga||0),0);}
+function posSubtotal(){return Object.entries(POS.cart).reduce((a,[pid,q])=>a+q*((prod(pid)||{}).harga||0),0);}
+function posDisc(){return Math.max(0,Math.min(+POS.disc||0,posSubtotal()));}
+function posTotal(){return posSubtotal()-posDisc();}
 function posCount(){return Object.values(POS.cart).reduce((a,q)=>a+q,0);}
 // ---- sesi kasir (buka/tutup laci) ----
 function regOpen(){return S.register||null;}
@@ -1155,7 +1159,8 @@ function posAdd(pid){const p=prod(pid);if(!p)return;const st=stock(pid);const q=
 function posInc(pid){const st=stock(pid);const q=POS.cart[pid]||0;if(q>=st){toast("Stok tinggal "+st);return;}POS.cart[pid]=q+1;posCheckoutModal();}
 function posDec(pid){const q=POS.cart[pid]||0;if(q<=1)delete POS.cart[pid];else POS.cart[pid]=q-1;if(posCount()===0){closeModal();rPOS();}else posCheckoutModal();}
 function posCheckoutModal(){
-  const tot=posTotal();if(tot<=0){toast("Keranjang kosong.");return;}
+  if(posCount()===0){toast("Keranjang kosong.");return;}
+  const sub=posSubtotal(),tot=posTotal();
   const lines=Object.entries(POS.cart).map(([pid,q])=>{const p=prod(pid)||{};const lt=q*(+p.harga||0);
     return `<div class="crt"><div class="cn"><b>${esc(p.name||"?")}</b><span>${rp(p.harga)} / botol</span></div><div class="stp"><button onclick="posDec('${pid}')">−</button><span>${q}</span><button onclick="posInc('${pid}')">+</button></div><div class="lt">${rp(lt)}</div></div>`;}).join("");
   const isCash=POS.method==="Tunai";
@@ -1165,16 +1170,23 @@ function posCheckoutModal(){
   const custCombo=combo(S.stores.filter(s=>s.name!==POS_NAME).map(s=>({id:s.id,label:s.name})),POS.customer,(id)=>{POS.customer=id;},"Umum / pelanggan langsung");
   openModal(`<button class="close" onclick="closeModal()">×</button><h3>Pembayaran</h3>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><span class="mini">${posCount()} item</span><button class="btn sm del" onclick="posClear()">🗑 Kosongkan</button></div>
-    <div style="max-height:32vh;overflow:auto;margin-bottom:8px">${lines}</div>
-    <div class="crt" style="border:none;font-weight:800;font-size:16px"><div class="cn">Total</div><div>${rp(tot)}</div></div>
+    <div style="max-height:28vh;overflow:auto;margin-bottom:8px">${lines}</div>
+    <div class="crt" style="border:none;padding:4px 0"><div class="cn">Subtotal</div><div>${rp(sub)}</div></div>
+    <div class="crt" style="border:none;padding:4px 0;align-items:center"><div class="cn">Diskon (Rp)</div><input id="posDisc" inputmode="numeric" style="width:130px;text-align:right;padding:8px 10px" placeholder="0" value="${POS.disc?grp(POS.disc):""}" oninput="posDiscInput(this)"></div>
+    <div class="crt" style="border-top:1px solid var(--line);border-bottom:none;font-weight:800;font-size:16px;padding-top:8px"><div class="cn">Total</div><div id="posTotL">${rp(tot)}</div></div>
     <label class="f" style="margin-top:10px">Pelanggan <span class="mini">(opsional)</span></label>${custCombo}
     <label class="f" style="margin-top:12px">Metode Bayar</label>
     <div class="posseg">${["Tunai","Transfer","QRIS"].map(x=>`<button class="${POS.method===x?"on":""}" onclick="posSetMethod('${x}')">${x}</button>`).join("")}</div>
     ${isCash?`<label class="f">Uang Diterima</label><input id="posBayar" inputmode="numeric" placeholder="${grp(tot)}" value="${POS.bayar?grp(POS.bayar):""}" oninput="posBayarInput(this)">
-    <div class="poskembali"><span>Kembalian</span><b id="posKembali">${rp(kembali)}</b></div>`:`<p class="mini" style="margin-top:6px">Pembayaran ${esc(POS.method)} dianggap pas — ${rp(tot)}.</p>`}
-    <div style="margin-top:16px;display:flex;gap:8px"><button class="btn gray" onclick="closeModal()">Batal</button><button class="btn" style="flex:1" onclick="posCheckout()">✓ Selesaikan · ${rp(tot)}</button></div>`);
+    <div class="poskembali"><span>Kembalian</span><b id="posKembali">${rp(kembali)}</b></div>`:`<p class="mini" style="margin-top:6px">Pembayaran ${esc(POS.method)} dianggap pas — <b id="posTotL2">${rp(tot)}</b>.</p>`}
+    <div style="margin-top:16px;display:flex;gap:8px"><button class="btn gray" onclick="closeModal()">Batal</button><button class="btn" style="flex:1" id="posSelesai" onclick="posCheckout()">✓ Selesaikan · ${rp(tot)}</button></div>`);
 }
-function posClear(){if(posCount()===0)return;if(!confirm("Kosongkan keranjang?"))return;POS.cart={};POS.bayar="";closeModal();rPOS();toast("Keranjang dikosongkan.");}
+function posDiscInput(el){el.value=grp(el.value);POS.disc=+digits(el.value)||0;const t=posTotal();
+  const set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
+  set("posTotL",rp(t));set("posTotL2",rp(t));set("posSelesai","✓ Selesaikan · "+rp(t));
+  const pb=document.getElementById("posBayar");if(pb)pb.placeholder=grp(t);
+  const kb=document.getElementById("posKembali");if(kb)kb.textContent=rp(Math.max(0,(+digits(POS.bayar)||0)-t));}
+function posClear(){if(posCount()===0)return;if(!confirm("Kosongkan keranjang?"))return;POS.cart={};POS.bayar="";POS.disc=0;closeModal();rPOS();toast("Keranjang dikosongkan.");}
 function posSetMethod(m){POS.method=m;if(m!=="Tunai")POS.bayar="";posCheckoutModal();}
 function posBayarInput(el){el.value=grp(el.value);POS.bayar=digits(el.value);const k=Math.max(0,(+POS.bayar||0)-posTotal());const kb=document.getElementById("posKembali");if(kb)kb.textContent=rp(k);}
 async function ensurePosStore(){let s=posStore();if(s)return s.id;await api("saveStore",{store:{id:null,name:POS_NAME,contact:"",address:"Penjualan langsung / kasir"}});await reload();s=posStore();return s?s.id:"";}
@@ -1204,16 +1216,17 @@ function posShowQris(total){
   renderQR(document.getElementById("qrCanvas"),dyn);
 }
 async function posFinalize(bayar,kembali,method){
-  const tot=posTotal();if(tot<=0){toast("Keranjang kosong.");return;}
+  if(posCount()===0){toast("Keranjang kosong.");return;}
+  const tot=posTotal();
   const reg=regOpen();if(!reg){toast("Buka kasir dulu sebelum transaksi.");closeModal();rPOS();return;}
   let storeId=POS.customer||await ensurePosStore();
   if(!storeId){toast("Gagal menyiapkan pelanggan.");return;}
   const items=Object.entries(POS.cart).map(([pid,q])=>{const p=prod(pid)||{};return {productId:pid,qty:q,harga:+p.harga||0,hpp:+p.hpp||0,kind:"jual"};});
-  const nota={id:null,date:today(),storeId,notaNo:nextNotaNo(today()),items,sessionId:reg.id,payMethod:method};
+  const nota={id:null,date:today(),storeId,notaNo:nextNotaNo(today()),items,sessionId:reg.id,payMethod:method,discount:posDisc()};
   try{
     const res=await api("saveNota",{nota});
     await api("addPayment",{notaId:res.id,amount:tot,date:today(),note:"POS "+method});
-    POS.cart={};POS.bayar="";POS.customer="";
+    POS.cart={};POS.bayar="";POS.customer="";POS.disc=0;
     await reload();
     posSuccess(res.id,tot,bayar,kembali,method);
   }catch(e){/* api sudah menampilkan toast error (mis. stok kurang) */}
@@ -1243,7 +1256,9 @@ function posReceiptText(id,bayar,kembali,method){
   if(n.notaNo)t+=cut(n.notaNo)+"\n";
   t+=lr(fmtDate(n.date),"Kasir: "+(BIZ.user||"-"))+"\n"+dash+"\n";
   notaItems(n).forEach(it=>{const pr=prod(it.productId)||{};t+=cut(pr.name||"?")+"\n"+lr("  "+it.qty+" x "+rp(it.harga),rp((+it.qty||0)*(+it.harga||0)))+"\n";});
-  t+=dash+"\n"+lr("TOTAL",rp(notaTotal(n)))+"\n";
+  t+=dash+"\n";
+  if(notaDisc(n)>0){t+=lr("Subtotal",rp(notaSubtotal(n)))+"\n"+lr("Diskon","-"+rp(notaDisc(n)))+"\n";}
+  t+=lr("TOTAL",rp(notaTotal(n)))+"\n";
   if(method){t+=lr("Bayar ("+method+")",rp(bayar))+"\n";if(method==="Tunai")t+=lr("Kembalian",rp(kembali||0))+"\n";}
   t+=dash+"\n"+ctr("Terima kasih :)")+"\n"+ctr("-- "+(BIZ.name||"Racikin")+" --")+"\n\n\n\n";
   return t;
@@ -1265,7 +1280,7 @@ function printReceipt(id,bayar,kembali,method){
     ${(p.address||contacts)?`<div class="rc">${p.address?esc(p.address):""}${p.address&&contacts?"<br>":""}${contacts}</div>`:""}
     <div class="rmeta">${esc(n.notaNo||"")}<br>${fmtDate(n.date)} · Kasir</div>
     ${items}
-    <div class="rtot"><div class="rrow"><span>TOTAL</span><span>${rp(total)}</span></div>${bayar!=null?`<div class="rrow"><span>Bayar (${esc(method||"Tunai")})</span><span>${rp(bayar)}</span></div><div class="rrow"><span>Kembalian</span><span>${rp(kembali||0)}</span></div>`:""}</div>
+    <div class="rtot">${notaDisc(n)>0?`<div class="rrow"><span>Subtotal</span><span>${rp(notaSubtotal(n))}</span></div><div class="rrow"><span>Diskon</span><span>-${rp(notaDisc(n))}</span></div>`:""}<div class="rrow"><span>TOTAL</span><span>${rp(total)}</span></div>${bayar!=null?`<div class="rrow"><span>Bayar (${esc(method||"Tunai")})</span><span>${rp(bayar)}</span></div><div class="rrow"><span>Kembalian</span><span>${rp(kembali||0)}</span></div>`:""}</div>
     <div class="rthx">Terima kasih 🙏<br>— ${esc(BIZ.name||"Racikin")} —</div>
   </div>`;
   window.print();
