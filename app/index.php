@@ -371,6 +371,19 @@ label.f{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;font-w
   .preport{width:182mm;margin:0 auto}
   .preport table,.preport tr,.preport .psec{page-break-inside:avoid}
 }
+/* ---- langganan / perpanjangan ---- */
+#subBanner{position:sticky;top:0;z-index:60}
+.subbn{background:linear-gradient(90deg,var(--amber),#e07b1a);color:#fff;padding:9px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:13px;font-weight:600}
+.subbn button{background:#fff;color:var(--red);border:none;padding:6px 14px;border-radius:20px;font-weight:800;font-size:12.5px;cursor:pointer;flex-shrink:0}
+.renbox{margin-top:6px}
+.plans{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.planc{background:var(--card);border:1.5px solid var(--line);border-radius:14px;padding:14px 8px;text-align:center;cursor:pointer;transition:.15s}
+.planc:hover{border-color:var(--red);box-shadow:0 6px 16px rgba(213,62,15,.14)}
+.planc .pl{font-weight:800;font-size:13px}
+.planc .pp{font-size:12px;color:var(--red);font-weight:700;margin-top:4px}
+.planc.dis{opacity:.5;cursor:not-allowed}.planc.dis:hover{border-color:var(--line);box-shadow:none}
+.amtbox{background:var(--red);color:#fff;border-radius:14px;padding:14px;text-align:center;font-size:26px;font-weight:800;letter-spacing:.5px;margin:8px 0}
+.bankbox{background:var(--bg);border:1px dashed var(--line);border-radius:12px;padding:12px 14px;font-size:14px;line-height:1.55;white-space:pre-line}
 </style>
 </head>
 <body>
@@ -395,6 +408,7 @@ label.f{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;font-w
   <div class="role">ANNA Snack &amp; Kitchen</div>
 </aside>
 <div class="content">
+  <div id="subBanner" style="display:none"></div>
   <div class="topbar"><div class="t-title" id="topTitle">Dashboard</div><img class="t-word-img" src="icons/logo-word.png" alt="Racikin"><div class="t-right">👋 Halo, <b>ANNA</b></div></div>
   <main>
     <section id="v-dashboard" class="view active"><div class="empty">Memuat data…</div></section>
@@ -416,6 +430,7 @@ label.f{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;font-w
 <div id="toast"></div>
 <div id="printArea"></div>
 <div class="loginbg" id="loginScreen" style="display:flex"><div class="loginbox" id="loginBox"></div></div>
+<div class="loginbg" id="subLock" style="display:none"><div class="loginbox" id="subLockBox" style="max-width:440px"></div></div>
 <nav class="botnav" id="botnav">
   <button data-v="dashboard" onclick="go('dashboard')"><span class="bic">📊</span>Beranda</button>
   <button data-v="distribusi" onclick="go('distribusi')"><span class="bic">🚚</span>Distribusi</button>
@@ -480,6 +495,8 @@ function comboPick(cid,id){const c=COMBO[cid];if(!c)return;const o=c.opts.find(x
 async function api(action,payload={},opts={}){
   const r=await fetch("api.php",{method:"POST",headers:{"Content-Type":"application/json","X-Requested-With":"fetch"},body:JSON.stringify({action,...payload})});
   const j=await r.json();
+  // langganan habis di tengah sesi → tampilkan layar kunci perpanjangan
+  if(r.status===403&&j&&j.expired){SUB=j.sub||{expired:true};if(typeof showSubLock==="function")showSubLock();throw new Error(j.error||"Langganan berakhir.");}
   if(j&&j.error){if(!opts.silent)toast("⚠️ "+j.error);throw new Error(j.error);}
   return j;
 }
@@ -1835,13 +1852,110 @@ async function doResetConfirm(){
   }catch(e){loginErr(e.message||"Link reset tidak valid atau kadaluarsa.");}
 }
 function loginErr(m){const e=document.getElementById("lerr");if(e){e.textContent=m;e.style.display="block";}}
-async function doLogin(){const code=document.getElementById("lCode").value.trim().toLowerCase(),email=document.getElementById("lEmail").value.trim().toLowerCase(),password=document.getElementById("lPass").value,remember=document.getElementById("lRemember").checked;if(!code||!email||!password){loginErr("Isi kode usaha, email & password.");return;}try{BIZ=await api("authLogin",{code,email,password,remember},{silent:true});document.getElementById("loginScreen").style.display="none";await bootApp();}catch(e){loginErr(e.message||"Gagal masuk.");}}
+async function doLogin(){const code=document.getElementById("lCode").value.trim().toLowerCase(),email=document.getElementById("lEmail").value.trim().toLowerCase(),password=document.getElementById("lPass").value,remember=document.getElementById("lRemember").checked;if(!code||!email||!password){loginErr("Isi kode usaha, email & password.");return;}try{BIZ=await api("authLogin",{code,email,password,remember},{silent:true});await afterAuth();}catch(e){loginErr(e.message||"Gagal masuk.");}}
 async function doRegister(){const name=document.getElementById("rName").value.trim(),code=document.getElementById("rCode").value.trim().toLowerCase(),user=document.getElementById("rUser").value.trim(),email=document.getElementById("rEmail").value.trim().toLowerCase(),password=document.getElementById("rPass").value;if(!name||!code||!user||!email||!password){loginErr("Lengkapi semua kolom.");return;}
   {const pe=pwProblem(password);if(pe){loginErr(pe);return;}}
   try{const r=await api("authRegister",{name,code,user,email,password},{silent:true});
     document.getElementById("loginBox").innerHTML=`<img class="lgo" src="icons/logo-bowl.png" alt=""><img class="lword" src="icons/logo-word.png" alt="Racikin"><div style="text-align:center;padding:6px 0"><div style="font-size:42px">⏳</div><h3 style="margin:8px 0 6px">Pendaftaran Berhasil!</h3><p class="lsub">Usaha <b>${esc(r.name||name)}</b> (kode: <b>${esc(r.alias||code)}</b>) sudah terdaftar. Akunmu akan <b>aktif setelah pembayaran dikonfirmasi</b> — kami hubungi via WhatsApp. 🙏</p><button class="btn ghost" style="width:100%;margin-top:16px" onclick="renderLogin('login')">Kembali ke Masuk</button></div>`;
   }catch(e){loginErr(e.message||"Gagal daftar.");}}
 async function doLogout(){if(!confirm("Keluar dari "+(BIZ.name||"usaha")+"?"))return;try{await api("authLogout");}catch(e){}location.reload();}
+// ================= LANGGANAN (perpanjangan + bukti transfer) =================
+let SUB={};   // status langganan terkini {paidUntil,daysLeft,expired}
+let _proofData="";
+// setelah login/authStatus: kalau langganan habis → layar kunci; kalau normal → app + banner
+async function afterAuth(){
+  document.getElementById("loginScreen").style.display="none";
+  SUB=(BIZ&&BIZ.sub)||{};
+  if(SUB.expired){showSubLock();return;}
+  document.getElementById("subLock").style.display="none";
+  await bootApp();
+  subBanner();
+}
+function showSubLock(){
+  document.getElementById("loginScreen").style.display="none";
+  const el=document.getElementById("subLock");el.style.display="flex";
+  document.getElementById("subLockBox").innerHTML=`<img class="lgo" src="icons/logo-bowl.png" alt="">
+    <div style="text-align:center"><div style="font-size:40px">🔒</div><h3 style="margin:6px 0 4px">Langganan Berakhir</h3>
+    <p class="lsub">Perpanjang untuk kembali mengakses <b>${esc(BIZ.name||"usaha")}</b>.</p></div>
+    <div id="renewArea" style="margin-top:8px">Memuat…</div>
+    <div style="text-align:center;margin-top:12px"><a class="llink" onclick="doLogout()">Keluar</a></div>`;
+  renderRenewArea("renewArea");
+}
+// banner peringatan H-7 di dalam app
+function subBanner(){
+  const el=document.getElementById("subBanner");if(!el)return;
+  const d=SUB&&SUB.daysLeft;
+  if(SUB&&!SUB.expired&&d!=null&&d<=7){
+    el.style.display="block";
+    el.innerHTML=`<div class="subbn"><span>⏰ Langganan habis ${d<=0?"hari ini":"dalam <b>"+d+" hari</b>"} (${esc(SUB.paidUntil||"")}).</span><button onclick="openRenew()">Perpanjang</button></div>`;
+  }else{el.style.display="none";el.innerHTML="";}
+}
+// modal perpanjang saat masih aktif (dari banner)
+function openRenew(){
+  openModal(`<button class="close" onclick="closeModal()">×</button><h3>Perpanjang Langganan</h3><div id="renewArea" style="margin-top:8px">Memuat…</div>`);
+  renderRenewArea("renewArea");
+}
+// area renewal dipakai bersama (layar kunci & modal)
+async function renderRenewArea(targetId){
+  const el=document.getElementById(targetId);if(!el)return;
+  let info;try{info=await api("subInfo");}catch(e){el.innerHTML='<p class="mini">Gagal memuat info langganan.</p>';return;}
+  window._subInfo=info;
+  // sudah aktif lagi (mis. baru disetujui admin) & masih di layar kunci → langsung masuk app
+  if(info.sub&&!info.sub.expired&&document.getElementById("subLock").style.display!=="none"){
+    SUB=info.sub;BIZ.sub=info.sub;document.getElementById("subLock").style.display="none";
+    toast("Langganan aktif kembali ✓");await bootApp();subBanner();return;
+  }
+  if(info.request&&info.request.status==="pending"){
+    el.innerHTML=`<div class="renbox" style="text-align:center"><div style="font-size:34px">⏳</div>
+      <p style="margin:6px 0">Bukti transfer <b>Rp${grp(info.request.amount)}</b> sedang <b>diverifikasi admin</b>. Biasanya 1×24 jam — nanti aktif otomatis setelah disetujui. 🙏</p>
+      <button class="btn ghost" style="width:100%;margin-top:8px" onclick="renderRenewArea('${targetId}')">↻ Cek status</button></div>`;
+    return;
+  }
+  const plans=[["1bln","1 Bulan"],["3bln","3 Bulan"],["1thn","1 Tahun"]];
+  const cards=plans.map(([k,lbl])=>{const pr=(info.prices||{})[k]||0;const dis=pr<=0;
+    return `<button class="planc${dis?' dis':''}" ${dis?"disabled":""} onclick="renewPick('${k}','${targetId}')"><div class="pl">${lbl}</div><div class="pp">${dis?"—":"Rp"+grp(pr)}</div></button>`;}).join("");
+  el.innerHTML=`<div class="renbox"><p class="mini" style="margin-bottom:8px">Pilih paket perpanjangan:</p><div class="plans">${cards}</div>
+    ${(info.prices&&(info.prices["1bln"]||info.prices["3bln"]||info.prices["1thn"]))?"":'<p class="mini" style="color:var(--red);margin-top:8px">Harga belum diatur admin. Hubungi admin dulu ya.</p>'}</div>`;
+}
+async function renewPick(plan,targetId){
+  let r;try{r=await api("startRenewal",{plan});}catch(e){return;}
+  _proofData="";
+  const el=document.getElementById(targetId);
+  el.innerHTML=`<div class="renbox">
+    <p class="mini">Transfer <b>TEPAT</b> sejumlah ini${r.uniq?` (sudah termasuk kode unik +${r.uniq} biar gampang dicek admin)`:""}:</p>
+    <div class="amtbox">Rp${grp(r.amount)}</div>
+    ${r.bank?`<div class="bankbox">${esc(r.bank).replace(/\n/g,"<br>")}</div>`:'<p class="mini" style="color:var(--amber)">Info rekening belum diatur admin — hubungi admin untuk nomor rekening.</p>'}
+    <label class="f" style="margin-top:12px">Foto bukti transfer</label>
+    <div id="proofPrev"></div>
+    <button class="btn ghost" style="width:100%" onclick="document.getElementById('proofInp').click()">📷 Pilih Foto Bukti</button>
+    <input type="file" id="proofInp" accept="image/*" style="display:none" onchange="renewPickFile(this)">
+    <label class="f" style="margin-top:10px">Catatan <span class="mini">(opsional)</span></label>
+    <input id="proofNote" placeholder="mis. a.n. pengirim transfer">
+    <button class="btn" style="width:100%;margin-top:12px" onclick="renewSubmit('${targetId}')">Kirim Bukti Transfer</button>
+    <button class="btn ghost" style="width:100%;margin-top:6px" onclick="renderRenewArea('${targetId}')">← Ganti paket</button>
+  </div>`;
+}
+function renewPickFile(inp){const f=inp.files[0];if(!f)return;
+  if(!/^image\//.test(f.type)){toast("File harus gambar.");return;}
+  if(f.size>5*1024*1024){toast("Ukuran maksimal 5MB.");return;}
+  const rd=new FileReader();
+  rd.onload=e=>{const img=new Image();img.onload=()=>{
+    const max=1000;let w=img.width,h=img.height;
+    if(w>h&&w>max){h=Math.round(h*max/w);w=max;}else if(h>=w&&h>max){w=Math.round(w*max/h);h=max;}
+    const cv=document.createElement("canvas");cv.width=w;cv.height=h;cv.getContext("2d").drawImage(img,0,0,w,h);
+    _proofData=cv.toDataURL("image/jpeg",0.85);
+    const pv=document.getElementById("proofPrev");if(pv)pv.innerHTML=`<img src="${_proofData}" style="max-width:100%;max-height:200px;border-radius:10px;margin-bottom:8px;border:1px solid var(--line)">`;
+  };img.onerror=()=>toast("Gambar tak terbaca.");img.src=e.target.result;};
+  rd.readAsDataURL(f);}
+async function renewSubmit(targetId){
+  if(!_proofData){toast("Pilih foto bukti transfer dulu.");return;}
+  const note=(document.getElementById("proofNote")||{}).value||"";
+  try{await api("submitProof",{proof:_proofData,note});}catch(e){return;}
+  _proofData="";
+  toast("Bukti terkirim ✓ Menunggu verifikasi admin.");
+  renderRenewArea(targetId);
+}
+
 async function bootApp(){
   try{await reload();
     const v=(()=>{try{return localStorage.getItem("anna_view");}catch(e){return null;}})()||"dashboard";
@@ -1855,7 +1969,7 @@ async function bootApp(){
   const rt=new URLSearchParams(location.search).get("reset");
   if(rt){window._resetToken=rt;document.getElementById("loginScreen").style.display="flex";renderLogin("reset");return;}
   let st;try{st=await api("authStatus");}catch(e){st={loggedIn:false};}
-  if(st&&st.loggedIn){BIZ=st;document.getElementById("loginScreen").style.display="none";await bootApp();}
+  if(st&&st.loggedIn){BIZ=st;await afterAuth();}
   else{renderLogin("login");}
 })();
 // ---- PWA: daftarkan service worker ----

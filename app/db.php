@@ -47,6 +47,8 @@ function master_pdo() {
     // active: 0 = pending (menunggu aktivasi admin setelah bayar), 1 = aktif.
     // DEFAULT 1 supaya usaha yang sudah ada tetap aktif; registrasi baru di-set 0.
     ensure_column($p, 'businesses', 'active', "active TINYINT(1) DEFAULT 1");
+    // paid_until: tanggal langganan berakhir. NULL = tanpa batas (usaha lama/legacy tak terkunci).
+    ensure_column($p, 'businesses', 'paid_until', "paid_until DATE DEFAULT NULL");
     // user per usaha: login = kode usaha (alias) + email + password
     // role: owner (pemilik, akses penuh) / staff (akses sesuai perms)
     // perms: daftar menu yang boleh diakses staff (CSV), mis. "pos,distribusi,pembayaran"
@@ -92,8 +94,42 @@ function master_pdo() {
         UNIQUE KEY uq_pr_selector (selector),
         INDEX(alias, email)
     ) ENGINE=InnoDB");
+    // pengaturan aplikasi (harga paket, info rekening) — editable dari panel admin
+    $p->exec("CREATE TABLE IF NOT EXISTS app_settings (
+        k VARCHAR(50) PRIMARY KEY,
+        v TEXT
+    ) ENGINE=InnoDB");
+    // pengajuan perpanjangan langganan (bukti transfer) — pelanggan submit, admin verifikasi
+    $p->exec("CREATE TABLE IF NOT EXISTS renewal_requests (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        alias VARCHAR(32),
+        email VARCHAR(160),
+        plan VARCHAR(8),
+        base_amount INT DEFAULT 0,
+        uniq INT DEFAULT 0,
+        amount INT DEFAULT 0,
+        proof MEDIUMTEXT,
+        note VARCHAR(255) DEFAULT '',
+        status VARCHAR(10) DEFAULT 'awaiting',
+        admin_note VARCHAR(255) DEFAULT '',
+        created DATETIME,
+        reviewed_at DATETIME DEFAULT NULL,
+        INDEX(alias), INDEX(status)
+    ) ENGINE=InnoDB");
     return $p;
 }
+
+// ---- Pengaturan aplikasi (key-value) ----
+function settings_all() {
+    $out = [];
+    foreach (master_pdo()->query("SELECT k,v FROM app_settings") as $r) $out[$r['k']] = $r['v'];
+    return $out + ['price_1bln'=>'0','price_3bln'=>'0','price_1thn'=>'0','bank_info'=>'','uniq_on'=>'1','uniq_max'=>'50'];
+}
+function setting_set($k, $v) {
+    master_pdo()->prepare("INSERT INTO app_settings (k,v) VALUES (?,?) ON DUPLICATE KEY UPDATE v=VALUES(v)")->execute([$k, (string)$v]);
+}
+// jumlah bulan per paket
+function plan_months($plan) { return ['1bln'=>1, '3bln'=>3, '1thn'=>12][$plan] ?? 0; }
 
 function valid_alias($a) { return (bool) preg_match('/^[a-z0-9]{2,24}$/', (string)$a); }
 

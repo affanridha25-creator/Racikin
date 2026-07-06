@@ -18,13 +18,17 @@ if (!is_array($in)) $in = [];
 $action = $in['action'] ?? 'bootstrap';   // JANGAN ambil dari $_GET (cegah CSRF via navigasi)
 
 // ---- AUTENTIKASI (tak butuh login dulu) ----
-if (in_array($action, ['authStatus','authLogin','authRegister','authLogout','authResetRequest','authResetConfirm','authChangePassword','usersList','userSave','userDelete'], true)) {
+if (in_array($action, ['authStatus','authLogin','authRegister','authLogout','authResetRequest','authResetConfirm','authChangePassword','usersList','userSave','userDelete','subInfo','startRenewal','submitProof'], true)) {
     try { handle_auth($action, $in); }
     catch (Exception $e) { error_log('auth: '.$e->getMessage()); http_response_code(500); echo json_encode(['error' => 'Terjadi kesalahan pada server.']); }
     exit;
 }
 
 $pdo = db();   // butuh login (kalau belum → 401 needLogin)
+
+// Gerbang langganan: kalau paid_until sudah lewat, blokir semua aksi data (perpanjangan lewat jalur auth di atas).
+$__sub = sub_status(current_business());
+if ($__sub['expired']) { http_response_code(403); echo json_encode(['error' => 'Langganan sudah berakhir. Silakan perpanjang untuk melanjutkan.', 'expired' => true, 'sub' => $__sub]); exit; }
 
 // ===== "Ingat saya": token persisten (selector:validator) — konstanta didefinisikan di atas file =====
 function is_https() { return (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https'); }
@@ -71,7 +75,14 @@ function try_remember_login($m) {
     $_SESSION['alias'] = $t['alias']; $_SESSION['user_name'] = $u['name']; $_SESSION['email'] = $t['email'];
     $_SESSION['role'] = $u['role'] ?? 'owner'; $_SESSION['perms'] = $u['perms'] ?? '';
     issue_remember_token($m, $t['alias'], $t['email']);
-    return ['name'=>$b['name'], 'alias'=>$t['alias'], 'user'=>$u['name'], 'email'=>$t['email']] + me_payload();
+    return ['name'=>$b['name'], 'alias'=>$t['alias'], 'user'=>$u['name'], 'email'=>$t['email'], 'sub'=>sub_status($b)] + me_payload();
+}
+// status langganan sebuah usaha: sisa hari + apakah kadaluarsa (dihitung via MySQL, aman timezone)
+function sub_status($b) {
+    if (!$b || empty($b['paid_until'])) return ['paidUntil' => null, 'daysLeft' => null, 'expired' => false];  // null = tanpa batas (legacy)
+    $q = master_pdo()->prepare("SELECT DATEDIFF(?, CURDATE())"); $q->execute([$b['paid_until']]);
+    $days = (int)$q->fetchColumn();
+    return ['paidUntil' => $b['paid_until'], 'daysLeft' => $days, 'expired' => ($days < 0)];
 }
 // payload user aktif (role + daftar menu yg boleh diakses)
 function me_payload() {
@@ -103,7 +114,7 @@ function handle_auth($action, $in) {
             if ($r) { echo json_encode(['loggedIn'=>true] + $r); return; }
             echo json_encode(['loggedIn'=>false]); return;
         }
-        echo json_encode(['loggedIn'=>true, 'name'=>$b['name'], 'alias'=>$b['alias'], 'user'=>($_SESSION['user_name'] ?? '')] + me_payload());
+        echo json_encode(['loggedIn'=>true, 'name'=>$b['name'], 'alias'=>$b['alias'], 'user'=>($_SESSION['user_name'] ?? ''), 'sub'=>sub_status($b)] + me_payload());
         return;
     }
     if ($action === 'authLogout') {
@@ -135,7 +146,7 @@ function handle_auth($action, $in) {
         $_SESSION['alias'] = $alias; $_SESSION['user_name'] = $u['name']; $_SESSION['email'] = $email;
         $_SESSION['role'] = $u['role'] ?? 'owner'; $_SESSION['perms'] = $u['perms'] ?? '';
         if (!empty($in['remember'])) issue_remember_token($m, $alias, $email);
-        echo json_encode(['ok'=>true, 'name'=>$b['name'], 'alias'=>$alias, 'user'=>$u['name'], 'email'=>$email] + me_payload()); return;
+        echo json_encode(['ok'=>true, 'name'=>$b['name'], 'alias'=>$alias, 'user'=>$u['name'], 'email'=>$email, 'sub'=>sub_status($b)] + me_payload()); return;
     }
     if ($action === 'authRegister') {
         $name = trim($in['name'] ?? ''); $alias = strtolower(trim($in['code'] ?? $in['alias'] ?? ''));
@@ -251,6 +262,57 @@ function handle_auth($action, $in) {
             if ($x->fetchColumn() === 'owner') { http_response_code(400); echo json_encode(['error' => 'Akun pemilik tak bisa dihapus.']); return; }
             $m->prepare("DELETE FROM users WHERE alias=? AND email=? AND role<>'owner'")->execute([$alias, $email]);
             $m->prepare("DELETE FROM remember_tokens WHERE alias=? AND email=?")->execute([$alias, $email]);
+            echo json_encode(['ok' => true]); return;
+        }
+    }
+    // ---- Langganan: info harga/status + mulai perpanjangan (nominal unik) + submit bukti transfer ----
+    if (in_array($action, ['subInfo','startRenewal','submitProof'], true)) {
+        $b = current_business();   // aktif=1 (termasuk yang sudah kadaluarsa → tetap bisa perpanjang)
+        if (!$b) { http_response_code(401); echo json_encode(['error' => 'Belum login.', 'needLogin' => true]); return; }
+        $alias = $b['alias']; $email = $_SESSION['email'] ?? '';
+        $set = settings_all();
+        $prices = ['1bln' => (int)$set['price_1bln'], '3bln' => (int)$set['price_3bln'], '1thn' => (int)$set['price_1thn']];
+
+        if ($action === 'subInfo') {
+            $q = $m->prepare("SELECT id,plan,amount,status,note,created FROM renewal_requests WHERE alias=? AND status IN ('awaiting','pending') ORDER BY id DESC LIMIT 1");
+            $q->execute([$alias]); $req = $q->fetch() ?: null;
+            if ($req) $req['amount'] = (int)$req['amount'];
+            echo json_encode(['ok' => true, 'sub' => sub_status($b), 'prices' => $prices, 'bank' => $set['bank_info'], 'request' => $req]); return;
+        }
+        if ($action === 'startRenewal') {
+            $plan = $in['plan'] ?? '';
+            if (!in_array($plan, ['1bln','3bln','1thn'], true)) { http_response_code(400); echo json_encode(['error' => 'Paket tidak dikenal.']); return; }
+            $base = $prices[$plan];
+            if ($base <= 0) { http_response_code(400); echo json_encode(['error' => 'Harga paket belum diatur. Hubungi admin dulu.']); return; }
+            $uniqOn  = ($set['uniq_on'] ?? '1') === '1';
+            $uniqMax = max(1, min(50, (int)($set['uniq_max'] ?? 50)));
+            // kode unik yg belum dipakai request aktif lain (cegah nominal bentrok antar-pelanggan)
+            $u = $m->query("SELECT amount FROM renewal_requests WHERE status IN ('awaiting','pending')")->fetchAll(PDO::FETCH_COLUMN);
+            $usedAmt = array_flip(array_map('intval', $u));
+            $uniq = 0; $amount = $base;
+            if ($uniqOn) {
+                $cands = range(1, $uniqMax); shuffle($cands);
+                foreach ($cands as $c) { if (!isset($usedAmt[$base + $c])) { $uniq = $c; break; } }
+                if ($uniq === 0) $uniq = random_int(1, $uniqMax);
+                $amount = $base + $uniq;
+            }
+            $m->prepare("DELETE FROM renewal_requests WHERE alias=? AND status='awaiting'")->execute([$alias]);  // ganti draft lama
+            $m->prepare("INSERT INTO renewal_requests (alias,email,plan,base_amount,uniq,amount,status,created) VALUES (?,?,?,?,?,?, 'awaiting', NOW())")
+              ->execute([$alias, $email, $plan, $base, $uniq, $amount]);
+            echo json_encode(['ok' => true, 'plan' => $plan, 'base' => $base, 'uniq' => $uniq, 'amount' => $amount, 'bank' => $set['bank_info']]); return;
+        }
+        if ($action === 'submitProof') {
+            $proof = (string)($in['proof'] ?? '');
+            if ($proof === '') { http_response_code(400); echo json_encode(['error' => 'Unggah foto bukti transfer dulu.']); return; }
+            if (!preg_match('#^data:image/(png|jpe?g|webp|gif);base64,#', $proof)) { http_response_code(400); echo json_encode(['error' => 'Bukti harus berupa gambar.']); return; }
+            if (strlen($proof) > 3500000) { http_response_code(400); echo json_encode(['error' => 'Gambar terlalu besar (maks ~2.5MB).']); return; }
+            $note = mb_substr(trim((string)($in['note'] ?? '')), 0, 255);
+            $q = $m->prepare("SELECT id FROM renewal_requests WHERE alias=? AND status='awaiting' ORDER BY id DESC LIMIT 1");
+            $q->execute([$alias]); $rid = $q->fetchColumn();
+            if (!$rid) { http_response_code(400); echo json_encode(['error' => 'Pilih paket dulu sebelum unggah bukti.']); return; }
+            // maksimum 1 pending per usaha (cegah antrian & storage membengkak)
+            $m->prepare("DELETE FROM renewal_requests WHERE alias=? AND status='pending' AND id<>?")->execute([$alias, $rid]);
+            $m->prepare("UPDATE renewal_requests SET proof=?, note=?, status='pending', created=NOW() WHERE id=?")->execute([$proof, $note, $rid]);
             echo json_encode(['ok' => true]); return;
         }
     }
