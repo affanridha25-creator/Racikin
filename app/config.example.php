@@ -32,3 +32,17 @@ define('RESET_FROM', 'noreply@racikin.com');          // buat email ini di cPane
 // Daftar host yang diizinkan — jaring pengaman bila APP_URL kosong (cegah Host-header injection).
 // Ganti kalau domainmu berbeda. Boleh biarkan bila sudah set APP_URL di atas.
 define('APP_HOSTS', ['login.racikin.com', 'racikin.com']);
+
+// ---- FREE TRIAL (auto-buat DB tenant via cPanel API) ----
+// Kalau TRIAL_ON=true DAN CPANEL_* terisi benar: daftar → DB dibuat otomatis →
+// langsung aktif trial. Kalau gagal / TRIAL_ON=false: daftar = PENDING (aktivasi manual admin).
+define('TRIAL_ON', false);          // ganti true setelah CPANEL_* di bawah terisi & teruji
+define('TRIAL_DAYS', 30);           // lama trial gratis (hari)
+// cPanel API token: cPanel > "Manage API Tokens" > Create. RAHASIA — jangan dibagikan.
+// CPANEL_HOST = host cPanel (mis. 'srv123.rumahweb.com' atau domainmu). CPANEL_USER = username cPanel.
+// CPANEL_DB_USER = user MySQL yang diberi hak ke DB baru (kosongkan = pakai DB_USER di atas).
+define('CPANEL_HOST', '');          // mis. 'srv123.rumahweb.com'
+define('CPANEL_PORT', 2083);
+define('CPANEL_USER', '');          // username cPanel
+define('CPANEL_TOKEN', '');         // API token cPanel (rahasia)
+define('CPANEL_DB_USER', '');       // kosong = pakai DB_USER

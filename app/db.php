@@ -133,6 +133,33 @@ function plan_months($plan) { return ['1bln'=>1, '3bln'=>3, '1thn'=>12][$plan] ?
 
 function valid_alias($a) { return (bool) preg_match('/^[a-z0-9]{2,24}$/', (string)$a); }
 
+// Auto-provision DB tenant via cPanel UAPI (untuk FREE TRIAL instan di shared hosting).
+// Return true kalau DB siap dipakai. Defensif: error apa pun → false (pemanggil fallback ke pending).
+function cpanel_create_db($dbname, $dbuser) {
+    if (!defined('CPANEL_HOST') || !defined('CPANEL_USER') || !defined('CPANEL_TOKEN') || !CPANEL_HOST || !CPANEL_TOKEN) return false;
+    if (!function_exists('curl_init')) { error_log('cpanel: curl tidak tersedia'); return false; }
+    $auth = 'Authorization: cpanel ' . CPANEL_USER . ':' . CPANEL_TOKEN;
+    $port = defined('CPANEL_PORT') ? (int)CPANEL_PORT : 2083;
+    $base = 'https://' . CPANEL_HOST . ':' . $port . '/execute/';
+    $call = function ($url) use ($auth) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER=>true, CURLOPT_HTTPHEADER=>[$auth], CURLOPT_TIMEOUT=>20, CURLOPT_CONNECTTIMEOUT=>10, CURLOPT_SSL_VERIFYPEER=>true, CURLOPT_SSL_VERIFYHOST=>2]);
+        $res = curl_exec($ch); $err = curl_error($ch); curl_close($ch);
+        if ($res === false) { error_log('cpanel curl: ' . $err); return null; }
+        $j = json_decode($res, true); return is_array($j) ? $j : null;
+    };
+    // 1) buat database (kalau sudah ada → anggap ok)
+    $r1 = $call($base . 'Mysql/create_database?name=' . rawurlencode($dbname));
+    if (!$r1 || (int)($r1['status'] ?? 0) !== 1) {
+        $errs = strtolower(implode(' ', (array)($r1['errors'] ?? [])));
+        if (strpos($errs, 'exist') === false) { error_log('cpanel create_database gagal: ' . json_encode($r1)); return false; }
+    }
+    // 2) beri hak penuh user MySQL ke DB itu
+    $r2 = $call($base . 'Mysql/set_privileges_on_database?user=' . rawurlencode($dbuser) . '&database=' . rawurlencode($dbname) . '&privileges=' . rawurlencode('ALL PRIVILEGES'));
+    if (!$r2 || (int)($r2['status'] ?? 0) !== 1) { error_log('cpanel set_privileges gagal: ' . json_encode($r2)); return false; }
+    return true;
+}
+
 // usaha yang sedang login (dari session)
 function current_business() {
     if (session_status() !== PHP_SESSION_ACTIVE) @session_start();

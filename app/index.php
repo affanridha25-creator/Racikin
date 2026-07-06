@@ -1985,6 +1985,9 @@ async function doLogin(){const code=document.getElementById("lCode").value.trim(
 async function doRegister(){const name=document.getElementById("rName").value.trim(),code=document.getElementById("rCode").value.trim().toLowerCase(),user=document.getElementById("rUser").value.trim(),email=document.getElementById("rEmail").value.trim().toLowerCase(),password=document.getElementById("rPass").value;if(!name||!code||!user||!email||!password){loginErr("Lengkapi semua kolom.");return;}
   {const pe=pwProblem(password);if(pe){loginErr(pe);return;}}
   try{const r=await api("authRegister",{name,code,user,email,password},{silent:true});
+    if(r.trial){   // free trial aktif → langsung masuk app
+      BIZ=r;await afterAuth();toast(`Selamat datang! Trial gratis ${r.trialDays||30} hari aktif 🎉`);return;
+    }
     document.getElementById("loginBox").innerHTML=`<img class="lgo" src="icons/logo-bowl.png" alt=""><img class="lword" src="icons/logo-word.png" alt="Racikin"><div style="text-align:center;padding:6px 0"><div style="font-size:42px">⏳</div><h3 style="margin:8px 0 6px">Pendaftaran Berhasil!</h3><p class="lsub">Usaha <b>${esc(r.name||name)}</b> (kode: <b>${esc(r.alias||code)}</b>) sudah terdaftar. Akunmu akan <b>aktif setelah pembayaran dikonfirmasi</b> — kami hubungi via WhatsApp. 🙏</p><button class="btn ghost" style="width:100%;margin-top:16px" onclick="renderLogin('login')">Kembali ke Masuk</button></div>`;
   }catch(e){loginErr(e.message||"Gagal daftar.");}}
 async function doLogout(){if(!confirm("Keluar dari "+(BIZ.name||"usaha")+"?"))return;try{await api("authLogout");}catch(e){}location.reload();}

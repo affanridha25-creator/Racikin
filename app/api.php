@@ -171,6 +171,18 @@ function handle_auth($action, $in) {
         }
         if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
         session_regenerate_id(true);
+        // FREE TRIAL: coba auto-provision DB tenant via cPanel API → aktif 30 hari langsung.
+        // Kalau tak dikonfigurasi / gagal → fallback PENDING (tunggu aktivasi admin). Defensif, tak bikin nyangkut.
+        if (defined('TRIAL_ON') && TRIAL_ON) {
+            $days = defined('TRIAL_DAYS') ? max(1, (int)TRIAL_DAYS) : 30;
+            $dbUser = defined('CPANEL_DB_USER') && CPANEL_DB_USER ? CPANEL_DB_USER : $DB_USER;
+            if (cpanel_create_db(DB_PREFIX . $alias, $dbUser)) {
+                $m->prepare("UPDATE businesses SET active=1, paid_until=DATE_ADD(CURDATE(), INTERVAL ? DAY) WHERE alias=?")->execute([$days, $alias]);
+                $_SESSION['alias'] = $alias; $_SESSION['user_name'] = $user; $_SESSION['email'] = $email; $_SESSION['role'] = 'owner'; $_SESSION['perms'] = '';
+                $b2 = $m->prepare("SELECT * FROM businesses WHERE alias=?"); $b2->execute([$alias]); $b2 = $b2->fetch();
+                echo json_encode(['ok'=>true, 'trial'=>true, 'loggedIn'=>true, 'trialDays'=>$days, 'name'=>$name, 'alias'=>$alias, 'user'=>$user, 'email'=>$email, 'sub'=>sub_status($b2)] + me_payload()); return;
+            }
+        }
         // akun dibuat sebagai PENDING — tidak auto-login; tunggu aktivasi admin (setelah bayar)
         echo json_encode(['ok'=>true, 'pending'=>true, 'name'=>$name, 'alias'=>$alias]); return;
     }
