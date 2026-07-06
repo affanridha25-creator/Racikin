@@ -124,6 +124,7 @@ input[type=password]{width:100%;padding:11px 12px;border:1px solid #d8d8d8;borde
 .btn{background:var(--red);color:#fff;border:none;padding:11px 18px;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer}
 .btn:hover{background:var(--red-d)}.btn.sm{padding:6px 12px;font-size:13px}
 .btn.gray{background:#eee;color:#555}.btn.green{background:var(--green)}.btn.amber{background:var(--amber)}.btn.del{background:#fbe7e5;color:var(--red)}
+.btn.wa{background:#25D366;color:#fff;text-decoration:none;display:inline-flex;align-items:center}
 .logout{color:var(--red);font-weight:700;font-size:13px;text-decoration:none}
 .msg{padding:11px 14px;border-radius:10px;margin-bottom:16px;font-size:14px;font-weight:600}
 .msg.ok{background:#e6f5ec;color:var(--green)}.msg.err{background:#fbe7e5;color:var(--red)}
@@ -245,6 +246,12 @@ details summary{list-style:none}details summary::-webkit-details-marker{display:
                 <button class="btn sm" name="months" value="3" title="Perpanjang 3 bulan">+3bln</button>
                 <button class="btn sm" name="months" value="12" title="Perpanjang 1 tahun">+1thn</button>
               </form>
+              <?php if ($r['paid_until']!==null): $dl=(int)$r['days_left'];
+                $waMsg = "Halo 🙏 Pengingat dari Racikin.\n\nLangganan usaha \"{$r['name']}\" "
+                  . ($dl<0 ? "sudah habis pada {$r['paid_until']}" : ($dl<=0 ? "habis hari ini" : "akan habis dalam {$dl} hari ({$r['paid_until']})"))
+                  . ".\n\nSilakan perpanjang lewat aplikasi (pilih paket → transfer → upload bukti) supaya bisa terus dipakai. Terima kasih 🙏"; ?>
+                <a class="btn sm wa" href="https://wa.me/?text=<?= rawurlencode($waMsg) ?>" target="_blank" rel="noopener" title="Ingatkan pemilik via WhatsApp">💬 Ingatkan</a>
+              <?php endif; ?>
             <?php endif; ?>
             <?php if (!$on): ?>
               <form method="post" onsubmit="return confirm('Pastikan database <?= h($r['db_name']) ?> sudah dibuat di cPanel + user MySQL sudah di-assign. Aktifkan usaha ini?')">

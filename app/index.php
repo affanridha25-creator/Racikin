@@ -213,6 +213,7 @@ td.num,th.num{text-align:right}
 .btn.ghost{background:#fff;color:var(--red);border:1.5px solid var(--red)}
 .btn.sm{padding:5px 11px;font-size:12px}
 .btn.gray{background:#eee;color:#555}.btn.gray:hover{background:#e0e0e0}
+.btn.wa{background:#25D366;color:#fff}.btn.wa:hover{background:#1eb457}
 .btn.dark{background:#333}.btn.dark:hover{background:#111}
 input,select,textarea{font-family:inherit;font-size:13px;padding:8px 10px;border:1px solid #d8d8d8;border-radius:8px;width:100%;min-width:0;max-width:100%;background:#fff}
 /* iOS/Safari: date/time input abaikan width:100% & melebar sesuai isi → normalkan */
@@ -1467,14 +1468,14 @@ function rPembayaran(){
     const lst=[...S.notas].filter(n=>inMonth(n.date)).sort((a,b)=>{const o={belum:0,sebagian:1,lunas:2};return o[notaStatus(a)]-o[notaStatus(b)]||(b.date||"").localeCompare(a.date||"");});
     const totalP=lst.reduce((a,n)=>a+notaDue(n),0);
     const rows=lst.map(n=>{const due=notaStatus(n)!=="lunas";
-      const acts=`<div class="cacts">${due?`<button class="btn sm" onclick="event.stopPropagation();payModal('${n.id}')">Bayar</button>`:""}<button class="btn sm gray" onclick="event.stopPropagation();payHist('${n.id}')">🕘</button></div>`;
+      const acts=`<div class="cacts">${due?`<button class="btn sm wa" onclick="event.stopPropagation();waTagih('${n.id}')">💬</button><button class="btn sm" onclick="event.stopPropagation();payModal('${n.id}')">Bayar</button>`:""}<button class="btn sm gray" onclick="event.stopPropagation();payHist('${n.id}')">🕘</button></div>`;
       return crow({icon:"💰",title:esc(n.notaNo||"-"),sub:`${esc((store(n.storeId)||{}).name||"?")} · ${fmtDate(n.date)}`,amt:rp(notaDue(n)),amtColor:"var(--amber)",status:notaStatus(n),onclick:due?`payModal('${n.id}')`:`payHist('${n.id}')`,acts});}).join("");
     document.getElementById("v-pembayaran").innerHTML=`<div class="card accent" style="margin-bottom:16px"><div class="lbl">Total Piutang (${monthLabelFull(FILTER_MONTH)})</div><div class="val">${rp(totalP)}</div></div>${monthBar()}${lst.length===0?'<div class="empty">Tak ada tagihan pada periode ini.</div>':`<div class="clist">${rows}</div>`}`;
     return;
   }
   const list=[...S.notas].filter(n=>inMonth(n.date)).sort((a,b)=>{const o={belum:0,sebagian:1,lunas:2};return o[notaStatus(a)]-o[notaStatus(b)]||(b.date||"").localeCompare(a.date||"");});
   const totalPiutang=list.reduce((a,n)=>a+notaDue(n),0);
-  const rows=list.map(n=>`<tr><td>${fmtDate(n.date)}</td><td>${esc(n.notaNo||"-")}</td><td>${esc((store(n.storeId)||{}).name||"?")}</td><td class="num">${notaItems(n).length} item</td><td class="num">${rp(notaTotal(n))}</td><td class="num" style="color:var(--green)">${rp(notaPaid(n))}</td><td class="num" style="color:var(--amber)"><b>${rp(notaDue(n))}</b></td><td><span class="pill ${notaStatus(n)}">${notaStatus(n).toUpperCase()}</span></td><td class="num"><div class="acts">${notaStatus(n)!=="lunas"?`<button class="btn sm" onclick="payModal('${n.id}')">Bayar</button>`:""}<button class="btn sm gray" onclick="payHist('${n.id}')">Riwayat</button></div></td></tr>`).join("");
+  const rows=list.map(n=>`<tr><td>${fmtDate(n.date)}</td><td>${esc(n.notaNo||"-")}</td><td>${esc((store(n.storeId)||{}).name||"?")}</td><td class="num">${notaItems(n).length} item</td><td class="num">${rp(notaTotal(n))}</td><td class="num" style="color:var(--green)">${rp(notaPaid(n))}</td><td class="num" style="color:var(--amber)"><b>${rp(notaDue(n))}</b></td><td><span class="pill ${notaStatus(n)}">${notaStatus(n).toUpperCase()}</span></td><td class="num"><div class="acts">${notaStatus(n)!=="lunas"?`<button class="btn sm wa" onclick="waTagih('${n.id}')">💬 Tagih</button><button class="btn sm" onclick="payModal('${n.id}')">Bayar</button>`:""}<button class="btn sm gray" onclick="payHist('${n.id}')">Riwayat</button></div></td></tr>`).join("");
   document.getElementById("v-pembayaran").innerHTML=`<h2 class="title">Pembayaran &amp; Piutang</h2><div class="desc">Tagihan dilacak per nota. Bisa cicil; sisa piutang update otomatis.</div>
   ${monthBar()}
   <div class="cards"><div class="card amber"><div class="lbl">Total Piutang (${monthLabelFull(FILTER_MONTH)})</div><div class="val">${rp(totalPiutang)}</div></div></div>
@@ -1491,6 +1492,23 @@ async function addPay(){const amt=+digits(document.getElementById("payAmt").valu
 function payHist(id){const n=S.notas.find(x=>x.id===id);if(!n){toast("Nota tak ditemukan.");return;}
   openModal(`<button class="close" onclick="closeModal()">×</button><h3>Riwayat Pembayaran</h3><p class="mini" style="margin-bottom:8px">${esc(n.notaNo||"-")} · ${esc((store(n.storeId)||{}).name||"?")}</p>${(n.payments||[]).length===0?'<div class="empty">Belum ada pembayaran.</div>':`<table><thead><tr><th>Tgl</th><th>Jumlah</th><th>Catatan</th><th></th></tr></thead><tbody>${n.payments.map(p=>`<tr><td>${fmtDate(p.date)}</td><td>${rp(p.amount)}</td><td>${esc(p.note||"")}</td><td class="num"><button class="btn sm gray" onclick="delPay(${p.id},'${id}')">×</button></td></tr>`).join("")}</tbody></table>`}<div style="margin-top:16px;text-align:right"><button class="btn gray" onclick="closeModal()">Tutup</button></div>`);}
 async function delPay(pid,id){await api("deletePayment",{id:pid});await reload();payHist(id);}
+// ---- Tagih via WhatsApp (klik-to-WA, gratis) ----
+function waPhone(raw){let d=(raw||"").replace(/\D/g,"");if(!d)return "";if(d.startsWith("0"))d="62"+d.slice(1);else if(d.startsWith("62"))d=d;else if(d.startsWith("8"))d="62"+d;else d="62"+d;return d;}
+function waTagih(id){
+  const n=S.notas.find(x=>x.id===id);if(!n){toast("Nota tak ditemukan.");return;}
+  const st=store(n.storeId)||{};const phone=waPhone(st.contact);
+  const total=notaTotal(n),paid=notaPaid(n),due=notaDue(n);
+  const items=notaItems(n).map(it=>{const p=prod(it.productId)||{};return `• ${p.name||"?"} ×${it.qty}`;}).join("\n");
+  const prof=S.profile||{};
+  let msg=`Halo${st.name?" "+st.name:""} 🙏\n\nPengingat tagihan dari *${BIZ.name||"kami"}*:\n`;
+  msg+=`No. Nota: ${n.notaNo||"-"}\nTanggal: ${fmtDate(n.date)}\n\n${items}\n\n`;
+  msg+=`Total: ${rp(total)}\nSudah bayar: ${rp(paid)}\n*Sisa tagihan: ${rp(due)}*\n\n`;
+  const cara=[];if(prof.qris)cara.push("QRIS");if(prof.whatsapp||prof.phone)cara.push("transfer");
+  msg+=`Mohon diselesaikan ya${cara.length?" (bisa "+cara.join(" / ")+")":""}. Terima kasih 🙏`;
+  const url=(phone?`https://wa.me/${phone}`:`https://wa.me/`)+"?text="+encodeURIComponent(msg);
+  window.open(url,"_blank");
+  if(!phone)toast("Kontak toko kosong — pilih nomor tujuan di WhatsApp.");
+}
 
 // ================= BAHAN BAKU =================
 function rBahan(){
