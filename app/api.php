@@ -347,7 +347,7 @@ function send_reset_email($to, $name, $alias, $tokenStr) {
 }
 
 // Daftar tabel dipakai bersama oleh reset & importAll (urutan: anak dulu, induk belakangan)
-const TABLES = ['payments','distributions','notas','register_sessions','cash_out','batch_materials','batch_ops','batch_outputs','batches','material_purchases','material_prices','materials','products','profile'];
+const TABLES = ['payments','distributions','notas','register_sessions','stock_adjustments','cash_out','batch_materials','batch_ops','batch_outputs','batches','material_purchases','material_prices','materials','products','profile'];
 const BATCH_CHILDREN = ['batch_materials','batch_ops','batch_outputs'];
 
 function gid($p) { return $p . bin2hex(random_bytes(5)); }
@@ -365,6 +365,7 @@ if (($_SESSION['role'] ?? 'owner') !== 'owner') {
         'addPayment'=>['pos','pembayaran'], 'deletePayment'=>['pembayaran'],
         'saveCashOut'=>['keuangan'], 'deleteCashOut'=>['keuangan'],
         'saveProduct'=>['produk'], 'deleteProduct'=>['produk'],
+        'saveStockAdj'=>['produk'], 'deleteStockAdj'=>['produk'],
         'saveStore'=>['pos','toko'], 'deleteStore'=>['toko'],
         'saveMaterial'=>['bahan'], 'deleteMaterial'=>['bahan'], 'deletePricePoint'=>['bahan'], 'resyncPrices'=>['bahan'],
         'saveMatPurchase'=>['bahan'], 'deleteMatPurchase'=>['bahan'],
@@ -449,7 +450,9 @@ try {
                 $x->execute([$pid]); $produced = intval($x->fetchColumn());
                 $x = $pdo->prepare("SELECT COALESCE(SUM(qty),0) FROM distributions WHERE product_id=? AND (nota_id<>? OR nota_id IS NULL)");
                 $x->execute([$pid, $id]); $others = intval($x->fetchColumn());
-                $avail = $produced - $others;
+                $x = $pdo->prepare("SELECT COALESCE(SUM(qty),0) FROM stock_adjustments WHERE product_id=?");
+                $x->execute([$pid]); $adj = intval($x->fetchColumn());
+                $avail = $produced - $others + $adj;   // penyesuaian (rusak/hilang/koreksi) ikut hitung
                 if ($q > $avail) {
                     $nm = $pdo->prepare("SELECT name FROM products WHERE id=?"); $nm->execute([$pid]); $nm = $nm->fetchColumn() ?: $pid;
                     http_response_code(400); echo json_encode(['error' => "Stok \"$nm\" tidak cukup. Tersedia $avail, diminta $q."]); break 2;
@@ -560,15 +563,43 @@ try {
         case 'saveProduct': {
             $p = $in['product'];
             $id = safe_id($p['id'] ?? '') ?: gid('p');
-            $pdo->prepare("REPLACE INTO products (id,name,cat,gram,harga,hpp) VALUES (?,?,?,?,?,?)")
+            // foto: kalau key 'photo' dikirim → pakai (boleh '' utk hapus); kalau tidak → pertahankan yang lama (REPLACE bersifat destruktif)
+            if (array_key_exists('photo', $p)) {
+                $photo = (string)$p['photo'];
+                if ($photo !== '' && !preg_match('#^data:image/(png|jpe?g|webp);base64,#', $photo)) { http_response_code(400); echo json_encode(['error' => 'Foto harus berupa gambar.']); break; }
+                if (strlen($photo) > 900000) { http_response_code(400); echo json_encode(['error' => 'Foto terlalu besar (maks ~600KB).']); break; }
+                $photo = ($photo === '') ? null : $photo;
+            } else {
+                $q = $pdo->prepare("SELECT photo FROM products WHERE id=?"); $q->execute([$id]); $photo = $q->fetchColumn() ?: null;
+            }
+            $pdo->prepare("REPLACE INTO products (id,name,cat,gram,harga,hpp,photo) VALUES (?,?,?,?,?,?,?)")
                 ->execute([$id, $p['name'], $p['cat'] ?: 'Umum', intval($p['gram']) ?: 1,
-                    intval($p['harga']), intval($p['hpp'])]);
+                    intval($p['harga']), intval($p['hpp']), $photo]);
             echo json_encode(['ok' => true, 'id' => $id]);
             break;
         }
 
         case 'deleteProduct':
             $pdo->prepare("DELETE FROM products WHERE id=?")->execute([$in['id']]);
+            echo json_encode(['ok' => true]);
+            break;
+
+        case 'saveStockAdj': {
+            $a = $in['adj'] ?? [];
+            $pid = safe_id($a['productId'] ?? '');
+            if ($pid === '') { http_response_code(400); echo json_encode(['error' => 'Produk tidak valid.']); break; }
+            $qty = intval($a['qty'] ?? 0);   // bertanda: negatif=kurang, positif=tambah
+            if ($qty === 0) { http_response_code(400); echo json_encode(['error' => 'Jumlah penyesuaian tidak boleh 0.']); break; }
+            $reason = in_array(($a['reason'] ?? ''), ['rusak','hilang','pakai','koreksi','opname','expired'], true) ? $a['reason'] : 'koreksi';
+            $id = gid('adj');
+            $pdo->prepare("INSERT INTO stock_adjustments (id,product_id,adate,qty,reason,note,created) VALUES (?,?,?,?,?,?,NOW())")
+                ->execute([$id, $pid, $a['date'] ?: today(), $qty, $reason, mb_substr((string)($a['note'] ?? ''), 0, 255)]);
+            echo json_encode(['ok' => true, 'id' => $id]);
+            break;
+        }
+
+        case 'deleteStockAdj':
+            $pdo->prepare("DELETE FROM stock_adjustments WHERE id=?")->execute([safe_id($in['id'] ?? '')]);
             echo json_encode(['ok' => true]);
             break;
 
@@ -830,8 +861,11 @@ function session_totals($pdo, $sid) {
 }
 
 function bootstrap($pdo) {
-    $products = $pdo->query("SELECT id,name,cat,gram,harga,hpp FROM products ORDER BY name")->fetchAll();
+    $products = $pdo->query("SELECT id,name,cat,gram,harga,hpp,photo FROM products ORDER BY name")->fetchAll();
     foreach ($products as &$p) { $p['gram']=intval($p['gram']); $p['harga']=intval($p['harga']); $p['hpp']=intval($p['hpp']); } unset($p);
+    // penyesuaian stok produk (rusak/hilang/koreksi/opname) — utk stok akurat & riwayat
+    $stockAdj = [];
+    foreach ($pdo->query("SELECT id,product_id AS productId,adate AS date,qty,reason,note FROM stock_adjustments ORDER BY adate DESC,id DESC") as $r) { $r['qty']=intval($r['qty']); $stockAdj[] = $r; }
 
     $stores = $pdo->query("SELECT id,name,contact,address FROM stores ORDER BY name")->fetchAll();
 
@@ -891,7 +925,7 @@ function bootstrap($pdo) {
     }
 
     $biz = current_business();
-    return compact('products','stores','materials','batches','notas','cashOut','profile','register','registerLog')
+    return compact('products','stores','materials','batches','notas','cashOut','profile','register','registerLog','stockAdj')
         + ['biz' => ['name'=>$biz['name']??'', 'alias'=>$biz['alias']??'', 'user'=>$_SESSION['user_name']??($biz['user_name']??'')],
            'me' => me_payload()];
 }

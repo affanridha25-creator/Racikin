@@ -169,6 +169,21 @@ function init_schema($pdo) {
         harga INT DEFAULT 0,
         hpp INT DEFAULT 0
     ) ENGINE=InnoDB");
+    // foto produk (data URI, opsional) — tampil di grid kasir
+    ensure_column($pdo, 'products', 'photo', "photo MEDIUMTEXT DEFAULT NULL");
+
+    // Penyesuaian stok produk (rusak/hilang/pakai sendiri/koreksi/opname). qty bertanda:
+    // negatif = stok berkurang, positif = bertambah. Stok = produksi − terjual + Σ penyesuaian.
+    $pdo->exec("CREATE TABLE IF NOT EXISTS stock_adjustments (
+        id VARCHAR(32) PRIMARY KEY,
+        product_id VARCHAR(32),
+        adate DATE,
+        qty INT DEFAULT 0,
+        reason VARCHAR(20) DEFAULT 'koreksi',
+        note VARCHAR(255) DEFAULT '',
+        created DATETIME DEFAULT NULL,
+        INDEX(product_id)
+    ) ENGINE=InnoDB");
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS stores (
         id VARCHAR(32) PRIMARY KEY,

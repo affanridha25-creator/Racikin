@@ -109,6 +109,9 @@ main{flex:1;padding:16px 30px 60px}
 .actrow:last-child{border-bottom:none}
 .actdot{width:9px;height:9px;border-radius:50%;margin-top:5px;flex-shrink:0}
 .logobox{width:88px;height:88px;border-radius:18px;background:var(--cream);display:flex;align-items:center;justify-content:center;font-size:40px;overflow:hidden;flex-shrink:0;border:1px solid var(--line)}
+.logobox img{width:100%;height:100%;object-fit:cover}
+.ptmb{width:36px;height:36px;object-fit:cover;border-radius:8px;flex-shrink:0;border:1px solid var(--line)}
+.ptmb.noimg{display:inline-flex;align-items:center;justify-content:center;background:var(--bg);font-size:18px}
 .logobox img{width:100%;height:100%;object-fit:contain}
 .hero3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px}
 @media(max-width:560px){.hero3{grid-template-columns:1fr}}
@@ -288,6 +291,8 @@ label.f{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;font-w
 .pcard:hover{box-shadow:0 10px 22px rgba(40,40,60,.1)}
 .pcard:active{transform:scale(.97)}
 .pcard.out{opacity:.5;pointer-events:none}
+.pcard .pcimg{width:calc(100% + 26px);height:96px;margin:-13px -13px 10px;border-radius:16px 16px 0 0;overflow:hidden;background:var(--bg)}
+.pcard .pcimg img{width:100%;height:100%;object-fit:cover;display:block}
 .pcard .pn{font-weight:700;font-size:13.5px;line-height:1.25;margin-bottom:8px;min-height:34px;color:var(--ink)}
 .pcard .pp{font-weight:800;color:var(--red);font-size:15px}
 .pcard .ps{font-size:11px;color:var(--muted);margin-top:2px}
@@ -621,7 +626,7 @@ const mat=id=>S.materials.find(m=>m.id===id);
 const notaItems=n=>n.items||[];
 let _stockCache=null;
 function stock(pid){
-  if(!_stockCache){const m={};S.batches.forEach(b=>(b.outputs||[]).forEach(o=>{m[o.productId]=(m[o.productId]||0)+(+o.qty||0);}));S.notas.forEach(n=>notaItems(n).forEach(it=>{m[it.productId]=(m[it.productId]||0)-(+it.qty||0);}));_stockCache=m;}
+  if(!_stockCache){const m={};S.batches.forEach(b=>(b.outputs||[]).forEach(o=>{m[o.productId]=(m[o.productId]||0)+(+o.qty||0);}));S.notas.forEach(n=>notaItems(n).forEach(it=>{m[it.productId]=(m[it.productId]||0)-(+it.qty||0);}));(S.stockAdj||[]).forEach(a=>{m[a.productId]=(m[a.productId]||0)+(+a.qty||0);});_stockCache=m;}
   return _stockCache[pid]||0;
 }
 // ringkasan per NOTA (gabungan semua item)
@@ -1055,7 +1060,7 @@ function rPOS(){
   }
   const st=sessTotals(),laci=reg.openingFloat+st.cash;
   const grid=S.products.map(p=>{const s=stock(p.id);const q=POS.cart[p.id]||0;
-    return `<button class="pcard ${s<=0?"out":""}" data-n="${esc(p.name.toLowerCase())}" onclick="posAdd('${p.id}')">${q>0?`<span class="qbadge">${q}</span>`:""}<div class="pn">${esc(p.name)}</div><div class="pp">${rp(p.harga)}</div><div class="ps">stok ${s}</div></button>`;}).join("");
+    return `<button class="pcard ${s<=0?"out":""} ${p.photo?"haspic":""}" data-n="${esc(p.name.toLowerCase())}" onclick="posAdd('${p.id}')">${q>0?`<span class="qbadge">${q}</span>`:""}${p.photo?`<div class="pcimg"><img src="${p.photo}" alt=""></div>`:""}<div class="pn">${esc(p.name)}</div><div class="pp">${rp(p.harga)}</div><div class="ps">stok ${s}</div></button>`;}).join("");
   const cnt=posCount(),tot=posTotal();
   el.innerHTML=`
     <div class="pos-head"><div class="pt">🛒 Kasir</div><button class="btn sm del" onclick="closeRegisterModal()">🔓 Tutup Kasir</button></div>
@@ -1612,24 +1617,61 @@ async function delPrice(pid,id){if(confirm("Hapus titik harga ini?")){await api(
 // ================= PRODUK =================
 function rProduk(){
   if(isMobile()){
-    const rows=S.products.map(p=>crow({icon:"🫙",title:esc(p.name),sub:`${esc(p.cat)} · ${p.gram}gr · stok ${stock(p.id)}`,badges:`<div class="csub">HPP ${rp(p.hpp)} · margin ${rp(p.harga-p.hpp)}</div>`,amt:rp(p.harga),onclick:`editProd('${p.id}')`,del:`delProd('${p.id}')`})).join("");
+    const rows=S.products.map(p=>crow({icon:p.photo?`<img src="${p.photo}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">`:"🫙",title:esc(p.name),sub:`${esc(p.cat)} · ${p.gram}gr · stok ${stock(p.id)}`,badges:`<div class="csub">HPP ${rp(p.hpp)} · margin ${rp(p.harga-p.hpp)}</div>`,amt:rp(p.harga),acts:`<div class="cacts"><button class="btn sm" onclick="event.stopPropagation();stockAdjModal('${p.id}')">⚖️</button></div>`,onclick:`editProd('${p.id}')`,del:`delProd('${p.id}')`})).join("");
     document.getElementById("v-produk").innerHTML=`<div class="desc">HPP terisi otomatis dari batch; bisa diubah manual.</div><button class="btn" style="width:100%;margin-bottom:14px" onclick="editProd()">+ Produk Baru</button>${S.products.length===0?'<div class="empty">Belum ada produk.</div>':`<div class="clist">${rows}</div>`}`;
     return;
   }
-  const rows=S.products.map(p=>`<tr><td>${esc(p.name)}</td><td>${esc(p.cat)}</td><td class="num">${p.gram} gr</td><td class="num">${rp(p.hpp)}</td><td class="num">${rp(p.harga)}</td><td class="num" style="color:${p.harga-p.hpp>=0?'var(--green)':'var(--red)'}">${rp(p.harga-p.hpp)}</td><td class="num">${stock(p.id)}</td><td class="num"><div class="acts"><button class="btn sm gray" onclick="editProd('${p.id}')">Edit</button><button class="btn sm del" onclick="delProd('${p.id}')">✕</button></div></td></tr>`).join("");
+  const rows=S.products.map(p=>`<tr><td><div style="display:flex;align-items:center;gap:9px">${p.photo?`<img src="${p.photo}" class="ptmb">`:'<span class="ptmb noimg">🫙</span>'}<span>${esc(p.name)}</span></div></td><td>${esc(p.cat)}</td><td class="num">${p.gram} gr</td><td class="num">${rp(p.hpp)}</td><td class="num">${rp(p.harga)}</td><td class="num" style="color:${p.harga-p.hpp>=0?'var(--green)':'var(--red)'}">${rp(p.harga-p.hpp)}</td><td class="num"><b>${stock(p.id)}</b></td><td class="num"><div class="acts"><button class="btn sm" onclick="stockAdjModal('${p.id}')">⚖️ Stok</button><button class="btn sm gray" onclick="editProd('${p.id}')">Edit</button><button class="btn sm del" onclick="delProd('${p.id}')">✕</button></div></td></tr>`).join("");
   document.getElementById("v-produk").innerHTML=`<h2 class="title">Master Produk</h2><div class="desc">HPP terisi otomatis dari batch terakhir, tapi bisa diubah manual.</div>
   <div class="flexbtns"><button class="btn" onclick="editProd()">+ Produk Baru</button></div>
   <div class="panel"><table><thead><tr><th>Nama</th><th>Kategori</th><th class="num">Ukuran</th><th class="num">HPP</th><th class="num">Harga</th><th class="num">Margin</th><th class="num">Stok</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
-function editProd(id){const p=id?S.products.find(x=>x.id===id):{id:null,name:"",cat:"",gram:"",hpp:"",harga:""};
+let _prodPhoto=null;   // null = tak diubah; "" = hapus; data URI = foto baru
+function editProd(id){const p=id?S.products.find(x=>x.id===id):{id:null,name:"",cat:"",gram:"",hpp:"",harga:"",photo:""};
+  _prodPhoto=null;
   openModal(`<button class="close" onclick="closeModal()">×</button><h3>${id?"Edit":"Tambah"} Produk</h3>
+  <div style="display:flex;gap:14px;align-items:center;margin-bottom:14px">
+    <div id="prodPhotoPrev" class="logobox" style="width:74px;height:74px">${p.photo?`<img src="${p.photo}" alt="">`:`<span>🫙</span>`}</div>
+    <div><div class="flexbtns" style="margin-bottom:0"><button class="btn sm ghost" onclick="document.getElementById('prodPhotoInp').click()">📷 Foto Produk</button>${p.photo?`<button class="btn sm gray" onclick="rmProdPhoto()">Hapus</button>`:""}</div><div class="mini" style="margin-top:6px">Opsional — tampil di grid kasir. Maks 5MB.</div></div>
+    <input type="file" id="prodPhotoInp" accept="image/*" style="display:none" onchange="pickProdPhoto(this)">
+  </div>
   <label class="f">Nama produk</label><input id="pn" value="${esc(p.name)}">
   <div class="grid2" style="margin:12px 0"><div><label class="f">Kategori</label><input id="pc" value="${esc(p.cat)}"></div><div><label class="f">Ukuran (gram)</label><input id="pg" type="number" value="${p.gram}"></div></div>
   <div class="grid2"><div><label class="f">HPP / botol</label><input id="ph" inputmode="numeric" value="${p.hpp?grp(p.hpp):""}" oninput="this.value=grp(this.value)"></div><div><label class="f">Harga jual / botol</label><input id="phj" inputmode="numeric" value="${p.harga?grp(p.harga):""}" oninput="this.value=grp(this.value)"></div></div>
   <p class="mini" style="margin-top:8px">Ukuran (gram) dipakai membagi HPP antar produk dalam 1 batch (per bobot).</p>
   <div style="margin-top:16px;text-align:right"><button class="btn gray" onclick="closeModal()">Batal</button> <button class="btn" onclick="saveProd('${id||""}')">Simpan</button></div>`);}
+function pickProdPhoto(inp){const f=inp.files[0];if(!f)return;if(!/^image\//.test(f.type)){toast("File harus gambar.");return;}if(f.size>5*1024*1024){toast("Maks 5MB.");return;}
+  const rd=new FileReader();rd.onload=e=>{const img=new Image();img.onload=()=>{const max=360;let w=img.width,h=img.height;if(w>h&&w>max){h=Math.round(h*max/w);w=max;}else if(h>=w&&h>max){w=Math.round(w*max/h);h=max;}const cv=document.createElement("canvas");cv.width=w;cv.height=h;cv.getContext("2d").drawImage(img,0,0,w,h);_prodPhoto=cv.toDataURL("image/jpeg",0.82);document.getElementById("prodPhotoPrev").innerHTML=`<img src="${_prodPhoto}" alt="">`;};img.onerror=()=>toast("Gambar tak terbaca.");img.src=e.target.result;};rd.readAsDataURL(f);}
+function rmProdPhoto(){_prodPhoto="";document.getElementById("prodPhotoPrev").innerHTML=`<span>🫙</span>`;}
 async function saveProd(id){const o={id:id||null,name:document.getElementById("pn").value.trim(),cat:document.getElementById("pc").value.trim()||"Umum",gram:+document.getElementById("pg").value||1,hpp:+digits(document.getElementById("ph").value)||0,harga:+digits(document.getElementById("phj").value)||0};
+  if(_prodPhoto!==null)o.photo=_prodPhoto;   // hanya kirim kalau diubah (biar tak terhapus saat REPLACE)
   if(!o.name){toast("Nama wajib.");return;}await api("saveProduct",{product:o});await reload();closeModal();toast("Produk tersimpan ✓");rProduk();}
+// ---- penyesuaian / opname stok produk ----
+function stockAdjModal(id){const p=S.products.find(x=>x.id===id);if(!p){toast("Produk tak ditemukan.");return;}const cur=stock(id);
+  const hist=(S.stockAdj||[]).filter(a=>a.productId===id).slice(0,8).map(a=>`<tr><td>${fmtDate(a.date)}</td><td class="num" style="color:${a.qty<0?'var(--red)':'var(--green)'}">${a.qty>0?'+':''}${a.qty}</td><td>${esc(adjReason(a.reason))}</td><td>${esc(a.note||"")}</td><td class="num"><button class="btn sm gray" onclick="delStockAdj('${a.id}','${id}')">×</button></td></tr>`).join("");
+  openModal(`<button class="close" onclick="closeModal()">×</button><h3>⚖️ Penyesuaian Stok — ${esc(p.name)}</h3>
+  <div class="poskembali" style="justify-content:space-between;margin-bottom:14px"><span>Stok tercatat sekarang</span><b>${cur}</b></div>
+  <label class="f">Jenis</label>
+  <select id="adjReason" onchange="adjModeChange()" style="width:100%;padding:10px;border:1px solid #d8d8d8;border-radius:10px;margin-bottom:12px">
+    <option value="rusak">Rusak</option><option value="expired">Kadaluarsa</option><option value="hilang">Hilang</option><option value="pakai">Dipakai sendiri</option><option value="koreksi">Koreksi (+/−)</option><option value="opname">Stok Opname (set jumlah fisik)</option>
+  </select>
+  <div id="adjQtyWrap"><label class="f" id="adjQtyLbl">Jumlah berkurang</label><input id="adjQty" inputmode="numeric" placeholder="mis. 3"></div>
+  <label class="f" style="margin-top:10px">Catatan <span class="mini">(opsional)</span></label><input id="adjNote" placeholder="mis. jatuh / bocor">
+  <button class="btn" style="width:100%;margin-top:14px" onclick="saveStockAdj('${id}')">Simpan Penyesuaian</button>
+  ${hist?`<h4 style="margin:16px 0 6px;font-size:14px">Riwayat Penyesuaian</h4><div class="panel" style="padding:0"><table><thead><tr><th>Tgl</th><th class="num">Qty</th><th>Jenis</th><th>Catatan</th><th></th></tr></thead><tbody>${hist}</tbody></table></div>`:""}
+  <p class="mini" style="margin-top:12px">Rusak/kadaluarsa/hilang/pakai = stok berkurang. Opname = set jumlah hasil hitung fisik (sistem hitung selisihnya). Koreksi = tambah/kurang manual (pakai − untuk kurang).</p>`);}
+function adjReason(r){return {rusak:"Rusak",expired:"Kadaluarsa",hilang:"Hilang",pakai:"Dipakai sendiri",koreksi:"Koreksi",opname:"Opname"}[r]||r;}
+function adjModeChange(){const r=document.getElementById("adjReason").value;const lbl=document.getElementById("adjQtyLbl");
+  lbl.textContent=r==="opname"?"Jumlah fisik hasil hitung":(r==="koreksi"?"Perubahan (+/−)":"Jumlah berkurang");}
+async function saveStockAdj(id){const r=document.getElementById("adjReason").value;let raw=document.getElementById("adjQty").value.trim().replace(/\./g,"");let n=parseInt(raw,10);if(isNaN(n)){toast("Isi jumlah.");return;}
+  let qty;const cur=stock(id);
+  if(r==="opname"){qty=n-cur;if(qty===0){toast("Jumlah fisik sama dengan stok tercatat — tak ada perubahan.");return;}}
+  else if(r==="koreksi"){qty=n;}          // boleh + atau − (user ketik tandanya)
+  else {qty=-Math.abs(n);}                 // rusak/hilang/pakai/expired = selalu mengurangi
+  if(qty===0){toast("Jumlah tidak boleh 0.");return;}
+  await api("saveStockAdj",{adj:{productId:id,qty,reason:r,note:document.getElementById("adjNote").value.trim(),date:today()}});
+  await reload();closeModal();toast("Stok disesuaikan ✓");rProduk();}
+async function delStockAdj(aid,id){if(confirm("Hapus penyesuaian ini? Stok akan kembali seperti semula.")){await api("deleteStockAdj",{id:aid});await reload();stockAdjModal(id);}}
 async function delProd(id){const used=S.batches.some(b=>(b.outputs||[]).some(o=>o.productId===id))||S.notas.some(n=>notaItems(n).some(it=>it.productId===id));if(used){toast("Produk dipakai di batch/nota.");return;}if(confirm("Hapus produk ini?")){await api("deleteProduct",{id});await reload();rProduk();}}
 
 // ================= TOKO =================
