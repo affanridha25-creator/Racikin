@@ -562,7 +562,7 @@ function rKeuangan(){
   const tabs=`<div class="ltabs" style="max-width:320px;margin-bottom:14px"><button class="${KEU_TAB==='lr'?'on':''}" onclick="KEU_TAB='lr';rKeuangan()">Laba Rugi</button><button class="${KEU_TAB==='kas'?'on':''}" onclick="KEU_TAB='kas';rKeuangan()">Kas</button></div>`;
   let body;
   if(KEU_TAB==='lr'){
-    body=`<div class="panel"><h3>Laba Rugi <span class="mini" style="font-weight:400">${monthLabelFull(FILTER_MONTH)}</span> <button class="btn sm" onclick="printLR()">🖨 Cetak</button></h3>
+    body=`<div class="panel"><h3>Laba Rugi <span class="mini" style="font-weight:400">${monthLabelFull(FILTER_MONTH)}</span> <button class="btn sm" onclick="printLR()">🖨 Cetak</button> <button class="btn sm gray" onclick="exportLR()">⬇️ CSV</button></h3>
       <div class="lrrow"><span>Pendapatan (Omzet)</span><b>${rp(k.pendapatan)}</b></div>
       <div class="lrrow"><span>Harga Pokok Penjualan (HPP)</span><span style="color:var(--red)">(${rp(k.hpp)})</span></div>
       <div class="lrrow tot"><span>Laba Kotor</span><b>${rp(k.labaKotor)}</b></div>
@@ -593,6 +593,37 @@ function editCash(id){
 }
 async function saveCash(){const c=window._c;if(!(+c.amount>0)){toast("Isi jumlah.");return;}await api("saveCashOut",{cash:c});await reload();closeModal();toast("Kas keluar dicatat ✓");rKeuangan();}
 async function delCash(id){if(confirm("Hapus catatan kas keluar ini?")){await api("deleteCashOut",{id});await reload();rKeuangan();}}
+// ---- Export CSV (buka di Excel; pemisah ; + BOM utk locale Indonesia) ----
+function downloadCSV(filename,rows){
+  const q=v=>{v=(v==null?"":String(v));return /[";\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;};
+  const csv=rows.map(r=>r.map(q).join(";")).join("\r\n");
+  const blob=new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8"});
+  const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  toast("File CSV diunduh ✓");
+}
+function exportPenjualan(){
+  const list=S.notas.filter(n=>inMonth(n.date)).sort((a,b)=>(a.date||"").localeCompare(b.date||""));
+  if(list.length===0){toast("Tak ada penjualan pada periode ini.");return;}
+  const rows=[["Tanggal","No Nota","Toko/Pelanggan","Item","Subtotal","Diskon","Total","Terbayar","Sisa","Status","Kasir","Metode"]];
+  list.forEach(n=>rows.push([n.date,n.notaNo||"",(store(n.storeId)||{}).name||"",notaItems(n).reduce((a,i)=>a+(+i.qty||0),0),notaSubtotal(n),notaDisc(n),notaTotal(n),notaPaid(n),notaDue(n),notaStatus(n),kasirName(n.createdBy),n.payMethod||""]));
+  const t=list.reduce((a,n)=>({s:a.s+notaSubtotal(n),d:a.d+notaDisc(n),t:a.t+notaTotal(n),p:a.p+notaPaid(n),u:a.u+notaDue(n)}),{s:0,d:0,t:0,p:0,u:0});
+  rows.push(["TOTAL","","","",t.s,t.d,t.t,t.p,t.u,"","",""]);
+  downloadCSV(`penjualan-${FILTER_MONTH==="all"?"semua":FILTER_MONTH}.csv`,rows);
+}
+function exportLR(){
+  const k=keuCalc();
+  const rows=[["Laporan Laba Rugi",monthLabelFull(FILTER_MONTH)],[],
+    ["Keterangan","Jumlah (Rp)"],
+    ["Pendapatan (Omzet)",k.pendapatan],
+    ["Harga Pokok Penjualan (HPP)",-k.hpp],
+    ["Laba Kotor",k.labaKotor],
+    ["Biaya Barang Gratis (bonus/endorse/tester)",-k.promo],
+    ["Biaya Operasional Lain",-k.biayaOp],
+    ["Laba Bersih",k.labaBersih],[],
+    ["Saldo Kas (total)",k.saldo]];
+  if((k.co||[]).length){rows.push([],["Rincian Kas Keluar (periode)"],["Tanggal","Kategori","Jumlah","Catatan"]);k.co.forEach(c=>rows.push([c.date,cashCatLabel(c.category),c.amount,c.note||""]));}
+  downloadCSV(`laba-rugi-${FILTER_MONTH==="all"?"semua":FILTER_MONTH}.csv`,rows);
+}
 function printLR(){
   const k=keuCalc();
   document.getElementById("printArea").innerHTML=`<div class="preport">
@@ -1418,7 +1449,7 @@ function rDistribusi(){
     const rows=list.map(n=>{const items=notaItems(n);const free=items.filter(it=>(it.kind||"jual")!=="jual");
       const badges=free.length?`<div style="margin-top:4px">${free.map(it=>`<span class="pill-mini ${it.kind}">${kindLabel(it.kind)}</span>`).join(" ")}</div>`:"";
       return crow({icon:"🧾",title:esc(n.notaNo||"-"),sub:`${esc((store(n.storeId)||{}).name||"?")} · ${items.length} item · ${fmtDate(n.date)}`,badges,amt:rp(notaTotal(n)),status:notaStatus(n),onclick:`editNota('${n.id}')`,del:`delNota('${n.id}')`});}).join("");
-    document.getElementById("v-distribusi").innerHTML=`<div class="desc">Tiap pengiriman = 1 nota berisi banyak produk.</div><button class="btn" style="width:100%;margin-bottom:14px" onclick="editNota()">+ Nota Baru</button>${monthBar()}${list.length===0?'<div class="empty">Tak ada nota pada periode ini.</div>':`<div class="clist">${rows}</div>`}`;
+    document.getElementById("v-distribusi").innerHTML=`<div class="desc">Tiap pengiriman = 1 nota berisi banyak produk.</div><div style="display:flex;gap:8px;margin-bottom:14px"><button class="btn" style="flex:1" onclick="editNota()">+ Nota Baru</button><button class="btn gray" onclick="exportPenjualan()">⬇️ CSV</button></div>${monthBar()}${list.length===0?'<div class="empty">Tak ada nota pada periode ini.</div>':`<div class="clist">${rows}</div>`}`;
     return;
   }
   const nm=it=>esc((prod(it.productId)||{}).name||"?");
@@ -1433,7 +1464,7 @@ function rDistribusi(){
     return `<tr><td>${fmtDate(n.date)}</td><td><b>${esc(n.notaNo||"-")}</b></td><td>${esc((store(n.storeId)||{}).name||"?")}</td><td>${itemsCell}</td><td class="num"><b>${rp(notaTotal(n))}</b></td><td class="num" style="color:var(--green)">${rp(notaProfit(n))}</td><td><span class="pill ${notaStatus(n)}">${notaStatus(n).toUpperCase()}</span></td><td class="num"><div class="acts"><button class="btn sm gray" onclick="editNota('${n.id}')">Edit</button><button class="btn sm del" onclick="delNota('${n.id}')">✕</button></div></td></tr>`;
   }).join("");
   document.getElementById("v-distribusi").innerHTML=`<h2 class="title">Distribusi ke Toko</h2><div class="desc">Tiap pengiriman = 1 nota/faktur berisi banyak produk. Stok berkurang otomatis &amp; jadi tagihan (per nota) di menu Pembayaran.</div>
-  <div class="flexbtns"><button class="btn" onclick="editNota()">+ Nota Baru</button>${monthBar()}${S.stores.length===0?'<span class="mini" style="align-self:center">⚠️ Tambah toko dulu.</span>':""}</div>
+  <div class="flexbtns"><button class="btn" onclick="editNota()">+ Nota Baru</button><button class="btn gray" onclick="exportPenjualan()">⬇️ Export CSV</button>${monthBar()}${S.stores.length===0?'<span class="mini" style="align-self:center">⚠️ Tambah toko dulu.</span>':""}</div>
   <div class="panel"><h3>Riwayat Nota</h3>${list.length===0?'<div class="empty">Tak ada nota pada periode ini.</div>':`<table><thead><tr><th>Tgl</th><th>No. Nota</th><th>Toko</th><th>Item</th><th class="num">Total</th><th class="num">Laba</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table>`}</div>`;
 }
 const NOTA_FREE_KINDS=[["bonus","Bonus"],["endorse","Endorse"],["tester","Tester"]];
