@@ -39,7 +39,7 @@ if ($isAdmin && in_array($do, ['activate','deactivate','delete'], true)) {
     else {
         $alias = preg_replace('/[^a-z0-9]/', '', strtolower($_POST['alias'] ?? ''));
         if ($alias === '') { $err = 'Alias tidak valid.'; }
-        elseif ($do === 'activate')   { $m->prepare("UPDATE businesses SET active=1, paid_until=IFNULL(paid_until, DATE_ADD(CURDATE(), INTERVAL 1 MONTH)) WHERE alias=?")->execute([$alias]); $msg = "Usaha \"$alias\" diaktifkan (langganan +1 bulan). ✓"; }
+        elseif ($do === 'activate')   { $m->prepare("UPDATE businesses SET active=1, paid_until=IFNULL(paid_until, DATE_ADD(CURDATE(), INTERVAL 30 DAY)) WHERE alias=?")->execute([$alias]); $msg = "Usaha \"$alias\" diaktifkan — trial 30 hari dimulai. ✓"; }
         elseif ($do === 'deactivate') { $m->prepare("UPDATE businesses SET active=0 WHERE alias=?")->execute([$alias]); $msg = "Usaha \"$alias\" dinonaktifkan."; }
         elseif ($do === 'delete') {
             $m->prepare("DELETE FROM businesses WHERE alias=?")->execute([$alias]);
@@ -254,9 +254,9 @@ details summary{list-style:none}details summary::-webkit-details-marker{display:
               <?php endif; ?>
             <?php endif; ?>
             <?php if (!$on): ?>
-              <form method="post" onsubmit="return confirm('Pastikan database <?= h($r['db_name']) ?> sudah dibuat di cPanel + user MySQL sudah di-assign. Aktifkan usaha ini?')">
+              <form method="post" onsubmit="return confirm('Pastikan database <?= h($r['db_name']) ?> sudah dibuat di cPanel + user MySQL sudah di-assign. Aktifkan &amp; mulai TRIAL 30 hari gratis?')">
                 <input type="hidden" name="csrf" value="<?= h($csrf) ?>"><input type="hidden" name="do" value="activate"><input type="hidden" name="alias" value="<?= h($r['alias']) ?>">
-                <button class="btn sm green">✓ Aktifkan</button>
+                <button class="btn sm green" title="Aktifkan + mulai trial 30 hari gratis">✓ Aktifkan (Trial 30hr)</button>
               </form>
             <?php else: ?>
               <form method="post" onsubmit="return confirm('Nonaktifkan (blokir login) usaha ini?')">
