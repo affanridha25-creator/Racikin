@@ -595,7 +595,12 @@ async function saveCash(){const c=window._c;if(!(+c.amount>0)){toast("Isi jumlah
 async function delCash(id){if(confirm("Hapus catatan kas keluar ini?")){await api("deleteCashOut",{id});await reload();rKeuangan();}}
 // ---- Export CSV (buka di Excel; pemisah ; + BOM utk locale Indonesia) ----
 function downloadCSV(filename,rows){
-  const q=v=>{v=(v==null?"":String(v));return /[";\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;};
+  const q=v=>{
+    if(typeof v==="number")return String(v);
+    v=(v==null?"":String(v));
+    // cegah formula/CSV injection: sel teks diawali = + - @ tab CR → beri prefix ' (kecuali angka murni)
+    if(/^[=+\-@\t\r]/.test(v)&&!/^-?\d+(\.\d+)?$/.test(v))v="'"+v;
+    return /[";\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;};
   const csv=rows.map(r=>r.map(q).join(";")).join("\r\n");
   const blob=new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8"});
   const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);

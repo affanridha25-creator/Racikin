@@ -316,7 +316,7 @@ function handle_auth($action, $in) {
         if ($action === 'submitProof') {
             $proof = (string)($in['proof'] ?? '');
             if ($proof === '') { http_response_code(400); echo json_encode(['error' => 'Unggah foto bukti transfer dulu.']); return; }
-            if (!preg_match('#^data:image/(png|jpe?g|webp|gif);base64,#', $proof)) { http_response_code(400); echo json_encode(['error' => 'Bukti harus berupa gambar.']); return; }
+            if (!is_img_datauri($proof)) { http_response_code(400); echo json_encode(['error' => 'Bukti harus berupa gambar.']); return; }
             if (strlen($proof) > 3500000) { http_response_code(400); echo json_encode(['error' => 'Gambar terlalu besar (maks ~2.5MB).']); return; }
             $note = mb_substr(trim((string)($in['note'] ?? '')), 0, 255);
             $q = $m->prepare("SELECT id FROM renewal_requests WHERE alias=? AND status='awaiting' ORDER BY id DESC LIMIT 1");
@@ -366,6 +366,8 @@ function gid($p) { return $p . bin2hex(random_bytes(5)); }
 function today() { return date('Y-m-d'); }
 // id dari klien harus alfanumerik saja (cegah XSS lewat interpolasi id ke handler onclick)
 function safe_id($id) { $id = (string)$id; return preg_match('/^[A-Za-z0-9_-]{1,40}$/', $id) ? $id : ''; }
+// data-URI gambar yang KETAT (full-match, hanya karakter base64) → cegah breakout HTML/XSS via src="..."
+function is_img_datauri($s) { return (bool) preg_match('#^data:image/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/\r\n=]+$#', (string)$s); }
 
 // ---- Otorisasi per-aksi: pemilik (owner) lolos semua; staf hanya aksi yang menunya diizinkan ----
 if (($_SESSION['role'] ?? 'owner') !== 'owner') {
@@ -584,7 +586,7 @@ try {
             // foto: kalau key 'photo' dikirim → pakai (boleh '' utk hapus); kalau tidak → pertahankan yang lama (REPLACE bersifat destruktif)
             if (array_key_exists('photo', $p)) {
                 $photo = (string)$p['photo'];
-                if ($photo !== '' && !preg_match('#^data:image/(png|jpe?g|webp);base64,#', $photo)) { http_response_code(400); echo json_encode(['error' => 'Foto harus berupa gambar.']); break; }
+                if ($photo !== '' && !is_img_datauri($photo)) { http_response_code(400); echo json_encode(['error' => 'Foto harus berupa gambar.']); break; }
                 if (strlen($photo) > 900000) { http_response_code(400); echo json_encode(['error' => 'Foto terlalu besar (maks ~600KB).']); break; }
                 $photo = ($photo === '') ? null : $photo;
             } else {
@@ -699,7 +701,7 @@ try {
         case 'saveProfile': {
             $p = $in['profile'] ?? [];
             $logo = (string)($p['logo'] ?? '');
-            if ($logo !== '' && !preg_match('#^data:image/(png|jpe?g|webp|gif);base64,#', $logo)) {
+            if ($logo !== '' && !is_img_datauri($logo)) {
                 http_response_code(400); echo json_encode(['error' => 'Logo harus berupa gambar.']); break;
             }
             if (strlen($logo) > 3000000) { http_response_code(400); echo json_encode(['error' => 'Logo terlalu besar (maks ~2MB).']); break; }
@@ -996,7 +998,7 @@ function import_all($pdo, $data) {
     if (!empty($data['profile']) && is_array($data['profile'])) {
         $pf = $data['profile'];
         $logo = (string)($pf['logo'] ?? '');
-        if ($logo !== '' && !preg_match('#^data:image/#', $logo)) $logo = '';
+        if ($logo !== '' && !is_img_datauri($logo)) $logo = '';
         $pdo->prepare("REPLACE INTO profile (id,address,phone,whatsapp,instagram,facebook,tiktok,logo) VALUES (1,?,?,?,?,?,?,?)")
             ->execute([$pf['address']??'',$pf['phone']??'',$pf['whatsapp']??'',$pf['instagram']??'',$pf['facebook']??'',$pf['tiktok']??'',$logo]);
     }
