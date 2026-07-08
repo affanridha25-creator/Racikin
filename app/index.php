@@ -606,14 +606,18 @@ function downloadCSV(filename,rows){
   const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
   toast("File CSV diunduh ✓");
 }
-function exportPenjualan(){
-  const list=S.notas.filter(n=>inMonth(n.date)).sort((a,b)=>(a.date||"").localeCompare(b.date||""));
-  if(list.length===0){toast("Tak ada penjualan pada periode ini.");return;}
+function exportPenjualan(scope){   // scope: 'distribusi' (non-POS) | 'pos' | undefined(semua)
+  let list=S.notas.filter(n=>inMonth(n.date));
+  if(scope==="distribusi")list=list.filter(n=>!n.sessionId);
+  else if(scope==="pos")list=list.filter(n=>n.sessionId);
+  list=list.sort((a,b)=>(a.date||"").localeCompare(b.date||""));
+  if(list.length===0){toast("Tak ada data pada periode ini.");return;}
   const rows=[["Tanggal","No Nota","Toko/Pelanggan","Item","Subtotal","Diskon","Total","Terbayar","Sisa","Status","Kasir","Metode"]];
   list.forEach(n=>rows.push([n.date,n.notaNo||"",(store(n.storeId)||{}).name||"",notaItems(n).reduce((a,i)=>a+(+i.qty||0),0),notaSubtotal(n),notaDisc(n),notaTotal(n),notaPaid(n),notaDue(n),notaStatus(n),kasirName(n.createdBy),n.payMethod||""]));
   const t=list.reduce((a,n)=>({s:a.s+notaSubtotal(n),d:a.d+notaDisc(n),t:a.t+notaTotal(n),p:a.p+notaPaid(n),u:a.u+notaDue(n)}),{s:0,d:0,t:0,p:0,u:0});
   rows.push(["TOTAL","","","",t.s,t.d,t.t,t.p,t.u,"","",""]);
-  downloadCSV(`penjualan-${FILTER_MONTH==="all"?"semua":FILTER_MONTH}.csv`,rows);
+  const pre=scope==="pos"?"penjualan-kasir":(scope==="distribusi"?"distribusi":"penjualan");
+  downloadCSV(`${pre}-${FILTER_MONTH==="all"?"semua":FILTER_MONTH}.csv`,rows);
 }
 function exportLR(){
   const k=keuCalc();
@@ -1174,11 +1178,15 @@ function closeRegisterSummary(s){
     <button class="btn" style="width:100%;margin-top:8px;background:var(--green)" onclick="closeModal();rPOS()">Selesai</button>
   </div>`);
 }
-function regReceiptText(s){
-  if(!s)return "";const W=32;
-  const ctr=t=>{t=String(t).slice(0,W);return " ".repeat(Math.max(0,Math.floor((W-t.length)/2)))+t;};
+// Helper format struk thermal 32 kolom (dipakai regReceiptText/posReceiptText/settlementText)
+function rcptFmt(){const W=32;
+  const cut=s=>String(s).slice(0,W);
+  const ctr=s=>{s=cut(s);return " ".repeat(Math.max(0,Math.floor((W-s.length)/2)))+s;};
   const lr=(l,r)=>{l=String(l);r=String(r);if(l.length+r.length>=W)l=l.slice(0,Math.max(0,W-r.length-1));return l+" ".repeat(Math.max(1,W-l.length-r.length))+r;};
-  const dash="-".repeat(W);
+  return {W,cut,ctr,lr,dash:"-".repeat(W)};
+}
+function regReceiptText(s){
+  if(!s)return "";const {ctr,lr,dash}=rcptFmt();
   let t=ctr((BIZ.name||"Racikin").toUpperCase())+"\n"+ctr("LAPORAN TUTUP KASIR")+"\n"+dash+"\n";
   t+=lr("Kasir",kasirName(s.openedBy))+"\n"+lr("Transaksi",s.count+" nota")+"\n"+dash+"\n";
   t+=lr("Modal awal",rp(s.openingFloat))+"\n";
@@ -1280,11 +1288,7 @@ function posSuccess(id,total,bayar,kembali,method){
 // Struk teks 58mm (32 kolom) untuk printer thermal
 function posReceiptText(id,bayar,kembali,method){
   const n=S.notas.find(x=>x.id===id);if(!n)return "";
-  const p=S.profile||{},W=32;
-  const cut=s=>String(s).slice(0,W);
-  const ctr=s=>{s=cut(s);return " ".repeat(Math.max(0,Math.floor((W-s.length)/2)))+s;};
-  const lr=(l,r)=>{l=String(l);r=String(r);if(l.length+r.length>=W)l=l.slice(0,Math.max(0,W-r.length-1));return l+" ".repeat(Math.max(1,W-l.length-r.length))+r;};
-  const dash="-".repeat(W);
+  const p=S.profile||{};const {cut,ctr,lr,dash}=rcptFmt();
   let t=ctr((BIZ.name||"Racikin").toUpperCase())+"\n";
   if(p.address)t+=ctr(p.address)+"\n";
   const kontak=[p.phone,p.whatsapp].filter(Boolean).join(" / ");if(kontak)t+=ctr(kontak)+"\n";
@@ -1296,13 +1300,16 @@ function posReceiptText(id,bayar,kembali,method){
   if(notaDisc(n)>0){t+=lr("Subtotal",rp(notaSubtotal(n)))+"\n"+lr("Diskon","-"+rp(notaDisc(n)))+"\n";}
   t+=lr("TOTAL",rp(notaTotal(n)))+"\n";
   if(method){t+=lr("Bayar ("+method+")",rp(bayar))+"\n";if(method==="Tunai")t+=lr("Kembalian",rp(kembali||0))+"\n";}
+  if(notaDue(n)>0)t+=lr("Sisa",rp(notaDue(n)))+"\n";
   t+=dash+"\n"+ctr("Terima kasih :)")+"\n"+ctr("-- "+(BIZ.name||"Racikin")+" --")+"\n\n\n\n";
   return t;
 }
 // Kirim struk ke app RawBT (Android) → cetak ke printer thermal Bluetooth 58mm
+// PENTING: encodeURIComponent — browser membuang \n \r \t dari URL mentah, jadi
+// tanpa encode baris-baris struk nyatu jadi satu. RawBT men-decode kembali → newline utuh.
 function printRawBT(text){
   if(!text){toast("Struk kosong.");return;}
-  try{window.location.href="rawbt:"+text;}catch(e){toast("Gagal buka RawBT. Pastikan app RawBT terpasang.");}
+  try{window.location.href="rawbt:"+encodeURIComponent(text);}catch(e){toast("Gagal buka RawBT. Pastikan app RawBT terpasang.");}
 }
 function printReceipt(id,bayar,kembali,method){
   const n=S.notas.find(x=>x.id===id);if(!n){toast("Nota tak ditemukan.");return;}
@@ -1450,15 +1457,15 @@ async function delBatch(id){if(confirm("Hapus batch ini? Stok berkurang.")){awai
 // ================= DISTRIBUSI (per NOTA) =================
 function rDistribusi(){
   if(isMobile()){
-    const list=S.notas.filter(n=>inMonth(n.date));
+    const list=S.notas.filter(n=>!n.sessionId&&inMonth(n.date));
     const rows=list.map(n=>{const items=notaItems(n);const free=items.filter(it=>(it.kind||"jual")!=="jual");
       const badges=free.length?`<div style="margin-top:4px">${free.map(it=>`<span class="pill-mini ${it.kind}">${kindLabel(it.kind)}</span>`).join(" ")}</div>`:"";
-      return crow({icon:"🧾",title:esc(n.notaNo||"-"),sub:`${esc((store(n.storeId)||{}).name||"?")} · ${items.length} item · ${fmtDate(n.date)}`,badges,amt:rp(notaTotal(n)),status:notaStatus(n),onclick:`editNota('${n.id}')`,del:`delNota('${n.id}')`});}).join("");
-    document.getElementById("v-distribusi").innerHTML=`<div class="desc">Tiap pengiriman = 1 nota berisi banyak produk.</div><div style="display:flex;gap:8px;margin-bottom:14px"><button class="btn" style="flex:1" onclick="editNota()">+ Nota Baru</button><button class="btn gray" onclick="exportPenjualan()">⬇️ CSV</button></div>${monthBar()}${list.length===0?'<div class="empty">Tak ada nota pada periode ini.</div>':`<div class="clist">${rows}</div>`}`;
+      return crow({icon:"🧾",title:esc(n.notaNo||"-"),sub:`${esc((store(n.storeId)||{}).name||"?")} · ${items.length} item · ${fmtDate(n.date)}`,badges,amt:rp(notaTotal(n)),status:notaStatus(n),acts:`<div class="cacts"><button class="btn sm gray" onclick="event.stopPropagation();strukModal('${n.id}')">🖨</button></div>`,onclick:`editNota('${n.id}')`,del:`delNota('${n.id}')`});}).join("");
+    document.getElementById("v-distribusi").innerHTML=`<div class="desc">Nota kirim/titip ke toko (faktur). Penjualan kasir POS ada di menu <b>Rekap Kasir</b>.</div><div style="display:flex;gap:8px;margin-bottom:14px"><button class="btn" style="flex:1" onclick="editNota()">+ Nota Baru</button><button class="btn gray" onclick="exportPenjualan('distribusi')">⬇️ CSV</button></div>${monthBar()}${list.length===0?'<div class="empty">Tak ada nota distribusi pada periode ini.</div>':`<div class="clist">${rows}</div>`}`;
     return;
   }
   const nm=it=>esc((prod(it.productId)||{}).name||"?");
-  const list=S.notas.filter(n=>inMonth(n.date));
+  const list=S.notas.filter(n=>!n.sessionId&&inMonth(n.date));
   const rows=list.map(n=>{
     const jualIt=notaItems(n).filter(it=>(it.kind||"jual")==="jual");
     const freeIt=notaItems(n).filter(it=>(it.kind||"jual")!=="jual");
@@ -1466,11 +1473,11 @@ function rDistribusi(){
     const jualTxt=jualIt.map(it=>li(nm(it),it.qty)).join("")||'<div class="li muted">—</div>';
     const freeTxt=freeIt.length?`<div class="free">${freeIt.map(it=>li(`<span class="pill-mini ${it.kind}">${kindLabel(it.kind)}</span> ${nm(it)}`,it.qty)).join("")}</div>`:"";
     const itemsCell=`<div class="itemcell">${jualTxt}${freeTxt}</div>`;
-    return `<tr><td>${fmtDate(n.date)}</td><td><b>${esc(n.notaNo||"-")}</b></td><td>${esc((store(n.storeId)||{}).name||"?")}</td><td>${itemsCell}</td><td class="num"><b>${rp(notaTotal(n))}</b></td><td class="num" style="color:var(--green)">${rp(notaProfit(n))}</td><td><span class="pill ${notaStatus(n)}">${notaStatus(n).toUpperCase()}</span></td><td class="num"><div class="acts"><button class="btn sm gray" onclick="editNota('${n.id}')">Edit</button><button class="btn sm del" onclick="delNota('${n.id}')">✕</button></div></td></tr>`;
+    return `<tr><td>${fmtDate(n.date)}</td><td><b>${esc(n.notaNo||"-")}</b></td><td>${esc((store(n.storeId)||{}).name||"?")}</td><td>${itemsCell}</td><td class="num"><b>${rp(notaTotal(n))}</b></td><td class="num" style="color:var(--green)">${rp(notaProfit(n))}</td><td><span class="pill ${notaStatus(n)}">${notaStatus(n).toUpperCase()}</span></td><td class="num"><div class="acts"><button class="btn sm" onclick="strukModal('${n.id}')">🖨 Struk</button><button class="btn sm gray" onclick="editNota('${n.id}')">Edit</button><button class="btn sm del" onclick="delNota('${n.id}')">✕</button></div></td></tr>`;
   }).join("");
-  document.getElementById("v-distribusi").innerHTML=`<h2 class="title">Distribusi ke Toko</h2><div class="desc">Tiap pengiriman = 1 nota/faktur berisi banyak produk. Stok berkurang otomatis &amp; jadi tagihan (per nota) di menu Pembayaran.</div>
-  <div class="flexbtns"><button class="btn" onclick="editNota()">+ Nota Baru</button><button class="btn gray" onclick="exportPenjualan()">⬇️ Export CSV</button>${monthBar()}${S.stores.length===0?'<span class="mini" style="align-self:center">⚠️ Tambah toko dulu.</span>':""}</div>
-  <div class="panel"><h3>Riwayat Nota</h3>${list.length===0?'<div class="empty">Tak ada nota pada periode ini.</div>':`<table><thead><tr><th>Tgl</th><th>No. Nota</th><th>Toko</th><th>Item</th><th class="num">Total</th><th class="num">Laba</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table>`}</div>`;
+  document.getElementById("v-distribusi").innerHTML=`<h2 class="title">Distribusi ke Toko</h2><div class="desc">Nota/faktur kirim &amp; titip ke toko (jadi tagihan di menu Pembayaran). Penjualan kasir POS terpisah di menu <b>Rekap Kasir</b>.</div>
+  <div class="flexbtns"><button class="btn" onclick="editNota()">+ Nota Baru</button><button class="btn gray" onclick="exportPenjualan('distribusi')">⬇️ Export CSV</button>${monthBar()}${S.stores.length===0?'<span class="mini" style="align-self:center">⚠️ Tambah toko dulu.</span>':""}</div>
+  <div class="panel"><h3>Riwayat Nota Distribusi</h3>${list.length===0?'<div class="empty">Tak ada nota distribusi pada periode ini.</div>':`<table><thead><tr><th>Tgl</th><th>No. Nota</th><th>Toko</th><th>Item</th><th class="num">Total</th><th class="num">Laba</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table>`}</div>`;
 }
 const NOTA_FREE_KINDS=[["bonus","Bonus"],["endorse","Endorse"],["tester","Tester"]];
 const kindLabel=k=>({jual:"",bonus:"BONUS",endorse:"ENDORSE",tester:"TESTER"}[k]||"");
@@ -1524,7 +1531,7 @@ async function delNota(id){if(confirm("Hapus nota ini beserta pembayarannya? Sto
 // ================= PEMBAYARAN (per NOTA) =================
 function rPembayaran(){
   if(isMobile()){
-    const lst=[...S.notas].filter(n=>inMonth(n.date)).sort((a,b)=>{const o={belum:0,sebagian:1,lunas:2};return o[notaStatus(a)]-o[notaStatus(b)]||(b.date||"").localeCompare(a.date||"");});
+    const lst=[...S.notas].filter(n=>!n.sessionId&&inMonth(n.date)).sort((a,b)=>{const o={belum:0,sebagian:1,lunas:2};return o[notaStatus(a)]-o[notaStatus(b)]||(b.date||"").localeCompare(a.date||"");});
     const totalP=lst.reduce((a,n)=>a+notaDue(n),0);
     const rows=lst.map(n=>{const due=notaStatus(n)!=="lunas";
       const acts=`<div class="cacts">${due?`<button class="btn sm wa" onclick="event.stopPropagation();waTagih('${n.id}')">💬</button><button class="btn sm" onclick="event.stopPropagation();payModal('${n.id}')">Bayar</button>`:""}<button class="btn sm gray" onclick="event.stopPropagation();payHist('${n.id}')">🕘</button></div>`;
@@ -1532,7 +1539,7 @@ function rPembayaran(){
     document.getElementById("v-pembayaran").innerHTML=`<div class="card accent" style="margin-bottom:16px"><div class="lbl">Total Piutang (${monthLabelFull(FILTER_MONTH)})</div><div class="val">${rp(totalP)}</div></div>${monthBar()}${lst.length===0?'<div class="empty">Tak ada tagihan pada periode ini.</div>':`<div class="clist">${rows}</div>`}`;
     return;
   }
-  const list=[...S.notas].filter(n=>inMonth(n.date)).sort((a,b)=>{const o={belum:0,sebagian:1,lunas:2};return o[notaStatus(a)]-o[notaStatus(b)]||(b.date||"").localeCompare(a.date||"");});
+  const list=[...S.notas].filter(n=>!n.sessionId&&inMonth(n.date)).sort((a,b)=>{const o={belum:0,sebagian:1,lunas:2};return o[notaStatus(a)]-o[notaStatus(b)]||(b.date||"").localeCompare(a.date||"");});
   const totalPiutang=list.reduce((a,n)=>a+notaDue(n),0);
   const rows=list.map(n=>`<tr><td>${fmtDate(n.date)}</td><td>${esc(n.notaNo||"-")}</td><td>${esc((store(n.storeId)||{}).name||"?")}</td><td class="num">${notaItems(n).length} item</td><td class="num">${rp(notaTotal(n))}</td><td class="num" style="color:var(--green)">${rp(notaPaid(n))}</td><td class="num" style="color:var(--amber)"><b>${rp(notaDue(n))}</b></td><td><span class="pill ${notaStatus(n)}">${notaStatus(n).toUpperCase()}</span></td><td class="num"><div class="acts">${notaStatus(n)!=="lunas"?`<button class="btn sm wa" onclick="waTagih('${n.id}')">💬 Tagih</button><button class="btn sm" onclick="payModal('${n.id}')">Bayar</button>`:""}<button class="btn sm gray" onclick="payHist('${n.id}')">Riwayat</button></div></td></tr>`).join("");
   document.getElementById("v-pembayaran").innerHTML=`<h2 class="title">Pembayaran &amp; Piutang</h2><div class="desc">Tagihan dilacak per nota. Bisa cicil; sisa piutang update otomatis.</div>
@@ -1755,39 +1762,80 @@ function kasirName(email){return _userNames[email]||email||"(tak tercatat)";}
 async function rRekap(){
   // ambil nama pengguna sekali (biar tampil nama, bukan email) — owner-only, sudah dijaga server
   if(Object.keys(_userNames).length===0){try{const r=await api("usersList");(r.users||[]).forEach(u=>_userNames[u.email]=u.name);}catch(e){}}
-  const fnotas=S.notas.filter(n=>inMonth(n.date));
+  const fnotas=S.notas.filter(n=>n.sessionId&&inMonth(n.date));   // POS saja (punya sesi kasir)
   const by={};
-  fnotas.forEach(n=>{const k=n.createdBy||"";if(!by[k])by[k]={omzet:0,laba:0,bayar:0,n:0};by[k].omzet+=notaTotal(n);by[k].laba+=notaProfit(n);by[k].bayar+=notaPaid(n);by[k].n++;});
+  fnotas.forEach(n=>{const k=n.createdBy||"";if(!by[k])by[k]={omzet:0,tunai:0,nontunai:0,n:0};by[k].omzet+=notaTotal(n);if(n.payMethod==="Tunai")by[k].tunai+=notaTotal(n);else by[k].nontunai+=notaTotal(n);by[k].n++;});
   const rows=Object.entries(by).map(([k,v])=>({k,...v})).sort((a,b)=>b.omzet-a.omzet);
-  const tot=rows.reduce((a,r)=>({omzet:a.omzet+r.omzet,laba:a.laba+r.laba,bayar:a.bayar+r.bayar,n:a.n+r.n}),{omzet:0,laba:0,bayar:0,n:0});
+  const tot=rows.reduce((a,r)=>({omzet:a.omzet+r.omzet,tunai:a.tunai+r.tunai,nontunai:a.nontunai+r.nontunai,n:a.n+r.n}),{omzet:0,tunai:0,nontunai:0,n:0});
   const el=document.getElementById("v-rekap");
   const sesi=regLogHtml();
-  if(rows.length===0){el.innerHTML=`<h2 class="title">Rekap Kasir</h2><div class="desc">Penjualan per kasir/pengguna.</div>${monthBar()}${sesi||'<div class="empty">Belum ada transaksi pada periode ini.</div>'}`;return;}
+  const head=`<h2 class="title">Penjualan Kasir (POS)</h2><div class="desc">Rekap transaksi kasir per pengguna &amp; per sesi. Ketuk sesi untuk lihat detail + cetak ulang struk/settlement.</div>`;
+  const expBtn=fnotas.length?`<button class="btn sm gray" onclick="exportPenjualan('pos')">⬇️ CSV</button>`:"";
+  if(rows.length===0){el.innerHTML=`${head}${monthBar()}${sesi||'<div class="empty">Belum ada penjualan kasir pada periode ini.</div>'}`;return;}
   if(isMobile()){
-    const cards=rows.map(r=>crow({icon:"🧑‍💼",title:esc(kasirName(r.k)),sub:`${r.n} transaksi · terbayar ${rp(r.bayar)}`,amt:rp(r.omzet),badges:(r.omzet-r.bayar>0?`<div class="csub">Piutang ${rp(r.omzet-r.bayar)}</div>`:"")})).join("");
-    el.innerHTML=`<h2 class="title">Rekap Kasir</h2><div class="desc">Penjualan per kasir/pengguna.</div>${monthBar()}
-      <div class="card accent" style="margin-bottom:14px"><div class="lbl">Total Omzet · ${monthLabelFull(FILTER_MONTH)}</div><div class="val">${rp(tot.omzet)}</div></div>
+    const cards=rows.map(r=>crow({icon:"🧑‍💼",title:esc(kasirName(r.k)),sub:`${r.n} transaksi · tunai ${rp(r.tunai)}`,amt:rp(r.omzet),badges:(r.nontunai>0?`<div class="csub">Non-tunai ${rp(r.nontunai)}</div>`:"")})).join("");
+    el.innerHTML=`${head}${monthBar()}
+      <div class="card accent" style="margin-bottom:14px"><div class="lbl">Total Penjualan Kasir · ${monthLabelFull(FILTER_MONTH)}</div><div class="val">${rp(tot.omzet)}</div></div>
+      <div style="margin-bottom:10px">${expBtn}</div>
       <div class="clist">${cards}</div>${sesi}`;
     return;
   }
-  const trs=rows.map(r=>`<tr><td>${esc(kasirName(r.k))}</td><td class="num">${r.n}</td><td class="num">${rp(r.omzet)}</td><td class="num" style="color:var(--green)">${rp(r.bayar)}</td><td class="num" style="color:var(--amber)">${rp(r.omzet-r.bayar)}</td></tr>`).join("");
-  el.innerHTML=`<h2 class="title">Rekap Penjualan per Kasir</h2><div class="desc">Ringkasan transaksi tiap kasir/pengguna pada periode terpilih.</div>${monthBar()}
-    <div class="panel"><table><thead><tr><th>Kasir</th><th class="num">Transaksi</th><th class="num">Omzet</th><th class="num">Terbayar</th><th class="num">Piutang</th></tr></thead>
-    <tbody>${trs}<tr class="tot" style="font-weight:700;border-top:2px solid var(--line)"><td>TOTAL</td><td class="num">${tot.n}</td><td class="num">${rp(tot.omzet)}</td><td class="num">${rp(tot.bayar)}</td><td class="num">${rp(tot.omzet-tot.bayar)}</td></tr></tbody></table></div>
-    <p class="mini" style="padding:0 4px">Kasir dicatat otomatis dari user yang membuat nota (POS &amp; distribusi).</p>${sesi}`;
+  const trs=rows.map(r=>`<tr><td>${esc(kasirName(r.k))}</td><td class="num">${r.n}</td><td class="num">${rp(r.omzet)}</td><td class="num" style="color:var(--green)">${rp(r.tunai)}</td><td class="num" style="color:var(--amber)">${rp(r.nontunai)}</td></tr>`).join("");
+  el.innerHTML=`${head}<div class="flexbtns">${expBtn}${monthBar()}</div>
+    <div class="panel"><table><thead><tr><th>Kasir</th><th class="num">Transaksi</th><th class="num">Penjualan</th><th class="num">Tunai</th><th class="num">Non-tunai</th></tr></thead>
+    <tbody>${trs}<tr class="tot" style="font-weight:700;border-top:2px solid var(--line)"><td>TOTAL</td><td class="num">${tot.n}</td><td class="num">${rp(tot.omzet)}</td><td class="num">${rp(tot.tunai)}</td><td class="num">${rp(tot.nontunai)}</td></tr></tbody></table></div>${sesi}`;
 }
 // Riwayat sesi kasir (buka/tutup laci) untuk bulan terpilih
 function regLogHtml(){
   const log=(S.registerLog||[]).filter(s=>inMonth(String(s.closedAt||s.openedAt||"").slice(0,10)));
   if(!log.length)return "";
   if(isMobile()){
-    const cards=log.map(s=>{const d=s.diff;return crow({icon:"🧾",title:esc(kasirName(s.openedBy)),sub:`${fmtClock(s.openedAt)} → ${fmtClock(s.closedAt)} · ${s.txnCount} nota`,amt:rp(s.cashSales),badges:`<div class="csub">Modal ${rp(s.openingFloat)} · Selisih <b style="color:${d===0?"var(--green)":"var(--red)"}">${(d>0?"+":"")+rp(d)}</b></div>`});}).join("");
+    const cards=log.map(s=>{const d=s.diff;return crow({icon:"🧾",title:esc(kasirName(s.openedBy)),sub:`${fmtClock(s.openedAt)} → ${fmtClock(s.closedAt)} · ${s.txnCount} nota`,amt:rp(s.cashSales),badges:`<div class="csub">Modal ${rp(s.openingFloat)} · Selisih <b style="color:${d===0?"var(--green)":"var(--red)"}">${(d>0?"+":"")+rp(d)}</b></div>`,onclick:`sessionDetail('${s.id}')`});}).join("");
     return `<div class="dsec" style="margin-top:22px"><h2 class="title" style="font-size:17px">Riwayat Sesi Kasir</h2></div><div class="clist">${cards}</div>`;
   }
-  const trs=log.map(s=>{const d=s.diff;return `<tr><td>${esc(kasirName(s.openedBy))}<br><span class="mini">${fmtClock(s.openedAt)} → ${fmtClock(s.closedAt)}</span></td><td class="num">${s.txnCount}</td><td class="num">${rp(s.openingFloat)}</td><td class="num">${rp(s.cashSales)}</td><td class="num">${rp(s.expected)}</td><td class="num">${rp(s.closing)}</td><td class="num" style="color:${d===0?"var(--green)":"var(--red)"};font-weight:700">${(d>0?"+":"")+rp(d)}</td></tr>`;}).join("");
-  return `<h2 class="title" style="font-size:18px;margin-top:26px">Riwayat Sesi Kasir</h2><div class="desc">Buka/tutup laci pada periode terpilih. Selisih = uang fisik − kas seharusnya.</div>
+  const trs=log.map(s=>{const d=s.diff;return `<tr style="cursor:pointer" onclick="sessionDetail('${s.id}')"><td>${esc(kasirName(s.openedBy))}<br><span class="mini">${fmtClock(s.openedAt)} → ${fmtClock(s.closedAt)}</span></td><td class="num">${s.txnCount}</td><td class="num">${rp(s.openingFloat)}</td><td class="num">${rp(s.cashSales)}</td><td class="num">${rp(s.expected)}</td><td class="num">${rp(s.closing)}</td><td class="num" style="color:${d===0?"var(--green)":"var(--red)"};font-weight:700">${(d>0?"+":"")+rp(d)}</td></tr>`;}).join("");
+  return `<h2 class="title" style="font-size:18px;margin-top:26px">Riwayat Sesi Kasir</h2><div class="desc">Buka/tutup laci pada periode terpilih. <b>Ketuk sesi</b> untuk detail transaksi + cetak ulang. Selisih = uang fisik − kas seharusnya.</div>
     <div class="panel"><table><thead><tr><th>Kasir / Waktu</th><th class="num">Nota</th><th class="num">Modal</th><th class="num">Tunai</th><th class="num">Seharusnya</th><th class="num">Dihitung</th><th class="num">Selisih</th></tr></thead><tbody>${trs}</tbody></table></div>`;
 }
+// ---- Detail sesi kasir: settlement + daftar transaksi + cetak ulang ----
+function sessionDetail(sid){
+  const s=(S.registerLog||[]).find(x=>x.id===sid);if(!s){toast("Sesi tak ditemukan.");return;}
+  const txns=S.notas.filter(n=>n.sessionId===sid).sort((a,b)=>(b.notaNo||"").localeCompare(a.notaNo||""));
+  const d=s.diff;
+  const rows=txns.map(n=>`<div class="crow"><div class="ci">🧾</div><div class="cmain"><div class="ctitle">${esc(n.notaNo||"-")}</div><div class="csub">${fmtDate(n.date)} · ${notaItems(n).length} item · ${esc(n.payMethod||"Tunai")}</div></div><div class="cright"><div class="camt">${rp(notaTotal(n))}</div></div><button class="crow-del" style="color:var(--red);font-size:16px" title="Cetak ulang struk" onclick="strukModal('${n.id}')">🖨</button></div>`).join("");
+  openModal(`<button class="close" onclick="closeModal()">×</button><h3>Sesi Kasir — ${esc(kasirName(s.openedBy))}</h3>
+    <div class="mini" style="margin:-6px 0 12px">${fmtClock(s.openedAt)} → ${fmtClock(s.closedAt)}</div>
+    <div class="regsum" style="background:var(--bg);border-radius:12px;padding:6px 14px;margin-bottom:14px">
+      <div class="rs" style="display:flex;justify-content:space-between;padding:7px 0"><span>Modal awal</span><b>${rp(s.openingFloat)}</b></div>
+      <div class="rs" style="display:flex;justify-content:space-between;padding:7px 0;border-top:1px solid var(--line)"><span>Penjualan tunai</span><b>${rp(s.cashSales)}</b></div>
+      <div class="rs" style="display:flex;justify-content:space-between;padding:7px 0;border-top:1px solid var(--line)"><span>Non-tunai</span><b>${rp(s.noncashSales)}</b></div>
+      <div class="rs" style="display:flex;justify-content:space-between;padding:7px 0;border-top:1px solid var(--line);font-weight:800"><span>Kas seharusnya</span><b>${rp(s.expected)}</b></div>
+      <div class="rs" style="display:flex;justify-content:space-between;padding:7px 0;border-top:1px solid var(--line)"><span>Uang dihitung</span><b>${rp(s.closing)}</b></div>
+      <div class="rs" style="display:flex;justify-content:space-between;padding:7px 0;border-top:1px solid var(--line);font-weight:800"><span>Selisih</span><b style="color:${d===0?'var(--green)':'var(--red)'}">${(d>0?'+':'')+rp(d)}</b></div>
+    </div>
+    <button class="btn" style="width:100%;margin-bottom:14px" onclick="printRawBT(settlementText('${sid}'))">🖨 Cetak Ulang Laporan Settlement</button>
+    <div class="mini" style="font-weight:700;color:var(--ink);margin-bottom:6px">Transaksi (${txns.length})</div>
+    ${txns.length===0?'<div class="empty">Tak ada transaksi.</div>':`<div class="clist">${rows}</div>`}`);
+}
+function settlementText(sid){
+  const s=(S.registerLog||[]).find(x=>x.id===sid);if(!s)return "";
+  const {ctr,lr,dash}=rcptFmt();
+  let t=ctr((BIZ.name||"Racikin").toUpperCase())+"\n"+ctr("LAPORAN TUTUP KASIR")+"\n"+dash+"\n";
+  t+=lr("Kasir",kasirName(s.openedBy))+"\n"+lr("Buka",fmtClock(s.openedAt))+"\n"+lr("Tutup",fmtClock(s.closedAt))+"\n"+lr("Transaksi",s.txnCount+" nota")+"\n"+dash+"\n";
+  t+=lr("Modal awal",rp(s.openingFloat))+"\n"+lr("Penjualan tunai",rp(s.cashSales))+"\n"+lr("Kas seharusnya",rp(s.expected))+"\n"+lr("Uang dihitung",rp(s.closing))+"\n"+lr("Selisih",(s.diff>0?"+":"")+rp(s.diff))+"\n"+lr("Penjualan non-tunai",rp(s.noncashSales))+"\n"+dash+"\n";
+  t+=ctr("-- "+(BIZ.name||"Racikin")+" --")+"\n\n\n\n";
+  return t;
+}
+// ---- Cetak ulang struk transaksi ----
+function strukModal(id){const n=S.notas.find(x=>x.id===id);if(!n){toast("Nota tak ditemukan.");return;}
+  const method=n.payMethod||"Tunai";const bayar=notaPaid(n);   // uang yg benar-benar diterima (bukan diasumsikan lunas)
+  openModal(`<button class="close" onclick="closeModal()">×</button><h3>🖨 Cetak Ulang Struk</h3>
+    <p class="mini" style="margin-bottom:14px">${esc(n.notaNo||"-")} · ${esc((store(n.storeId)||{}).name||"?")} · ${fmtDate(n.date)} · ${rp(notaTotal(n))}</p>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button class="btn" onclick="printRawBT(posReceiptText('${id}',${bayar},0,'${esc(method)}'))">🖨 Struk Printer Bluetooth (RawBT)</button>
+      <button class="btn ghost" onclick="printReceipt('${id}',${bayar},0,'${esc(method)}')">Struk PDF / Printer biasa</button>
+    </div>
+    <div class="mini" style="text-align:center;margin-top:10px">Printer Bluetooth perlu app RawBT (Android).</div>`);}
 
 // ================= PENGGUNA (multi-user, khusus pemilik) =================
 async function rUsers(){
