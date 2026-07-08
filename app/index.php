@@ -679,6 +679,7 @@ const notaService=n=>Math.max(0,+n.service||0);   // service charge (Rp), beku p
 const notaTax=n=>Math.max(0,+n.tax||0);           // pajak/PPN (Rp), beku per nota
 const notaBase=n=>notaSubtotal(n)-notaDisc(n);    // penjualan bersih (tanpa service/pajak)
 const notaTotal=n=>notaBase(n)+notaService(n)+notaTax(n);
+const notaOmzet=n=>notaBase(n)+notaService(n);     // omzet/pendapatan = TANPA pajak (pajak = titipan negara)
 const notaProfit=n=>notaItems(n).reduce((a,it)=>a+(+it.qty||0)*((+it.harga||0)-(+it.hpp||0)),0)-notaDisc(n)+notaService(n);  // service = pemasukan; pajak = titipan (tak masuk laba)
 const notaQty=n=>notaItems(n).reduce((a,it)=>a+(+it.qty||0),0);
 const notaPaid=n=>(n.payments||[]).reduce((a,p)=>a+(+p.amount||0),0);
@@ -778,10 +779,10 @@ function deltaTag(frac){if(frac==null)return '<span class="mini flat">baru</span
 // --- kalkulasi terpusat dashboard (dipakai versi mobile & desktop) ---
 function computeDash(){
   const fnotas=S.notas.filter(n=>inMonth(n.date));
-  const omzet=fnotas.reduce((a,n)=>a+notaTotal(n),0);
+  const omzet=fnotas.reduce((a,n)=>a+notaOmzet(n),0);   // tanpa pajak, konsisten dg Laba-Rugi
   const laba=fnotas.reduce((a,n)=>a+notaProfit(n),0);
   const margin=omzet>0?laba/omzet*100:0;
-  const byOmz={},byLab={};S.notas.forEach(n=>{const k=(n.date||"").slice(0,7);if(!k)return;byOmz[k]=(byOmz[k]||0)+notaTotal(n);byLab[k]=(byLab[k]||0)+notaProfit(n);});
+  const byOmz={},byLab={};S.notas.forEach(n=>{const k=(n.date||"").slice(0,7);if(!k)return;byOmz[k]=(byOmz[k]||0)+notaOmzet(n);byLab[k]=(byLab[k]||0)+notaProfit(n);});
   const dOmz=momDelta(byOmz),dLab=momDelta(byLab);
   // posisi keuangan (saldo/piutang/stok = kondisi SEKARANG, lintas semua bulan)
   const saldoKas=keuCalc().saldo;
@@ -1788,12 +1789,12 @@ async function delProd(id){const used=S.batches.some(b=>(b.outputs||[]).some(o=>
 // ================= TOKO =================
 function rToko(){
   if(isMobile()){
-    const rows=S.stores.map(s=>{const ns=S.notas.filter(n=>n.storeId===s.id);const omz=ns.reduce((a,n)=>a+notaTotal(n),0),due=ns.reduce((a,n)=>a+notaDue(n),0);
+    const rows=S.stores.map(s=>{const ns=S.notas.filter(n=>n.storeId===s.id);const omz=ns.reduce((a,n)=>a+notaOmzet(n),0),due=ns.reduce((a,n)=>a+notaDue(n),0);
       return crow({icon:"🏪",title:esc(s.name),sub:`${esc(s.contact||"tanpa kontak")}${due>0?` · piutang ${rp(due)}`:""}`,amt:rp(omz),onclick:`editStore('${s.id}')`,del:`delStore('${s.id}')`});}).join("");
     document.getElementById("v-toko").innerHTML=`<div class="desc">Daftar toko/warung tempat titip atau jual.</div><button class="btn" style="width:100%;margin-bottom:14px" onclick="editStore()">+ Toko Baru</button>${S.stores.length===0?'<div class="empty">Belum ada toko.</div>':`<div class="clist">${rows}</div>`}`;
     return;
   }
-  const rows=S.stores.map(s=>{const ns=S.notas.filter(n=>n.storeId===s.id);const omz=ns.reduce((a,n)=>a+notaTotal(n),0),due=ns.reduce((a,n)=>a+notaDue(n),0);
+  const rows=S.stores.map(s=>{const ns=S.notas.filter(n=>n.storeId===s.id);const omz=ns.reduce((a,n)=>a+notaOmzet(n),0),due=ns.reduce((a,n)=>a+notaDue(n),0);
     return `<tr><td>${esc(s.name)}</td><td>${esc(s.contact||"")}</td><td>${esc(s.address||"")}</td><td class="num">${rp(omz)}</td><td class="num" style="color:var(--amber)">${rp(due)}</td><td class="num"><div class="acts"><button class="btn sm gray" onclick="editStore('${s.id}')">Edit</button><button class="btn sm del" onclick="delStore('${s.id}')">✕</button></div></td></tr>`;}).join("");
   document.getElementById("v-toko").innerHTML=`<h2 class="title">Master Toko</h2><div class="desc">Daftar toko/warung tempat titip atau jual produk.</div>
   <div class="flexbtns"><button class="btn" onclick="editStore()">+ Toko Baru</button></div>

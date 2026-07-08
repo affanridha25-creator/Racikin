@@ -942,7 +942,7 @@ function persist_nota($pdo, $n) {
         }
     }
     // catat kasir/pembuat + sesi kasir + metode bayar: pertahankan nilai asli saat edit, isi baru saat pertama
-    $ex = $pdo->prepare("SELECT created_by, session_id, pay_method FROM notas WHERE id=?"); $ex->execute([$id]); $ex = $ex->fetch();
+    $ex = $pdo->prepare("SELECT created_by, session_id, pay_method, service, tax FROM notas WHERE id=?"); $ex->execute([$id]); $ex = $ex->fetch();
     if ($ex === false) {   // nota baru
         $creator   = $_SESSION['email'] ?? '';
         $sessionId = safe_id($n['sessionId'] ?? '') ?: null;
@@ -956,9 +956,12 @@ function persist_nota($pdo, $n) {
     $sub = 0; foreach ($clean as $it) $sub += $it['qty'] * $it['harga'];
     $discount = max(0, min(intval($n['discount'] ?? 0), $sub));
     $base = $sub - $discount;
-    // service charge & pajak: HANYA transaksi kasir (POS = punya sessionId); tarif dari Profil (owner), dibekukan per nota
+    // service charge & pajak: dibekukan per nota. Saat EDIT → pertahankan nilai lama (jangan hitung ulang dg tarif terkini).
+    // Nota kasir BARU (POS = punya sessionId) → hitung dari tarif Profil (owner).
     $service = 0; $tax = 0;
-    if ($sessionId !== null) {
+    if ($ex !== false) {                          // edit → beku
+        $service = intval($ex['service']); $tax = intval($ex['tax']);
+    } elseif ($sessionId !== null) {              // nota kasir baru
         $cfg = $pdo->query("SELECT svc_enabled,svc_rate,tax_enabled,tax_rate FROM profile WHERE id=1")->fetch() ?: [];
         if (!empty($cfg['svc_enabled'])) $service = (int) round($base * ((float)$cfg['svc_rate']) / 100);
         if (!empty($cfg['tax_enabled'])) $tax     = (int) round(($base + $service) * ((float)$cfg['tax_rate']) / 100);  // pajak atas base+service
@@ -1107,8 +1110,14 @@ function import_all($pdo, $data) {
         $pf = $data['profile'];
         $logo = (string)($pf['logo'] ?? '');
         if ($logo !== '' && !is_img_datauri($logo)) $logo = '';
-        $pdo->prepare("REPLACE INTO profile (id,address,phone,whatsapp,instagram,facebook,tiktok,logo) VALUES (1,?,?,?,?,?,?,?)")
-            ->execute([$pf['address']??'',$pf['phone']??'',$pf['whatsapp']??'',$pf['instagram']??'',$pf['facebook']??'',$pf['tiktok']??'',$logo]);
+        // REPLACE = DELETE+INSERT → sertakan SEMUA kolom, jika tidak qris/footer/svc/tax ikut terhapus saat import
+        $qris = trim(preg_replace('/[\r\n\t]+/', '', (string)($pf['qris'] ?? '')));
+        if ($qris !== '' && !preg_match('/^[0-9A-Za-z.\- ]{20,600}$/', $qris)) $qris = '';
+        $footer = mb_substr(preg_replace('/[\r\n\t]+/', ' ', (string)($pf['footer'] ?? '')), 0, 255);
+        $clamp = function ($v) { return max(0, min(100, round((float)$v, 2))); };
+        $pdo->prepare("REPLACE INTO profile (id,address,phone,whatsapp,instagram,facebook,tiktok,logo,qris,footer,svc_enabled,svc_rate,tax_enabled,tax_rate) VALUES (1,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+            ->execute([$pf['address']??'',$pf['phone']??'',$pf['whatsapp']??'',$pf['instagram']??'',$pf['facebook']??'',$pf['tiktok']??'',$logo,
+                $qris,$footer,!empty($pf['svc_enabled'])?1:0,$clamp($pf['svc_rate']??0),!empty($pf['tax_enabled'])?1:0,$clamp($pf['tax_rate']??0)]);
     }
     $pdo->commit();
 }
