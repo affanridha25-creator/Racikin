@@ -381,6 +381,7 @@ function init_schema($pdo) {
         qris VARCHAR(600) DEFAULT ''
     ) ENGINE=InnoDB");
     ensure_column($pdo, 'profile', 'qris', "qris VARCHAR(600) DEFAULT ''");
+    ensure_column($pdo, 'profile', 'footer', "footer VARCHAR(255) DEFAULT ''");   // pesan bawah struk (custom)
 
     // Sekali jalan: isi ref titik harga 'batch' lama dengan mencocokkan batch (material+tanggal+harga).
     if (!$pdo->query("SELECT v FROM meta WHERE k='ref_backfill'")->fetchColumn()) {

@@ -1205,7 +1205,13 @@ function rcptFmt(){const W=32;
   const cut=s=>String(s).slice(0,W);
   const ctr=s=>{s=cut(s);return " ".repeat(Math.max(0,Math.floor((W-s.length)/2)))+s;};
   const lr=(l,r)=>{l=String(l);r=String(r);if(l.length+r.length>=W)l=l.slice(0,Math.max(0,W-r.length-1));return l+" ".repeat(Math.max(1,W-l.length-r.length))+r;};
-  return {W,cut,ctr,lr,dash:"-".repeat(W)};
+  // pecah teks panjang jadi beberapa baris ≤W (nama produk/alamat tak lagi kepotong)
+  const wrap=s=>{const out=[];let line="";String(s).split(/\s+/).filter(Boolean).forEach(w=>{
+    while(w.length>W){if(line){out.push(line);line="";}out.push(w.slice(0,W));w=w.slice(W);}
+    if(!line)line=w;else if((line+" "+w).length<=W)line+=" "+w;else{out.push(line);line=w;}});
+    if(line)out.push(line);return out.join("\n");};
+  const ctrWrap=s=>wrap(s).split("\n").map(ctr).join("\n");
+  return {W,cut,ctr,lr,wrap,ctrWrap,dash:"-".repeat(W)};
 }
 function regReceiptText(s){
   if(!s)return "";const {ctr,lr,dash}=rcptFmt();
@@ -1310,20 +1316,27 @@ function posSuccess(id,total,bayar,kembali,method){
 // Struk teks 58mm (32 kolom) untuk printer thermal
 function posReceiptText(id,bayar,kembali,method){
   const n=S.notas.find(x=>x.id===id);if(!n)return "";
-  const p=S.profile||{};const {cut,ctr,lr,dash}=rcptFmt();
-  let t=ctr((BIZ.name||"Racikin").toUpperCase())+"\n";
-  if(p.address)t+=ctr(p.address)+"\n";
-  const kontak=[p.phone,p.whatsapp].filter(Boolean).join(" / ");if(kontak)t+=ctr(kontak)+"\n";
+  const p=S.profile||{};const {ctr,lr,dash,wrap,ctrWrap}=rcptFmt();
+  let t=ctrWrap((BIZ.name||"Racikin").toUpperCase())+"\n";
+  if(p.address)t+=ctrWrap(p.address)+"\n";
+  // kontak: telp & WA digabung; kalau sama tak dobel
+  let kontak="";
+  if(p.phone&&p.whatsapp)kontak=(p.phone===p.whatsapp)?("Telp/WA "+p.phone):("Telp "+p.phone+"  WA "+p.whatsapp);
+  else if(p.phone)kontak="Telp "+p.phone;else if(p.whatsapp)kontak="WA "+p.whatsapp;
+  if(kontak)t+=ctrWrap(kontak)+"\n";
   t+=dash+"\n";
-  if(n.notaNo)t+=cut(n.notaNo)+"\n";
+  if(n.notaNo)t+=wrap(n.notaNo)+"\n";
   t+=lr(fmtDate(n.date),"Kasir: "+(BIZ.user||"-"))+"\n"+dash+"\n";
-  notaItems(n).forEach(it=>{const pr=prod(it.productId)||{};t+=cut(pr.name||"?")+"\n"+lr("  "+it.qty+" x "+rp(it.harga),rp((+it.qty||0)*(+it.harga||0)))+"\n";});
+  notaItems(n).forEach(it=>{const pr=prod(it.productId)||{};t+=wrap(pr.name||"?")+"\n"+lr("  "+it.qty+" x "+rp(it.harga),rp((+it.qty||0)*(+it.harga||0)))+"\n";});
   t+=dash+"\n";
   if(notaDisc(n)>0){t+=lr("Subtotal",rp(notaSubtotal(n)))+"\n"+lr("Diskon","-"+rp(notaDisc(n)))+"\n";}
   t+=lr("TOTAL",rp(notaTotal(n)))+"\n";
   if(method){t+=lr("Bayar ("+method+")",rp(bayar))+"\n";if(method==="Tunai")t+=lr("Kembalian",rp(kembali||0))+"\n";}
   if(notaDue(n)>0)t+=lr("Sisa",rp(notaDue(n)))+"\n";
-  t+=dash+"\n"+ctr("Terima kasih :)")+"\n"+ctr("-- "+(BIZ.name||"Racikin")+" --")+"\n\n\n\n";
+  t+=dash+"\n";
+  const footer=(p.footer||"").trim();
+  t+=(footer?ctrWrap(footer):ctr("Terima kasih :)"))+"\n";
+  t+=ctr("-- "+(BIZ.name||"Racikin")+" --")+"\n\n\n\n";
   return t;
 }
 // Kirim struk ke app RawBT (Android) → cetak ke printer thermal Bluetooth 58mm
@@ -1336,7 +1349,7 @@ function printRawBT(text){
 function printReceipt(id,bayar,kembali,method){
   const n=S.notas.find(x=>x.id===id);if(!n){toast("Nota tak ditemukan.");return;}
   const p=S.profile||{};
-  const contacts=[p.phone?"Telp "+p.phone:"",p.whatsapp?"WA "+p.whatsapp:""].filter(Boolean).map(esc).join(" · ");
+  const contacts=(p.phone&&p.whatsapp)?(p.phone===p.whatsapp?"Telp/WA "+esc(p.phone):"Telp "+esc(p.phone)+" · WA "+esc(p.whatsapp)):(p.phone?"Telp "+esc(p.phone):(p.whatsapp?"WA "+esc(p.whatsapp):""));
   const items=notaItems(n).map(it=>{const pr=prod(it.productId)||{};const sub=(+it.qty||0)*(+it.harga||0);return `<div class="rrow"><span class="ri">${esc(pr.name||"?")}<br><span style="color:#555">${it.qty} × ${rp(it.harga)}</span></span><span>${rp(sub)}</span></div>`;}).join("");
   const total=notaTotal(n);
   document.getElementById("printArea").innerHTML=`<div class="preceipt">
@@ -1345,8 +1358,8 @@ function printReceipt(id,bayar,kembali,method){
     ${(p.address||contacts)?`<div class="rc">${p.address?esc(p.address):""}${p.address&&contacts?"<br>":""}${contacts}</div>`:""}
     <div class="rmeta">${esc(n.notaNo||"")}<br>${fmtDate(n.date)} · Kasir</div>
     ${items}
-    <div class="rtot">${notaDisc(n)>0?`<div class="rrow"><span>Subtotal</span><span>${rp(notaSubtotal(n))}</span></div><div class="rrow"><span>Diskon</span><span>-${rp(notaDisc(n))}</span></div>`:""}<div class="rrow"><span>TOTAL</span><span>${rp(total)}</span></div>${bayar!=null?`<div class="rrow"><span>Bayar (${esc(method||"Tunai")})</span><span>${rp(bayar)}</span></div><div class="rrow"><span>Kembalian</span><span>${rp(kembali||0)}</span></div>`:""}</div>
-    <div class="rthx">Terima kasih 🙏<br>— ${esc(BIZ.name||"Racikin")} —</div>
+    <div class="rtot">${notaDisc(n)>0?`<div class="rrow"><span>Subtotal</span><span>${rp(notaSubtotal(n))}</span></div><div class="rrow"><span>Diskon</span><span>-${rp(notaDisc(n))}</span></div>`:""}<div class="rrow"><span>TOTAL</span><span>${rp(total)}</span></div>${bayar!=null?`<div class="rrow"><span>Bayar (${esc(method||"Tunai")})</span><span>${rp(bayar)}</span></div><div class="rrow"><span>Kembalian</span><span>${rp(kembali||0)}</span></div>`:""}${notaDue(n)>0?`<div class="rrow"><span>Sisa</span><span>${rp(notaDue(n))}</span></div>`:""}</div>
+    <div class="rthx">${(p.footer||"").trim()?esc((p.footer||"").trim()):"Terima kasih 🙏"}<br>— ${esc(BIZ.name||"Racikin")} —</div>
   </div>`;
   window.print();
 }
@@ -1911,7 +1924,7 @@ function rProfile(){
   _prof=JSON.parse(JSON.stringify(S.profile||{}));
   const logo=_prof.logo||"";
   document.getElementById("v-profile").innerHTML=`<h2 class="title">Profil Usaha</h2>
-  <div class="desc">Logo &amp; kontak ini muncul di kop laporan yang kamu cetak (HPP batch &amp; laba rugi).</div>
+  <div class="desc">Logo &amp; kontak muncul di aplikasi, <b>struk PDF</b>, &amp; kop laporan cetak. <span class="mini">(Struk thermal 58mm hanya teks — tak memuat gambar logo.)</span></div>
   <div class="panel" style="max-width:600px">
     <div style="display:flex;gap:18px;align-items:center;margin-bottom:20px;flex-wrap:wrap">
       <div id="logoPrev" class="logobox">${logo?`<img src="${logo}" alt="logo">`:`<span>🍲</span>`}</div>
@@ -1925,7 +1938,8 @@ function rProfile(){
     <label class="f">Alamat</label><textarea id="pfAddr" rows="2" style="margin-bottom:14px" placeholder="mis. Jl. Melati No. 10, Bandung">${esc(_prof.address||"")}</textarea>
     <div class="grid2" style="margin-bottom:14px"><div><label class="f">No. Telepon</label><input id="pfPhone" value="${esc(_prof.phone||"")}" placeholder="0812xxxx"></div><div><label class="f">WhatsApp</label><input id="pfWa" value="${esc(_prof.whatsapp||"")}" placeholder="0812xxxx"></div></div>
     <div class="grid2" style="margin-bottom:14px"><div><label class="f">Instagram</label><input id="pfIg" value="${esc(_prof.instagram||"")}" placeholder="@usaha"></div><div><label class="f">Facebook</label><input id="pfFb" value="${esc(_prof.facebook||"")}" placeholder="nama halaman"></div></div>
-    <label class="f">TikTok / sosmed lain</label><input id="pfTt" value="${esc(_prof.tiktok||"")}" placeholder="@usaha" style="margin-bottom:18px">
+    <label class="f">TikTok / sosmed lain</label><input id="pfTt" value="${esc(_prof.tiktok||"")}" placeholder="@usaha" style="margin-bottom:14px">
+    <label class="f">Pesan bawah struk <span class="mini">(kaki struk kasir — kosongkan = "Terima kasih :)")</span></label><input id="pfFooter" value="${esc(_prof.footer||"")}" placeholder="mis. Terima kasih & sampai jumpa lagi!" maxlength="120" style="margin-bottom:18px">
     <div style="border-top:1px solid var(--line);padding-top:16px">
       <label class="f">Kode QRIS <span class="mini">(untuk pembayaran di Kasir)</span></label>
       <textarea id="pfQris" rows="3" placeholder="Tempel string QRIS dari hasil scan sticker usahamu (mulai 0002...)" oninput="qrisCheck(this.value)" style="font-size:12px;font-family:monospace">${esc(_prof.qris||"")}</textarea>
@@ -1965,7 +1979,7 @@ async function saveProfile(){
   const g=id=>document.getElementById(id).value.trim();
   const qris=document.getElementById("pfQris").value.replace(/[\r\n\t]+/g,"").trim();
   if(qris&&!qrisValid(qris)){toast("Kode QRIS belum valid — cek lagi.");return;}
-  const prof={address:g("pfAddr"),phone:g("pfPhone"),whatsapp:g("pfWa"),instagram:g("pfIg"),facebook:g("pfFb"),tiktok:g("pfTt"),logo:_prof.logo||"",qris};
+  const prof={address:g("pfAddr"),phone:g("pfPhone"),whatsapp:g("pfWa"),instagram:g("pfIg"),facebook:g("pfFb"),tiktok:g("pfTt"),footer:g("pfFooter"),logo:_prof.logo||"",qris};
   await api("saveProfile",{profile:prof});await reload();toast("Profil tersimpan ✓");rProfile();
 }
 // kop laporan untuk cetak (logo + nama usaha + kontak/sosmed)

@@ -677,8 +677,9 @@ try {
             $g = function ($k, $max) use ($p) { return mb_substr(trim((string)($p[$k] ?? '')), 0, $max); };
             $qris = trim(preg_replace('/[\r\n\t]+/', '', (string)($p['qris'] ?? '')));   // buang enter/tab saja; spasi internal (nama merchant) dipertahankan
             if ($qris !== '' && !preg_match('/^[0-9A-Za-z.\- ]{20,600}$/', $qris)) { http_response_code(400); echo json_encode(['error' => 'Kode QRIS tidak valid.']); break; }
-            $pdo->prepare("REPLACE INTO profile (id,address,phone,whatsapp,instagram,facebook,tiktok,logo,qris) VALUES (1,?,?,?,?,?,?,?,?)")
-                ->execute([$g('address',255),$g('phone',60),$g('whatsapp',60),$g('instagram',120),$g('facebook',120),$g('tiktok',120),$logo,$qris]);
+            $footer = preg_replace('/[\r\n\t]+/', ' ', $g('footer',255));   // pesan bawah struk (1 baris)
+            $pdo->prepare("REPLACE INTO profile (id,address,phone,whatsapp,instagram,facebook,tiktok,logo,qris,footer) VALUES (1,?,?,?,?,?,?,?,?,?)")
+                ->execute([$g('address',255),$g('phone',60),$g('whatsapp',60),$g('instagram',120),$g('facebook',120),$g('tiktok',120),$logo,$qris,$footer]);
             echo json_encode(['ok' => true]);
             break;
         }
@@ -966,7 +967,7 @@ function bootstrap($pdo) {
     $cashOut = [];
     if ($seeKeu) foreach ($pdo->query("SELECT id,cdate AS date,category,amount,note FROM cash_out ORDER BY cdate DESC,id DESC") as $r) { $r['amount']=intval($r['amount']); $cashOut[] = $r; }
 
-    $profile = $pdo->query("SELECT address,phone,whatsapp,instagram,facebook,tiktok,logo,qris FROM profile WHERE id=1")->fetch() ?: [];
+    $profile = $pdo->query("SELECT address,phone,whatsapp,instagram,facebook,tiktok,logo,qris,footer FROM profile WHERE id=1")->fetch() ?: [];
 
     // sesi kasir yang sedang terbuka (kalau ada) + riwayat sesi tertutup
     $register = $pdo->query("SELECT id,opened_by AS openedBy,opened_at AS openedAt,opening_float AS openingFloat FROM register_sessions WHERE status='open' LIMIT 1")->fetch() ?: null;
