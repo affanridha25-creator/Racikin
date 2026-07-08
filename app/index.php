@@ -539,7 +539,8 @@ function setMonth(v){FILTER_MONTH=v;renderCur();}
 function monthBar(){const ks=monthKeys();if(FILTER_MONTH!=="all"&&!ks.includes(FILTER_MONTH))FILTER_MONTH="all";return `<select class="monthsel" onchange="setMonth(this.value)"><option value="all" ${FILTER_MONTH==="all"?"selected":""}>📅 Semua Bulan</option>${ks.map(k=>`<option value="${k}" ${FILTER_MONTH===k?"selected":""}>${monthLabelFull(k)}</option>`).join("")}</select>`;}
 function keuCalc(){
   const notas=S.notas.filter(n=>inMonth(n.date));
-  const pendapatan=notas.reduce((a,n)=>a+notaTotal(n),0);
+  const pendapatan=notas.reduce((a,n)=>a+notaBase(n)+notaService(n),0);   // omzet tanpa pajak (service = pemasukan usaha)
+  const pajak=notas.reduce((a,n)=>a+notaTax(n),0);                        // pajak terkumpul (titipan negara, bukan laba)
   const isJual=it=>(it.kind||"jual")==="jual";
   const hpp=notas.reduce((a,n)=>a+notaItems(n).filter(isJual).reduce((x,it)=>x+(+it.qty||0)*(+it.hpp||0),0),0);
   const promo=notas.reduce((a,n)=>a+notaItems(n).filter(it=>!isJual(it)).reduce((x,it)=>x+(+it.qty||0)*(+it.hpp||0),0),0);
@@ -552,7 +553,7 @@ function keuCalc(){
   const kasKeluarP=co.reduce((a,c)=>a+(+c.amount||0),0);
   const totalMasuk=S.notas.reduce((a,n)=>a+notaPaid(n),0);
   const totalKeluar=cashOut().reduce((a,c)=>a+(+c.amount||0),0);
-  return {notas,pendapatan,hpp,promo,labaKotor,biayaOp,labaBersih,byCat,co,kasMasukP,kasKeluarP,saldo:totalMasuk-totalKeluar};
+  return {notas,pendapatan,pajak,hpp,promo,labaKotor,biayaOp,labaBersih,byCat,co,kasMasukP,kasKeluarP,saldo:totalMasuk-totalKeluar};
 }
 const CASH_CATS=[["prive","Kas Diambil Pemilik"],["operasional","Biaya Operasional"],["modal","Beli Bahan / Modal"],["lain","Lainnya"]];
 const cashCatLabel=k=>({prive:"Kas Diambil Pemilik",operasional:"Biaya Operasional",modal:"Beli Bahan / Modal",lain:"Lainnya"}[k]||k);
@@ -568,8 +569,9 @@ function rKeuangan(){
       <div class="lrrow tot"><span>Laba Kotor</span><b>${rp(k.labaKotor)}</b></div>
       ${k.promo>0?`<div class="lrrow"><span>Biaya Barang Gratis (bonus/endorse/tester)</span><span style="color:var(--red)">(${rp(k.promo)})</span></div>`:""}
       <div class="lrrow"><span>Biaya Operasional Lain <span style="font-weight:400;color:var(--muted)">(non-produksi)</span></span><span style="color:var(--red)">(${rp(k.biayaOp)})</span></div>
-      <div class="lrrow tot big"><span>Laba Bersih</span><b style="color:${k.labaBersih>=0?'var(--green)':'var(--red)'}">${rp(k.labaBersih)}</b></div></div>
-      <p class="mini" style="padding:0 4px">HPP sudah termasuk bahan + operasional produksi. Kas diambil pemilik (prive) tidak masuk laba rugi — lihat tab <b>Kas</b>.</p>`;
+      <div class="lrrow tot big"><span>Laba Bersih</span><b style="color:${k.labaBersih>=0?'var(--green)':'var(--red)'}">${rp(k.labaBersih)}</b></div>
+      ${k.pajak>0?`<div class="lrrow" style="border-top:1px dashed var(--line)"><span>Pajak Terkumpul (PPN) <span style="font-weight:400;color:var(--muted)">— titipan negara, di luar laba</span></span><b style="color:var(--amber)">${rp(k.pajak)}</b></div>`:""}</div>
+      <p class="mini" style="padding:0 4px">HPP sudah termasuk bahan + operasional produksi. Kas diambil pemilik (prive) tidak masuk laba rugi — lihat tab <b>Kas</b>.${k.pajak>0?" Pajak yang dipungut bukan laba — sisihkan untuk disetor.":""}</p>`;
   } else {
     const rows=k.co.map(c=>`<div class="crow"><div class="ci">${cashCatIcon(c.category)}</div><div class="cmain"><div class="ctitle">${cashCatLabel(c.category)}</div><div class="csub">${fmtDate(c.date)}${c.note?" · "+esc(c.note):""}</div></div><div class="cright"><div class="camt" style="color:var(--red)">−${rp(c.amount)}</div></div><button class="crow-del" onclick="delCash('${c.id}')">✕</button></div>`).join("");
     body=`<div class="cards"><div class="card accent"><div class="lbl">Saldo Kas (total)</div><div class="val">${rp(k.saldo)}</div></div></div>
@@ -628,7 +630,8 @@ function exportLR(){
     ["Laba Kotor",k.labaKotor],
     ["Biaya Barang Gratis (bonus/endorse/tester)",-k.promo],
     ["Biaya Operasional Lain",-k.biayaOp],
-    ["Laba Bersih",k.labaBersih],[],
+    ["Laba Bersih",k.labaBersih],
+    ...(k.pajak>0?[["Pajak Terkumpul (PPN, titipan negara)",k.pajak]]:[]),[],
     ["Saldo Kas (total)",k.saldo]];
   if((k.co||[]).length){rows.push([],["Rincian Kas Keluar (periode)"],["Tanggal","Kategori","Jumlah","Catatan"]);k.co.forEach(c=>rows.push([c.date,cashCatLabel(c.category),c.amount,c.note||""]));}
   downloadCSV(`laba-rugi-${FILTER_MONTH==="all"?"semua":FILTER_MONTH}.csv`,rows);
@@ -672,8 +675,11 @@ function stock(pid){
 // ringkasan per NOTA (gabungan semua item)
 const notaSubtotal=n=>notaItems(n).reduce((a,it)=>a+(+it.qty||0)*(+it.harga||0),0);
 const notaDisc=n=>Math.max(0,Math.min(+n.discount||0,notaSubtotal(n)));
-const notaTotal=n=>notaSubtotal(n)-notaDisc(n);
-const notaProfit=n=>notaItems(n).reduce((a,it)=>a+(+it.qty||0)*((+it.harga||0)-(+it.hpp||0)),0)-notaDisc(n);
+const notaService=n=>Math.max(0,+n.service||0);   // service charge (Rp), beku per nota
+const notaTax=n=>Math.max(0,+n.tax||0);           // pajak/PPN (Rp), beku per nota
+const notaBase=n=>notaSubtotal(n)-notaDisc(n);    // penjualan bersih (tanpa service/pajak)
+const notaTotal=n=>notaBase(n)+notaService(n)+notaTax(n);
+const notaProfit=n=>notaItems(n).reduce((a,it)=>a+(+it.qty||0)*((+it.harga||0)-(+it.hpp||0)),0)-notaDisc(n)+notaService(n);  // service = pemasukan; pajak = titipan (tak masuk laba)
 const notaQty=n=>notaItems(n).reduce((a,it)=>a+(+it.qty||0),0);
 const notaPaid=n=>(n.payments||[]).reduce((a,p)=>a+(+p.amount||0),0);
 const notaDue=n=>notaTotal(n)-notaPaid(n);
@@ -1085,7 +1091,12 @@ let POS={cart:{},bayar:"",method:"Tunai",customer:"",q:"",disc:0};
 function posStore(){return S.stores.find(s=>s.name===POS_NAME);}
 function posSubtotal(){return Object.entries(POS.cart).reduce((a,[pid,q])=>a+q*((prod(pid)||{}).harga||0),0);}
 function posDisc(){return Math.max(0,Math.min(+POS.disc||0,posSubtotal()));}
-function posTotal(){return posSubtotal()-posDisc();}
+function posSvcRate(){const p=S.profile||{};return p.svc_enabled?Math.max(0,+p.svc_rate||0):0;}
+function posTaxRate(){const p=S.profile||{};return p.tax_enabled?Math.max(0,+p.tax_rate||0):0;}
+function posBase(){return posSubtotal()-posDisc();}
+function posService(){return Math.round(posBase()*posSvcRate()/100);}
+function posTax(){return Math.round((posBase()+posService())*posTaxRate()/100);}   // pajak atas base+service
+function posTotal(){return posBase()+posService()+posTax();}
 function posCount(){return Object.values(POS.cart).reduce((a,q)=>a+q,0);}
 // ---- sesi kasir (buka/tutup laci) ----
 function regOpen(){return S.register||null;}
@@ -1245,6 +1256,8 @@ function posCheckoutModal(){
     <div style="max-height:28vh;overflow:auto;margin-bottom:8px">${lines}</div>
     <div class="crt" style="border:none;padding:4px 0"><div class="cn">Subtotal</div><div>${rp(sub)}</div></div>
     <div class="crt" style="border:none;padding:4px 0;align-items:center"><div class="cn">Diskon (Rp)</div><input id="posDisc" inputmode="numeric" style="width:130px;text-align:right;padding:8px 10px" placeholder="0" value="${POS.disc?grp(POS.disc):""}" oninput="posDiscInput(this)"></div>
+    ${posSvcRate()>0?`<div class="crt" style="border:none;padding:4px 0"><div class="cn">Service (${posSvcRate()}%)</div><div id="posSvcL">${rp(posService())}</div></div>`:""}
+    ${posTaxRate()>0?`<div class="crt" style="border:none;padding:4px 0"><div class="cn">Pajak (${posTaxRate()}%)</div><div id="posTaxL">${rp(posTax())}</div></div>`:""}
     <div class="crt" style="border-top:1px solid var(--line);border-bottom:none;font-weight:800;font-size:16px;padding-top:8px"><div class="cn">Total</div><div id="posTotL">${rp(tot)}</div></div>
     <label class="f" style="margin-top:10px">Pelanggan <span class="mini">(opsional)</span></label>${custCombo}
     <label class="f" style="margin-top:12px">Metode Bayar</label>
@@ -1255,6 +1268,7 @@ function posCheckoutModal(){
 }
 function posDiscInput(el){el.value=grp(el.value);POS.disc=+digits(el.value)||0;const t=posTotal();
   const set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
+  set("posSvcL",rp(posService()));set("posTaxL",rp(posTax()));
   set("posTotL",rp(t));set("posTotL2",rp(t));set("posSelesai","✓ Selesaikan · "+rp(t));
   const pb=document.getElementById("posBayar");if(pb)pb.placeholder=grp(t);
   const kb=document.getElementById("posKembali");if(kb)kb.textContent=rp(Math.max(0,(+digits(POS.bayar)||0)-t));}
@@ -1329,7 +1343,10 @@ function posReceiptText(id,bayar,kembali,method){
   t+=lr(fmtDate(n.date),"Kasir: "+(BIZ.user||"-"))+"\n"+dash+"\n";
   notaItems(n).forEach(it=>{const pr=prod(it.productId)||{};t+=wrap(pr.name||"?")+"\n"+lr("  "+it.qty+" x "+rp(it.harga),rp((+it.qty||0)*(+it.harga||0)))+"\n";});
   t+=dash+"\n";
-  if(notaDisc(n)>0){t+=lr("Subtotal",rp(notaSubtotal(n)))+"\n"+lr("Diskon","-"+rp(notaDisc(n)))+"\n";}
+  const svc=notaService(n),tax=notaTax(n),base=notaBase(n);
+  if(notaDisc(n)>0||svc>0||tax>0){t+=lr("Subtotal",rp(notaSubtotal(n)))+"\n";if(notaDisc(n)>0)t+=lr("Diskon","-"+rp(notaDisc(n)))+"\n";}
+  if(svc>0)t+=lr("Service"+(base>0?" ("+Math.round(svc/base*100)+"%)":""),rp(svc))+"\n";
+  if(tax>0)t+=lr("Pajak"+((base+svc)>0?" ("+Math.round(tax/(base+svc)*100)+"%)":""),rp(tax))+"\n";
   t+=lr("TOTAL",rp(notaTotal(n)))+"\n";
   if(method){t+=lr("Bayar ("+method+")",rp(bayar))+"\n";if(method==="Tunai")t+=lr("Kembalian",rp(kembali||0))+"\n";}
   if(notaDue(n)>0)t+=lr("Sisa",rp(notaDue(n)))+"\n";
@@ -1358,7 +1375,7 @@ function printReceipt(id,bayar,kembali,method){
     ${(p.address||contacts)?`<div class="rc">${p.address?esc(p.address):""}${p.address&&contacts?"<br>":""}${contacts}</div>`:""}
     <div class="rmeta">${esc(n.notaNo||"")}<br>${fmtDate(n.date)} · Kasir</div>
     ${items}
-    <div class="rtot">${notaDisc(n)>0?`<div class="rrow"><span>Subtotal</span><span>${rp(notaSubtotal(n))}</span></div><div class="rrow"><span>Diskon</span><span>-${rp(notaDisc(n))}</span></div>`:""}<div class="rrow"><span>TOTAL</span><span>${rp(total)}</span></div>${bayar!=null?`<div class="rrow"><span>Bayar (${esc(method||"Tunai")})</span><span>${rp(bayar)}</span></div><div class="rrow"><span>Kembalian</span><span>${rp(kembali||0)}</span></div>`:""}${notaDue(n)>0?`<div class="rrow"><span>Sisa</span><span>${rp(notaDue(n))}</span></div>`:""}</div>
+    <div class="rtot">${(notaDisc(n)>0||notaService(n)>0||notaTax(n)>0)?`<div class="rrow"><span>Subtotal</span><span>${rp(notaSubtotal(n))}</span></div>${notaDisc(n)>0?`<div class="rrow"><span>Diskon</span><span>-${rp(notaDisc(n))}</span></div>`:""}${notaService(n)>0?`<div class="rrow"><span>Service</span><span>${rp(notaService(n))}</span></div>`:""}${notaTax(n)>0?`<div class="rrow"><span>Pajak</span><span>${rp(notaTax(n))}</span></div>`:""}`:""}<div class="rrow"><span>TOTAL</span><span>${rp(total)}</span></div>${bayar!=null?`<div class="rrow"><span>Bayar (${esc(method||"Tunai")})</span><span>${rp(bayar)}</span></div><div class="rrow"><span>Kembalian</span><span>${rp(kembali||0)}</span></div>`:""}${notaDue(n)>0?`<div class="rrow"><span>Sisa</span><span>${rp(notaDue(n))}</span></div>`:""}</div>
     <div class="rthx">${(p.footer||"").trim()?esc((p.footer||"").trim()):"Terima kasih 🙏"}<br>— ${esc(BIZ.name||"Racikin")} —</div>
   </div>`;
   window.print();
@@ -1945,6 +1962,18 @@ function rProfile(){
       <textarea id="pfQris" rows="3" placeholder="Tempel string QRIS dari hasil scan sticker usahamu (mulai 0002...)" oninput="qrisCheck(this.value)" style="font-size:12px;font-family:monospace">${esc(_prof.qris||"")}</textarea>
       <div id="qrisMsg" class="mini" style="margin-top:6px">${_prof.qris?(qrisValid(_prof.qris)?'<span style="color:var(--green)">✓ QRIS valid — nanti muncul di Kasir saat pilih QRIS.</span>':'<span style="color:var(--red)">⚠ Kode QRIS belum valid.</span>'):'Scan sticker QRIS-mu pakai app pembaca QR, salin teksnya ke sini. Kosongkan kalau belum ada.'}</div>
     </div>
+    <div style="border-top:1px solid var(--line);padding-top:16px;margin-top:16px">
+      <label class="f">Service Charge &amp; Pajak <span class="mini">(otomatis di transaksi Kasir)</span></label>
+      <div class="grid2" style="margin-top:8px;align-items:center">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="pfSvcOn" ${_prof.svc_enabled?"checked":""}> Service charge</label>
+        <div style="display:flex;align-items:center;gap:6px;justify-content:flex-end"><input id="pfSvcRate" inputmode="decimal" value="${_prof.svc_rate&&+_prof.svc_rate?(+_prof.svc_rate):""}" placeholder="0" style="width:80px;text-align:right"><b>%</b></div>
+      </div>
+      <div class="grid2" style="margin-top:10px;align-items:center">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="pfTaxOn" ${_prof.tax_enabled?"checked":""}> Pajak / PPN</label>
+        <div style="display:flex;align-items:center;gap:6px;justify-content:flex-end"><input id="pfTaxRate" inputmode="decimal" value="${_prof.tax_rate&&+_prof.tax_rate?(+_prof.tax_rate):""}" placeholder="0" style="width:80px;text-align:right"><b>%</b></div>
+      </div>
+      <div class="mini" style="margin-top:8px">Pajak dihitung di atas (subtotal − diskon + service). Muncul terpisah di struk &amp; "Pajak Terkumpul" di Laba-Rugi (bukan laba).</div>
+    </div>
     <div style="text-align:right;margin-top:16px"><button class="btn" onclick="saveProfile()">💾 Simpan Profil</button></div>
   </div>
   <div class="panel" style="max-width:600px"><h3>🔒 Keamanan</h3>
@@ -1979,7 +2008,11 @@ async function saveProfile(){
   const g=id=>document.getElementById(id).value.trim();
   const qris=document.getElementById("pfQris").value.replace(/[\r\n\t]+/g,"").trim();
   if(qris&&!qrisValid(qris)){toast("Kode QRIS belum valid — cek lagi.");return;}
-  const prof={address:g("pfAddr"),phone:g("pfPhone"),whatsapp:g("pfWa"),instagram:g("pfIg"),facebook:g("pfFb"),tiktok:g("pfTt"),footer:g("pfFooter"),logo:_prof.logo||"",qris};
+  const nrate=id=>Math.max(0,Math.min(100,+document.getElementById(id).value||0));
+  const prof={address:g("pfAddr"),phone:g("pfPhone"),whatsapp:g("pfWa"),instagram:g("pfIg"),facebook:g("pfFb"),tiktok:g("pfTt"),footer:g("pfFooter"),
+    svc_enabled:document.getElementById("pfSvcOn").checked?1:0,svc_rate:nrate("pfSvcRate"),
+    tax_enabled:document.getElementById("pfTaxOn").checked?1:0,tax_rate:nrate("pfTaxRate"),
+    logo:_prof.logo||"",qris};
   await api("saveProfile",{profile:prof});await reload();toast("Profil tersimpan ✓");rProfile();
 }
 // kop laporan untuk cetak (logo + nama usaha + kontak/sosmed)

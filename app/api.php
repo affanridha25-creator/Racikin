@@ -510,12 +510,12 @@ try {
         case 'addPayment': {
             $notaId = $in['notaId'];
             $amount = intval($in['amount']);
-            // batasi ke sisa tagihan nota (subtotal − diskon) supaya piutang tak jadi negatif/palsu
+            // batasi ke sisa tagihan nota (base − diskon + service + pajak) supaya piutang tak jadi negatif/palsu
             $q = $pdo->prepare("SELECT COALESCE(SUM(qty*harga),0) FROM distributions WHERE nota_id=?");
             $q->execute([$notaId]); $sub = intval($q->fetchColumn());
-            $q = $pdo->prepare("SELECT COALESCE(discount,0) FROM notas WHERE id=?");
-            $q->execute([$notaId]); $disc = intval($q->fetchColumn());
-            $total = max(0, $sub - $disc);
+            $q = $pdo->prepare("SELECT COALESCE(discount,0),COALESCE(service,0),COALESCE(tax,0) FROM notas WHERE id=?");
+            $q->execute([$notaId]); $row = $q->fetch(PDO::FETCH_NUM) ?: [0,0,0];
+            $total = max(0, $sub - intval($row[0])) + intval($row[1]) + intval($row[2]);
             $q = $pdo->prepare("SELECT COALESCE(SUM(amount),0) FROM payments WHERE nota_id=?");
             $q->execute([$notaId]); $paid = intval($q->fetchColumn());
             $remaining = max(0, $total - $paid);
@@ -678,8 +678,12 @@ try {
             $qris = trim(preg_replace('/[\r\n\t]+/', '', (string)($p['qris'] ?? '')));   // buang enter/tab saja; spasi internal (nama merchant) dipertahankan
             if ($qris !== '' && !preg_match('/^[0-9A-Za-z.\- ]{20,600}$/', $qris)) { http_response_code(400); echo json_encode(['error' => 'Kode QRIS tidak valid.']); break; }
             $footer = preg_replace('/[\r\n\t]+/', ' ', $g('footer',255));   // pesan bawah struk (1 baris)
-            $pdo->prepare("REPLACE INTO profile (id,address,phone,whatsapp,instagram,facebook,tiktok,logo,qris,footer) VALUES (1,?,?,?,?,?,?,?,?,?)")
-                ->execute([$g('address',255),$g('phone',60),$g('whatsapp',60),$g('instagram',120),$g('facebook',120),$g('tiktok',120),$logo,$qris,$footer]);
+            // service charge & pajak: on/off + tarif % (0..100, maks 2 desimal) — khusus pemilik (saveProfile owner-only)
+            $rate = function ($k) use ($p) { return max(0, min(100, round((float)($p[$k] ?? 0), 2))); };
+            $svcOn = !empty($p['svc_enabled']) ? 1 : 0; $svcRate = $rate('svc_rate');
+            $taxOn = !empty($p['tax_enabled']) ? 1 : 0; $taxRate = $rate('tax_rate');
+            $pdo->prepare("REPLACE INTO profile (id,address,phone,whatsapp,instagram,facebook,tiktok,logo,qris,footer,svc_enabled,svc_rate,tax_enabled,tax_rate) VALUES (1,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+                ->execute([$g('address',255),$g('phone',60),$g('whatsapp',60),$g('instagram',120),$g('facebook',120),$g('tiktok',120),$logo,$qris,$footer,$svcOn,$svcRate,$taxOn,$taxRate]);
             echo json_encode(['ok' => true]);
             break;
         }
@@ -890,25 +894,33 @@ function persist_nota($pdo, $n) {
     // diskon (Rp), dibatasi 0..subtotal item jual
     $sub = 0; foreach ($clean as $it) $sub += $it['qty'] * $it['harga'];
     $discount = max(0, min(intval($n['discount'] ?? 0), $sub));
-    $pdo->prepare("REPLACE INTO notas (id,nota_no,ndate,store_id,created_by,session_id,pay_method,discount) VALUES (?,?,?,?,?,?,?,?)")
-        ->execute([$id, $n['notaNo'] ?? '', $date, $storeId, $creator, $sessionId, $payMethod, $discount]);
+    $base = $sub - $discount;
+    // service charge & pajak: HANYA transaksi kasir (POS = punya sessionId); tarif dari Profil (owner), dibekukan per nota
+    $service = 0; $tax = 0;
+    if ($sessionId !== null) {
+        $cfg = $pdo->query("SELECT svc_enabled,svc_rate,tax_enabled,tax_rate FROM profile WHERE id=1")->fetch() ?: [];
+        if (!empty($cfg['svc_enabled'])) $service = (int) round($base * ((float)$cfg['svc_rate']) / 100);
+        if (!empty($cfg['tax_enabled'])) $tax     = (int) round(($base + $service) * ((float)$cfg['tax_rate']) / 100);  // pajak atas base+service
+    }
+    $pdo->prepare("REPLACE INTO notas (id,nota_no,ndate,store_id,created_by,session_id,pay_method,discount,service,tax) VALUES (?,?,?,?,?,?,?,?,?,?)")
+        ->execute([$id, $n['notaNo'] ?? '', $date, $storeId, $creator, $sessionId, $payMethod, $discount, $service, $tax]);
     $pdo->prepare("DELETE FROM distributions WHERE nota_id=?")->execute([$id]);
     $ins = $pdo->prepare("INSERT INTO distributions (id,nota_id,ddate,store_id,product_id,qty,harga,hpp,kind) VALUES (?,?,?,?,?,?,?,?,?)");
     foreach ($clean as $it)
         $ins->execute([gid('d'), $id, $date, $storeId, $it['productId'], $it['qty'], $it['harga'], $it['hpp'], $it['kind']]);
-    return ['id'=>$id, 'sub'=>$sub, 'total'=>$sub - $discount, 'sessionId'=>$sessionId, 'payMethod'=>$payMethod];
+    return ['id'=>$id, 'sub'=>$sub, 'total'=>$base + $service + $tax, 'service'=>$service, 'tax'=>$tax, 'sessionId'=>$sessionId, 'payMethod'=>$payMethod];
 }
 
 // Total penjualan sebuah sesi kasir, dipecah tunai vs non-tunai (dari nilai item nota)
 function session_totals($pdo, $sid) {
-    $rows = $pdo->prepare("SELECT n.pay_method AS pm, n.discount AS disc, COALESCE(SUM(d.qty*d.harga),0) AS tot
+    $rows = $pdo->prepare("SELECT n.pay_method AS pm, n.discount AS disc, n.service AS svc, n.tax AS tax, COALESCE(SUM(d.qty*d.harga),0) AS tot
         FROM notas n LEFT JOIN distributions d ON d.nota_id=n.id
-        WHERE n.session_id=? GROUP BY n.id, n.pay_method, n.discount");
+        WHERE n.session_id=? GROUP BY n.id, n.pay_method, n.discount, n.service, n.tax");
     $rows->execute([$sid]);
     $cash = 0; $noncash = 0; $count = 0;
     foreach ($rows as $r) {
         $sub = intval($r['tot']);
-        $t = $sub - min(max(0, intval($r['disc'])), $sub);   // total = subtotal - diskon (mirror notaTotal di klien)
+        $t = $sub - min(max(0, intval($r['disc'])), $sub) + intval($r['svc']) + intval($r['tax']);   // total = base + service + pajak (mirror notaTotal)
         $count++;
         if (($r['pm'] ?? '') === 'Tunai') $cash += $t; else $noncash += $t;
     }
@@ -959,7 +971,7 @@ function bootstrap($pdo) {
     foreach ($pdo->query("SELECT id,nota_id AS notaId,pdate AS date,amount,note FROM payments ORDER BY pdate,id") as $r) {
         $r['amount']=intval($r['amount']); $pay[$r['notaId']][] = $r;
     }
-    $notas = $pdo->query("SELECT id,nota_no AS notaNo,ndate AS date,store_id AS storeId,created_by AS createdBy,session_id AS sessionId,pay_method AS payMethod,discount FROM notas ORDER BY ndate DESC,id DESC")->fetchAll();
+    $notas = $pdo->query("SELECT id,nota_no AS notaNo,ndate AS date,store_id AS storeId,created_by AS createdBy,session_id AS sessionId,pay_method AS payMethod,discount,service,tax FROM notas ORDER BY ndate DESC,id DESC")->fetchAll();
     foreach ($notas as &$n) { $n['discount']=intval($n['discount']); $n['items']=$items[$n['id']]??[]; $n['payments']=$pay[$n['id']]??[]; } unset($n);
 
     // Kas keluar (termasuk prive pemilik) hanya untuk pemilik / staf ber-akses Keuangan
@@ -967,7 +979,7 @@ function bootstrap($pdo) {
     $cashOut = [];
     if ($seeKeu) foreach ($pdo->query("SELECT id,cdate AS date,category,amount,note FROM cash_out ORDER BY cdate DESC,id DESC") as $r) { $r['amount']=intval($r['amount']); $cashOut[] = $r; }
 
-    $profile = $pdo->query("SELECT address,phone,whatsapp,instagram,facebook,tiktok,logo,qris,footer FROM profile WHERE id=1")->fetch() ?: [];
+    $profile = $pdo->query("SELECT address,phone,whatsapp,instagram,facebook,tiktok,logo,qris,footer,svc_enabled,svc_rate,tax_enabled,tax_rate FROM profile WHERE id=1")->fetch() ?: [];
 
     // sesi kasir yang sedang terbuka (kalau ada) + riwayat sesi tertutup
     $register = $pdo->query("SELECT id,opened_by AS openedBy,opened_at AS openedAt,opening_float AS openingFloat FROM register_sessions WHERE status='open' LIMIT 1")->fetch() ?: null;
