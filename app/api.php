@@ -868,13 +868,15 @@ function recompute_product_hpp($pdo, $productIds) {
 
 // Total penjualan sebuah sesi kasir, dipecah tunai vs non-tunai (dari nilai item nota)
 function session_totals($pdo, $sid) {
-    $rows = $pdo->prepare("SELECT n.pay_method AS pm, COALESCE(SUM(d.qty*d.harga),0) AS tot
+    $rows = $pdo->prepare("SELECT n.pay_method AS pm, n.discount AS disc, COALESCE(SUM(d.qty*d.harga),0) AS tot
         FROM notas n LEFT JOIN distributions d ON d.nota_id=n.id
-        WHERE n.session_id=? GROUP BY n.id, n.pay_method");
+        WHERE n.session_id=? GROUP BY n.id, n.pay_method, n.discount");
     $rows->execute([$sid]);
     $cash = 0; $noncash = 0; $count = 0;
     foreach ($rows as $r) {
-        $t = intval($r['tot']); $count++;
+        $sub = intval($r['tot']);
+        $t = $sub - min(max(0, intval($r['disc'])), $sub);   // total = subtotal - diskon (mirror notaTotal di klien)
+        $count++;
         if (($r['pm'] ?? '') === 'Tunai') $cash += $t; else $noncash += $t;
     }
     return ['cash' => $cash, 'noncash' => $noncash, 'count' => $count];
