@@ -1135,10 +1135,11 @@ function rPOS(){
         <div class="rgc"><span>Modal awal</span><b>${rp(reg.openingFloat)}</b></div>
         <div class="rgc"><span>Penjualan tunai</span><b>${rp(st.cash)}</b></div>
         <div class="rgc"><span>Non-tunai</span><b>${rp(st.noncash)}</b></div>
-        <div class="rgc" style="cursor:pointer" onclick="sessionTxnsModal()" title="Lihat / batalkan transaksi sesi ini"><span>Transaksi ›</span><b>${st.cnt}</b></div>
+        <div class="rgc"><span>Transaksi</span><b>${st.cnt}</b></div>
         <div class="rgc hl"><span>Kas di laci</span><b>${rp(laci)}</b></div>
       </div>
     </div>
+    <button class="btn ghost" style="width:100%;justify-content:center;margin-bottom:12px" onclick="sessionTxnsModal()">🧾 Transaksi Sesi Ini${st.cnt?` (${st.cnt})`:""} — lihat / batalkan</button>
     <input class="possearch" id="posSearch" placeholder="🔎 Cari produk…" oninput="posFilterGrid(this.value)" value="${esc(POS.q)}">
     ${S.products.length===0?'<div class="empty">Belum ada produk. Tambah dulu di menu Produk.</div>':`<div class="posgrid" id="posGrid">${grid}</div>`}
     ${cnt>0?`<div class="posbar"><button class="posclr" onclick="event.stopPropagation();posClear()" title="Kosongkan">🗑</button><div class="posbarmain" onclick="posCheckoutModal()"><div><div class="pc">${cnt} item</div><div class="pv">${rp(tot)}</div></div><div class="go">Bayar →</div></div></div>`:""}`;
