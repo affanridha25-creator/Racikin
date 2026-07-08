@@ -1268,8 +1268,8 @@ async function posFinalize(bayar,kembali,method){
   const items=Object.entries(POS.cart).map(([pid,q])=>{const p=prod(pid)||{};return {productId:pid,qty:q,harga:+p.harga||0,hpp:+p.hpp||0,kind:"jual"};});
   const nota={id:null,date:today(),storeId,notaNo:nextNotaNo(today()),items,sessionId:reg.id,payMethod:method,discount:posDisc()};
   try{
-    const res=await api("saveNota",{nota});
-    await api("addPayment",{notaId:res.id,amount:tot,date:today(),note:"POS "+method});
+    // ATOMIK: simpan nota + catat pembayaran dalam satu transaksi server (cegah piutang hantu)
+    const res=await api("posSale",{nota});
     POS.cart={};POS.bayar="";POS.customer="";POS.disc=0;
     await reload();
     posSuccess(res.id,tot,bayar,kembali,method);

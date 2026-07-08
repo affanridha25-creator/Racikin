@@ -362,6 +362,7 @@ function send_reset_email($to, $name, $alias, $tokenStr) {
 const TABLES = ['payments','distributions','notas','register_sessions','stock_adjustments','cash_out','batch_materials','batch_ops','batch_outputs','batches','material_purchases','material_prices','materials','products','profile'];
 const BATCH_CHILDREN = ['batch_materials','batch_ops','batch_outputs'];
 
+class ApiError extends Exception {}   // pesan aman ditampilkan ke user (HTTP 400)
 function gid($p) { return $p . bin2hex(random_bytes(5)); }
 function today() { return date('Y-m-d'); }
 // id dari klien harus alfanumerik saja (cegah XSS lewat interpolasi id ke handler onclick)
@@ -374,7 +375,7 @@ if (($_SESSION['role'] ?? 'owner') !== 'owner') {
     $OWNER_ONLY = ['reset', 'importAll', 'saveProfile'];   // hapus/timpa data & identitas usaha (incl. QRIS) = khusus pemilik
     $NEED = [
         'saveBatch'=>['produksi'], 'deleteBatch'=>['produksi'],
-        'saveNota'=>['pos','distribusi'], 'deleteNota'=>['pos','distribusi'],
+        'saveNota'=>['pos','distribusi'], 'deleteNota'=>['pos','distribusi'], 'posSale'=>['pos'],
         'openRegister'=>['pos'], 'closeRegister'=>['pos'],
         'addPayment'=>['pos','pembayaran'], 'deletePayment'=>['pembayaran'],
         'saveCashOut'=>['keuangan'], 'deleteCashOut'=>['keuangan'],
@@ -438,63 +439,27 @@ try {
         }
 
         case 'saveNota': {
-            $n = $in['nota'];
-            $id = safe_id($n['id'] ?? '') ?: gid('n');
-            $storeId = $n['storeId'] ?? '';
-            if ($storeId === '') { http_response_code(400); echo json_encode(['error' => 'Toko/penerima wajib dipilih.']); break; }
-            $date = $n['date'] ?: today();
-            // kumpulkan item valid (produk terisi & qty > 0)
-            $clean = [];
-            foreach ($n['items'] ?? [] as $it) {
-                $pid = $it['productId'] ?? '';
-                $qty = intval($it['qty'] ?? 0);
-                if ($pid === '' || $qty <= 0) continue;
-                $kind = $it['kind'] ?? 'jual';
-                if (!in_array($kind, ['jual','bonus','endorse','tester'], true)) $kind = 'jual';
-                // bonus/endorse/tester = gratis → harga 0 (tak ditagih)
-                $harga = ($kind === 'jual') ? intval($it['harga'] ?? 0) : 0;
-                $clean[] = ['productId'=>$pid, 'qty'=>$qty, 'harga'=>$harga, 'hpp'=>intval($it['hpp'] ?? 0), 'kind'=>$kind];
-            }
-            if (!$clean) { http_response_code(400); echo json_encode(['error' => 'Nota harus punya minimal 1 item dengan qty > 0.']); break; }
-            // validasi stok per produk (gabung qty item produk sama; item nota ini sendiri tak dihitung)
-            $need = [];
-            foreach ($clean as $it) $need[$it['productId']] = ($need[$it['productId']] ?? 0) + $it['qty'];
-            foreach ($need as $pid => $q) {
-                $x = $pdo->prepare("SELECT COALESCE(SUM(qty),0) FROM batch_outputs WHERE product_id=?");
-                $x->execute([$pid]); $produced = intval($x->fetchColumn());
-                $x = $pdo->prepare("SELECT COALESCE(SUM(qty),0) FROM distributions WHERE product_id=? AND (nota_id<>? OR nota_id IS NULL)");
-                $x->execute([$pid, $id]); $others = intval($x->fetchColumn());
-                $x = $pdo->prepare("SELECT COALESCE(SUM(qty),0) FROM stock_adjustments WHERE product_id=?");
-                $x->execute([$pid]); $adj = intval($x->fetchColumn());
-                $avail = $produced - $others + $adj;   // penyesuaian (rusak/hilang/koreksi) ikut hitung
-                if ($q > $avail) {
-                    $nm = $pdo->prepare("SELECT name FROM products WHERE id=?"); $nm->execute([$pid]); $nm = $nm->fetchColumn() ?: $pid;
-                    http_response_code(400); echo json_encode(['error' => "Stok \"$nm\" tidak cukup. Tersedia $avail, diminta $q."]); break 2;
-                }
-            }
             $pdo->beginTransaction();
-            // catat kasir/pembuat + sesi kasir + metode bayar: pertahankan nilai asli saat edit, isi baru saat pertama
-            $ex = $pdo->prepare("SELECT created_by, session_id, pay_method FROM notas WHERE id=?"); $ex->execute([$id]); $ex = $ex->fetch();
-            if ($ex === false) {   // nota baru
-                $creator   = $_SESSION['email'] ?? '';
-                $sessionId = safe_id($n['sessionId'] ?? '') ?: null;
-                $payMethod = in_array(($n['payMethod'] ?? ''), ['Tunai','Transfer','QRIS'], true) ? $n['payMethod'] : '';
-            } else {               // edit → pertahankan pembuat/sesi/metode asli
-                $creator   = $ex['created_by'];
-                $sessionId = $ex['session_id'];
-                $payMethod = $ex['pay_method'];
-            }
-            // diskon (Rp), dibatasi 0..subtotal item jual
-            $sub = 0; foreach ($clean as $it) $sub += $it['qty'] * $it['harga'];
-            $discount = max(0, min(intval($n['discount'] ?? 0), $sub));
-            $pdo->prepare("REPLACE INTO notas (id,nota_no,ndate,store_id,created_by,session_id,pay_method,discount) VALUES (?,?,?,?,?,?,?,?)")
-                ->execute([$id, $n['notaNo'] ?? '', $date, $storeId, $creator, $sessionId, $payMethod, $discount]);
-            $pdo->prepare("DELETE FROM distributions WHERE nota_id=?")->execute([$id]);
-            $ins = $pdo->prepare("INSERT INTO distributions (id,nota_id,ddate,store_id,product_id,qty,harga,hpp,kind) VALUES (?,?,?,?,?,?,?,?,?)");
-            foreach ($clean as $it)
-                $ins->execute([gid('d'), $id, $date, $storeId, $it['productId'], $it['qty'], $it['harga'], $it['hpp'], $it['kind']]);
+            $r = persist_nota($pdo, $in['nota'] ?? []);
             $pdo->commit();
-            echo json_encode(['ok' => true, 'id' => $id]);
+            echo json_encode(['ok' => true, 'id' => $r['id']]);
+            break;
+        }
+
+        case 'posSale': {
+            // Transaksi kasir ATOMIK: simpan nota + catat pembayaran dalam SATU transaksi DB.
+            // Cegah "piutang hantu" bila pencatatan bayar gagal setelah nota tersimpan.
+            $n = $in['nota'] ?? [];
+            $sid = safe_id($n['sessionId'] ?? '');
+            $open = $pdo->query("SELECT id FROM register_sessions WHERE status='open' LIMIT 1")->fetchColumn();
+            if ($sid === '' || $open !== $sid) throw new ApiError('Kasir belum dibuka atau sesi berbeda. Muat ulang halaman.');
+            $pdo->beginTransaction();
+            $r = persist_nota($pdo, $n);
+            if ($r['total'] > 0)   // catat pembayaran penuh (tunai/non-tunai) sebesar total setelah diskon
+                $pdo->prepare("INSERT INTO payments (nota_id,pdate,amount,note) VALUES (?,?,?,?)")
+                    ->execute([$r['id'], today(), $r['total'], 'POS ' . ($r['payMethod'] ?: 'Tunai')]);
+            $pdo->commit();
+            echo json_encode(['ok' => true, 'id' => $r['id'], 'total' => $r['total']]);
             break;
         }
 
@@ -747,6 +712,10 @@ try {
             http_response_code(400);
             echo json_encode(['error' => 'Aksi tidak dikenal: ' . $action]);
     }
+} catch (ApiError $e) {                      // error tervalidasi → pesan aman ditampilkan ke user
+    if ($pdo->inTransaction()) $pdo->rollBack();
+    http_response_code(400);
+    echo json_encode(['error' => $e->getMessage()]);
 } catch (Exception $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();
     error_log('api['.$action.']: '.$e->getMessage());
@@ -864,6 +833,65 @@ function recompute_product_hpp($pdo, $productIds) {
         // hanya tulis HPP produk ini — jangan sentuh produk lain di batch sumber
         if ($bid) update_product_hpp($pdo, load_batch($pdo, $bid), $pid);
     }
+}
+
+// Simpan/ubah 1 nota + itemnya (distributions) DI DALAM transaksi yang sudah dibuka pemanggil.
+// Lempar ApiError untuk input tak valid / stok kurang. Return ['id','sub','total','sessionId','payMethod'].
+function persist_nota($pdo, $n) {
+    $id = safe_id($n['id'] ?? '') ?: gid('n');
+    $storeId = $n['storeId'] ?? '';
+    if ($storeId === '') throw new ApiError('Toko/penerima wajib dipilih.');
+    $date = $n['date'] ?: today();
+    // kumpulkan item valid (produk terisi & qty > 0)
+    $clean = [];
+    foreach ($n['items'] ?? [] as $it) {
+        $pid = $it['productId'] ?? '';
+        $qty = intval($it['qty'] ?? 0);
+        if ($pid === '' || $qty <= 0) continue;
+        $kind = $it['kind'] ?? 'jual';
+        if (!in_array($kind, ['jual','bonus','endorse','tester'], true)) $kind = 'jual';
+        // bonus/endorse/tester = gratis → harga 0 (tak ditagih)
+        $harga = ($kind === 'jual') ? intval($it['harga'] ?? 0) : 0;
+        $clean[] = ['productId'=>$pid, 'qty'=>$qty, 'harga'=>$harga, 'hpp'=>intval($it['hpp'] ?? 0), 'kind'=>$kind];
+    }
+    if (!$clean) throw new ApiError('Nota harus punya minimal 1 item dengan qty > 0.');
+    // validasi stok per produk (gabung qty item produk sama; item nota ini sendiri tak dihitung)
+    $need = [];
+    foreach ($clean as $it) $need[$it['productId']] = ($need[$it['productId']] ?? 0) + $it['qty'];
+    foreach ($need as $pid => $q) {
+        $x = $pdo->prepare("SELECT COALESCE(SUM(qty),0) FROM batch_outputs WHERE product_id=?");
+        $x->execute([$pid]); $produced = intval($x->fetchColumn());
+        $x = $pdo->prepare("SELECT COALESCE(SUM(qty),0) FROM distributions WHERE product_id=? AND (nota_id<>? OR nota_id IS NULL)");
+        $x->execute([$pid, $id]); $others = intval($x->fetchColumn());
+        $x = $pdo->prepare("SELECT COALESCE(SUM(qty),0) FROM stock_adjustments WHERE product_id=?");
+        $x->execute([$pid]); $adj = intval($x->fetchColumn());
+        $avail = $produced - $others + $adj;   // penyesuaian (rusak/hilang/koreksi) ikut hitung
+        if ($q > $avail) {
+            $nm = $pdo->prepare("SELECT name FROM products WHERE id=?"); $nm->execute([$pid]); $nm = $nm->fetchColumn() ?: $pid;
+            throw new ApiError("Stok \"$nm\" tidak cukup. Tersedia $avail, diminta $q.");
+        }
+    }
+    // catat kasir/pembuat + sesi kasir + metode bayar: pertahankan nilai asli saat edit, isi baru saat pertama
+    $ex = $pdo->prepare("SELECT created_by, session_id, pay_method FROM notas WHERE id=?"); $ex->execute([$id]); $ex = $ex->fetch();
+    if ($ex === false) {   // nota baru
+        $creator   = $_SESSION['email'] ?? '';
+        $sessionId = safe_id($n['sessionId'] ?? '') ?: null;
+        $payMethod = in_array(($n['payMethod'] ?? ''), ['Tunai','Transfer','QRIS'], true) ? $n['payMethod'] : '';
+    } else {               // edit → pertahankan pembuat/sesi/metode asli
+        $creator   = $ex['created_by'];
+        $sessionId = $ex['session_id'];
+        $payMethod = $ex['pay_method'];
+    }
+    // diskon (Rp), dibatasi 0..subtotal item jual
+    $sub = 0; foreach ($clean as $it) $sub += $it['qty'] * $it['harga'];
+    $discount = max(0, min(intval($n['discount'] ?? 0), $sub));
+    $pdo->prepare("REPLACE INTO notas (id,nota_no,ndate,store_id,created_by,session_id,pay_method,discount) VALUES (?,?,?,?,?,?,?,?)")
+        ->execute([$id, $n['notaNo'] ?? '', $date, $storeId, $creator, $sessionId, $payMethod, $discount]);
+    $pdo->prepare("DELETE FROM distributions WHERE nota_id=?")->execute([$id]);
+    $ins = $pdo->prepare("INSERT INTO distributions (id,nota_id,ddate,store_id,product_id,qty,harga,hpp,kind) VALUES (?,?,?,?,?,?,?,?,?)");
+    foreach ($clean as $it)
+        $ins->execute([gid('d'), $id, $date, $storeId, $it['productId'], $it['qty'], $it['harga'], $it['hpp'], $it['kind']]);
+    return ['id'=>$id, 'sub'=>$sub, 'total'=>$sub - $discount, 'sessionId'=>$sessionId, 'payMethod'=>$payMethod];
 }
 
 // Total penjualan sebuah sesi kasir, dipecah tunai vs non-tunai (dari nilai item nota)
