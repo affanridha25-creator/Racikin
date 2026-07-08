@@ -465,6 +465,10 @@ try {
 
         case 'deleteNota': {
             $id = $in['id'];
+            // Lindungi sesi kasir yang sudah ditutup: transaksinya tak boleh dibatalkan (settlement sudah beku)
+            $st = $pdo->prepare("SELECT s.status FROM notas n JOIN register_sessions s ON s.id=n.session_id WHERE n.id=?");
+            $st->execute([$id]);
+            if ($st->fetchColumn() === 'closed') throw new ApiError('Transaksi dari sesi kasir yang sudah ditutup tak bisa dibatalkan.');
             $pdo->beginTransaction();
             $pdo->prepare("DELETE FROM payments WHERE nota_id=?")->execute([$id]);
             $pdo->prepare("DELETE FROM distributions WHERE nota_id=?")->execute([$id]);

@@ -1092,6 +1092,27 @@ function regOpen(){return S.register||null;}
 function fmtClock(dt){if(!dt)return "";const m=String(dt).match(/(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);return m?`${m[3]}/${m[2]} ${m[4]}:${m[5]}`:esc(String(dt));}
 function sessNotas(){const r=regOpen();return r?S.notas.filter(n=>n.sessionId===r.id):[];}
 function sessTotals(){let cash=0,noncash=0,cnt=0;sessNotas().forEach(n=>{const t=notaTotal(n);cnt++;if(n.payMethod==="Tunai")cash+=t;else noncash+=t;});return {cash,noncash,cnt};}
+// Daftar + pembatalan transaksi sesi kasir yang SEDANG BERJALAN (stok balik & pembayaran dihapus).
+// Sesi yang sudah ditutup tak bisa diubah (dijaga server) supaya settlement tetap konsisten.
+function sessionTxnsModal(){
+  if(!regOpen()){toast("Kasir belum dibuka.");return;}
+  const list=sessNotas().sort((a,b)=>(b.notaNo||"").localeCompare(a.notaNo||""));
+  const rows=list.map(n=>`<div class="crow"><div class="ci">🧾</div><div class="cmain"><div class="ctitle">${esc(n.notaNo||"-")}</div><div class="csub">${notaItems(n).length} item · ${esc(n.payMethod||"Tunai")} · ${rp(notaTotal(n))}</div></div><div style="display:flex;gap:6px"><button class="btn sm gray" onclick="strukModal('${n.id}')">🖨</button><button class="btn sm del" onclick="voidPosNota('${n.id}')">✕ Batal</button></div></div>`).join("");
+  openModal(`<button class="close" onclick="closeModal()">×</button><h3>Transaksi Sesi Ini (${list.length})</h3>
+    <p class="mini" style="margin-bottom:12px">Batalkan transaksi keliru — <b>stok kembali</b> &amp; pembayaran dihapus. Hanya berlaku selama sesi belum ditutup.</p>
+    ${list.length===0?'<div class="empty">Belum ada transaksi di sesi ini.</div>':`<div class="clist">${rows}</div>`}`);
+}
+async function voidPosNota(id){
+  const n=S.notas.find(x=>x.id===id);if(!n)return;
+  if(!confirm(`Batalkan transaksi ${n.notaNo||""}? Stok kembali & pembayaran dihapus.`))return;
+  try{
+    await api("deleteNota",{id});
+    await reload();
+    toast("Transaksi dibatalkan ✓");
+    if(regOpen())sessionTxnsModal();else closeModal();
+    rPOS();
+  }catch(e){/* api sudah menampilkan toast error (mis. sesi sudah ditutup) */}
+}
 
 function rPOS(){
   const reg=regOpen(),el=document.getElementById("v-pos");
@@ -1114,7 +1135,7 @@ function rPOS(){
         <div class="rgc"><span>Modal awal</span><b>${rp(reg.openingFloat)}</b></div>
         <div class="rgc"><span>Penjualan tunai</span><b>${rp(st.cash)}</b></div>
         <div class="rgc"><span>Non-tunai</span><b>${rp(st.noncash)}</b></div>
-        <div class="rgc"><span>Transaksi</span><b>${st.cnt}</b></div>
+        <div class="rgc" style="cursor:pointer" onclick="sessionTxnsModal()" title="Lihat / batalkan transaksi sesi ini"><span>Transaksi ›</span><b>${st.cnt}</b></div>
         <div class="rgc hl"><span>Kas di laci</span><b>${rp(laci)}</b></div>
       </div>
     </div>
