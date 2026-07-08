@@ -358,6 +358,50 @@ function send_reset_email($to, $name, $alias, $tokenStr) {
     @mail($to, $subject, $body, $headers);
 }
 
+// Bangun HTML struk untuk dikirim via email — dari data nota di server (otoritatif, anti-injeksi)
+function build_receipt_html($pdo, $n) {
+    $esc = function ($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); };
+    $rp  = function ($v) { return 'Rp' . number_format((int)$v, 0, ',', '.'); };
+    $biz = current_business(); $bizName = $biz['name'] ?? 'Racikin';
+    $pf = $pdo->query("SELECT address,phone,whatsapp,footer FROM profile WHERE id=1")->fetch() ?: [];
+    $q = $pdo->prepare("SELECT d.qty,d.harga,p.name FROM distributions d LEFT JOIN products p ON p.id=d.product_id WHERE d.nota_id=?");
+    $q->execute([$n['id']]); $items = $q->fetchAll();
+    $sub = 0; foreach ($items as $r) $sub += (int)$r['qty'] * (int)$r['harga'];
+    $disc = min(max(0, (int)$n['discount']), $sub);
+    $svc = (int)$n['service']; $tax = (int)$n['tax'];
+    $total = $sub - $disc + $svc + $tax;
+    $phone = $esc($pf['phone'] ?? ''); $wa = $esc($pf['whatsapp'] ?? '');
+    $kontak = ($phone && $wa) ? ($phone === $wa ? "Telp/WA $phone" : "Telp $phone &middot; WA $wa") : ($phone ? "Telp $phone" : ($wa ? "WA $wa" : ''));
+    $rows = '';
+    foreach ($items as $r) {
+        $lt = (int)$r['qty'] * (int)$r['harga'];
+        $rows .= '<tr><td style="padding:4px 0">' . $esc($r['name'] ?: '?') . '<br><span style="color:#888;font-size:12px">' . (int)$r['qty'] . ' x ' . $rp($r['harga']) . '</span></td><td style="padding:4px 0;text-align:right;white-space:nowrap">' . $rp($lt) . '</td></tr>';
+    }
+    $line = function ($l, $v, $b = false) use ($esc, $rp) {
+        $st = $b ? ';font-weight:700' : '';
+        return '<tr><td style="padding:2px 0' . $st . '">' . $esc($l) . '</td><td style="padding:2px 0;text-align:right' . $st . '">' . $rp($v) . '</td></tr>';
+    };
+    $tot = '';
+    if ($disc > 0 || $svc > 0 || $tax > 0) $tot .= $line('Subtotal', $sub);
+    if ($disc > 0) $tot .= $line('Diskon', -$disc);
+    if ($svc > 0)  $tot .= $line('Service', $svc);
+    if ($tax > 0)  $tot .= $line('Pajak', $tax);
+    $tot .= $line('TOTAL', $total, true);
+    $footer = trim((string)($pf['footer'] ?? '')); if ($footer === '') $footer = 'Terima kasih';
+    $addr = $pf['address'] ?? '';
+    return '<div style="max-width:340px;margin:0 auto;font-family:Arial,Helvetica,sans-serif;color:#222;border:1px solid #eee;border-radius:12px;padding:20px">'
+        . '<div style="text-align:center;border-bottom:1px dashed #ccc;padding-bottom:12px;margin-bottom:12px">'
+        . '<div style="font-size:18px;font-weight:800">' . $esc($bizName) . '</div>'
+        . ($addr ? '<div style="font-size:12px;color:#666;margin-top:4px">' . $esc($addr) . '</div>' : '')
+        . ($kontak ? '<div style="font-size:12px;color:#666">' . $kontak . '</div>' : '')
+        . '</div>'
+        . '<div style="font-size:13px;color:#444;margin-bottom:10px">' . $esc($n['nota_no'] ?: '') . '<br>' . $esc($n['ndate']) . ($n['store_name'] ? ' &middot; ' . $esc($n['store_name']) : '') . '</div>'
+        . '<table style="width:100%;border-collapse:collapse;font-size:14px;border-bottom:1px dashed #ccc;margin-bottom:8px">' . $rows . '</table>'
+        . '<table style="width:100%;border-collapse:collapse;font-size:14px">' . $tot . '</table>'
+        . '<div style="text-align:center;color:#666;font-size:12px;margin-top:16px;border-top:1px dashed #ccc;padding-top:12px">' . $esc($footer) . '<br>&mdash; ' . $esc($bizName) . ' &mdash;</div>'
+        . '</div>';
+}
+
 // Daftar tabel dipakai bersama oleh reset & importAll (urutan: anak dulu, induk belakangan)
 const TABLES = ['payments','distributions','notas','register_sessions','stock_adjustments','cash_out','batch_materials','batch_ops','batch_outputs','batches','material_purchases','material_prices','materials','products','profile'];
 const BATCH_CHILDREN = ['batch_materials','batch_ops','batch_outputs'];
@@ -375,7 +419,7 @@ if (($_SESSION['role'] ?? 'owner') !== 'owner') {
     $OWNER_ONLY = ['reset', 'importAll', 'saveProfile'];   // hapus/timpa data & identitas usaha (incl. QRIS) = khusus pemilik
     $NEED = [
         'saveBatch'=>['produksi'], 'deleteBatch'=>['produksi'],
-        'saveNota'=>['pos','distribusi'], 'deleteNota'=>['pos','distribusi'], 'posSale'=>['pos'],
+        'saveNota'=>['pos','distribusi'], 'deleteNota'=>['pos','distribusi'], 'posSale'=>['pos'], 'emailReceipt'=>['pos','distribusi','pembayaran'],
         'openRegister'=>['pos'], 'closeRegister'=>['pos'],
         'addPayment'=>['pos','pembayaran'], 'deletePayment'=>['pembayaran'],
         'saveCashOut'=>['keuangan'], 'deleteCashOut'=>['keuangan'],
@@ -504,6 +548,23 @@ try {
                 'cashSales' => $t['cash'], 'noncashSales' => $t['noncash'], 'count' => $t['count'],
                 'expected' => $expected, 'closing' => $closing, 'diff' => $closing - $expected,
             ]]);
+            break;
+        }
+
+        case 'emailReceipt': {
+            $notaId = safe_id($in['notaId'] ?? '');
+            $email  = trim((string)($in['email'] ?? ''));
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) throw new ApiError('Alamat email tidak valid.');
+            $q = $pdo->prepare("SELECT n.*, s.name AS store_name FROM notas n LEFT JOIN stores s ON s.id=n.store_id WHERE n.id=?");
+            $q->execute([$notaId]); $n = $q->fetch();
+            if (!$n) throw new ApiError('Nota tak ditemukan.');
+            $biz = current_business(); $bizName = $biz['name'] ?? 'Racikin';
+            $host = preg_replace('/:\d+$/', '', app_host());
+            $from = defined('RESET_FROM') && RESET_FROM ? RESET_FROM : ('noreply@' . preg_replace('/^www\./', '', $host));
+            $subject = 'Struk ' . ($n['nota_no'] ?: '') . ' - ' . $bizName;
+            $headers = "From: " . mb_encode_mimeheader($bizName) . " <$from>\r\nReply-To: $from\r\nContent-Type: text/html; charset=UTF-8\r\nMIME-Version: 1.0\r\n";
+            $sent = @mail($email, $subject, build_receipt_html($pdo, $n), $headers);
+            echo json_encode(['ok' => true, 'sent' => (bool)$sent]);
             break;
         }
 

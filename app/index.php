@@ -1091,8 +1091,8 @@ let POS={cart:{},bayar:"",method:"Tunai",customer:"",q:"",disc:0};
 function posStore(){return S.stores.find(s=>s.name===POS_NAME);}
 function posSubtotal(){return Object.entries(POS.cart).reduce((a,[pid,q])=>a+q*((prod(pid)||{}).harga||0),0);}
 function posDisc(){return Math.max(0,Math.min(+POS.disc||0,posSubtotal()));}
-function posSvcRate(){const p=S.profile||{};return p.svc_enabled?Math.max(0,+p.svc_rate||0):0;}
-function posTaxRate(){const p=S.profile||{};return p.tax_enabled?Math.max(0,+p.tax_rate||0):0;}
+function posSvcRate(){const p=S.profile||{};return +p.svc_enabled?Math.max(0,+p.svc_rate||0):0;}   // +() krn TINYINT datang sbg string "0"/"1" (keduanya truthy di JS)
+function posTaxRate(){const p=S.profile||{};return +p.tax_enabled?Math.max(0,+p.tax_rate||0):0;}
 function posBase(){return posSubtotal()-posDisc();}
 function posService(){return Math.round(posBase()*posSvcRate()/100);}
 function posTax(){return Math.round((posBase()+posService())*posTaxRate()/100);}   // pajak atas base+service
@@ -1323,7 +1323,8 @@ function posSuccess(id,total,bayar,kembali,method){
     ${method==="Tunai"?`<div class="poskembali" style="justify-content:center;gap:14px;margin-bottom:16px">Kembalian <b>${rp(kembali)}</b></div>`:""}
     <div style="display:flex;flex-direction:column;gap:8px">
       <button class="btn" onclick="printRawBT(posReceiptText('${id}',${bayar},${kembali},'${esc(method)}'))">🖨 Cetak Struk (Printer Bluetooth)</button>
-      <div style="display:flex;gap:8px"><button class="btn ghost" style="flex:1" onclick="printReceipt('${id}',${bayar},${kembali},'${esc(method)}')">Struk PDF/biasa</button><button class="btn" style="flex:1;background:var(--green)" onclick="closeModal();rPOS()">+ Transaksi Baru</button></div>
+      <div style="display:flex;gap:8px"><button class="btn ghost" style="flex:1" onclick="printReceipt('${id}',${bayar},${kembali},'${esc(method)}')">Struk PDF</button><button class="btn ghost" style="flex:1" onclick="emailReceiptModal('${id}')">✉️ Email</button></div>
+      <button class="btn" style="background:var(--green)" onclick="closeModal();rPOS()">+ Transaksi Baru</button>
       <div class="mini" style="text-align:center;margin-top:2px">Printer Bluetooth perlu app <b>RawBT</b> (Android).</div>
     </div></div>`);
 }
@@ -1886,8 +1887,23 @@ function strukModal(id){const n=S.notas.find(x=>x.id===id);if(!n){toast("Nota ta
     <div style="display:flex;flex-direction:column;gap:8px">
       <button class="btn" onclick="printRawBT(posReceiptText('${id}',${bayar},0,'${esc(method)}'))">🖨 Struk Printer Bluetooth (RawBT)</button>
       <button class="btn ghost" onclick="printReceipt('${id}',${bayar},0,'${esc(method)}')">Struk PDF / Printer biasa</button>
+      <button class="btn ghost" onclick="emailReceiptModal('${id}')">✉️ Kirim ke Email</button>
     </div>
     <div class="mini" style="text-align:center;margin-top:10px">Printer Bluetooth perlu app RawBT (Android).</div>`);}
+// ---- Kirim struk ke email pelanggan ----
+function emailReceiptModal(id){const n=S.notas.find(x=>x.id===id);if(!n){toast("Nota tak ditemukan.");return;}
+  openModal(`<button class="close" onclick="closeModal()">×</button><h3>✉️ Kirim Struk ke Email</h3>
+    <p class="mini" style="margin-bottom:12px">${esc(n.notaNo||"-")} · ${rp(notaTotal(n))}</p>
+    <label class="f">Email pelanggan</label>
+    <input id="rcptEmail" type="email" inputmode="email" placeholder="nama@email.com" autofocus onkeydown="if(event.key==='Enter')sendReceiptEmail('${id}')">
+    <div style="margin-top:16px;text-align:right"><button class="btn gray" onclick="closeModal()">Batal</button> <button class="btn" id="rcptSendBtn" onclick="sendReceiptEmail('${id}')">Kirim</button></div>`);}
+async function sendReceiptEmail(id){
+  const email=(document.getElementById("rcptEmail").value||"").trim();
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){toast("Email tidak valid.");return;}
+  const btn=document.getElementById("rcptSendBtn");if(btn){btn.disabled=true;btn.textContent="Mengirim…";}
+  try{const r=await api("emailReceipt",{notaId:id,email});closeModal();toast(r&&r.sent?("Struk dikirim ke "+email+" ✓"):"Struk diproses — jika email tak masuk, cek pengaturan email hosting.");}
+  catch(e){if(btn){btn.disabled=false;btn.textContent="Kirim";}}
+}
 
 // ================= PENGGUNA (multi-user, khusus pemilik) =================
 async function rUsers(){
@@ -1965,11 +1981,11 @@ function rProfile(){
     <div style="border-top:1px solid var(--line);padding-top:16px;margin-top:16px">
       <label class="f">Service Charge &amp; Pajak <span class="mini">(otomatis di transaksi Kasir)</span></label>
       <div class="grid2" style="margin-top:8px;align-items:center">
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="pfSvcOn" ${_prof.svc_enabled?"checked":""}> Service charge</label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="pfSvcOn" ${+_prof.svc_enabled?"checked":""}> Service charge</label>
         <div style="display:flex;align-items:center;gap:6px;justify-content:flex-end"><input id="pfSvcRate" inputmode="decimal" value="${_prof.svc_rate&&+_prof.svc_rate?(+_prof.svc_rate):""}" placeholder="0" style="width:80px;text-align:right"><b>%</b></div>
       </div>
       <div class="grid2" style="margin-top:10px;align-items:center">
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="pfTaxOn" ${_prof.tax_enabled?"checked":""}> Pajak / PPN</label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="pfTaxOn" ${+_prof.tax_enabled?"checked":""}> Pajak / PPN</label>
         <div style="display:flex;align-items:center;gap:6px;justify-content:flex-end"><input id="pfTaxRate" inputmode="decimal" value="${_prof.tax_rate&&+_prof.tax_rate?(+_prof.tax_rate):""}" placeholder="0" style="width:80px;text-align:right"><b>%</b></div>
       </div>
       <div class="mini" style="margin-top:8px">Pajak dihitung di atas (subtotal − diskon + service). Muncul terpisah di struk &amp; "Pajak Terkumpul" di Laba-Rugi (bukan laba).</div>
