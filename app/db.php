@@ -307,8 +307,10 @@ function init_schema($pdo) {
     ensure_column($pdo, 'notas', 'pay_method', "pay_method VARCHAR(16) DEFAULT ''");
     // diskon/potongan nota (Rp) — mengurangi nilai jual & laba
     ensure_column($pdo, 'notas', 'discount', "discount INT DEFAULT 0");
-    ensure_column($pdo, 'notas', 'service', "service INT DEFAULT 0");   // service charge (Rp), beku saat transaksi
-    ensure_column($pdo, 'notas', 'tax', "tax INT DEFAULT 0");           // pajak/PPN (Rp), beku saat transaksi
+    ensure_column($pdo, 'notas', 'service', "service INT DEFAULT 0");        // service charge (Rp), beku saat transaksi
+    ensure_column($pdo, 'notas', 'tax', "tax INT DEFAULT 0");                // pajak/PPN (Rp), beku saat transaksi
+    ensure_column($pdo, 'notas', 'svc_rate', "svc_rate DECIMAL(5,2) DEFAULT 0");   // tarif service yg dipakai (utk label struk presisi)
+    ensure_column($pdo, 'notas', 'tax_rate', "tax_rate DECIMAL(5,2) DEFAULT 0");   // tarif pajak yg dipakai
 
     // Sesi kasir (buka/tutup laci): modal awal, siapa yang buka, rekonsiliasi saat tutup
     $pdo->exec("CREATE TABLE IF NOT EXISTS register_sessions (

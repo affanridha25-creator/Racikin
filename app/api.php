@@ -383,9 +383,10 @@ function build_receipt_html($pdo, $n) {
     };
     $tot = '';
     if ($disc > 0 || $svc > 0 || $tax > 0) $tot .= $line('Subtotal', $sub);
+    $pct = function ($r) { $r = (float)$r; return $r > 0 ? ' (' . rtrim(rtrim(number_format($r, 2, '.', ''), '0'), '.') . '%)' : ''; };
     if ($disc > 0) $tot .= $line('Diskon', -$disc);
-    if ($svc > 0)  $tot .= $line('Service', $svc);
-    if ($tax > 0)  $tot .= $line('Pajak', $tax);
+    if ($svc > 0)  $tot .= $line('Service' . $pct($n['svc_rate'] ?? 0), $svc);
+    if ($tax > 0)  $tot .= $line('Pajak' . $pct($n['tax_rate'] ?? 0), $tax);
     $tot .= $line('TOTAL', $total, true);
     $footer = trim((string)($pf['footer'] ?? '')); if ($footer === '') $footer = 'Terima kasih';
     $addr = $pf['address'] ?? '';
@@ -942,7 +943,7 @@ function persist_nota($pdo, $n) {
         }
     }
     // catat kasir/pembuat + sesi kasir + metode bayar: pertahankan nilai asli saat edit, isi baru saat pertama
-    $ex = $pdo->prepare("SELECT created_by, session_id, pay_method, service, tax FROM notas WHERE id=?"); $ex->execute([$id]); $ex = $ex->fetch();
+    $ex = $pdo->prepare("SELECT created_by, session_id, pay_method, service, tax, svc_rate, tax_rate FROM notas WHERE id=?"); $ex->execute([$id]); $ex = $ex->fetch();
     if ($ex === false) {   // nota baru
         $creator   = $_SESSION['email'] ?? '';
         $sessionId = safe_id($n['sessionId'] ?? '') ?: null;
@@ -958,16 +959,17 @@ function persist_nota($pdo, $n) {
     $base = $sub - $discount;
     // service charge & pajak: dibekukan per nota. Saat EDIT → pertahankan nilai lama (jangan hitung ulang dg tarif terkini).
     // Nota kasir BARU (POS = punya sessionId) → hitung dari tarif Profil (owner).
-    $service = 0; $tax = 0;
-    if ($ex !== false) {                          // edit → beku
+    $service = 0; $tax = 0; $svcRate = 0.0; $taxRate = 0.0;
+    if ($ex !== false) {                          // edit → beku (nilai & tarif dipertahankan)
         $service = intval($ex['service']); $tax = intval($ex['tax']);
+        $svcRate = (float)$ex['svc_rate'];  $taxRate = (float)$ex['tax_rate'];
     } elseif ($sessionId !== null) {              // nota kasir baru
         $cfg = $pdo->query("SELECT svc_enabled,svc_rate,tax_enabled,tax_rate FROM profile WHERE id=1")->fetch() ?: [];
-        if (!empty($cfg['svc_enabled'])) $service = (int) round($base * ((float)$cfg['svc_rate']) / 100);
-        if (!empty($cfg['tax_enabled'])) $tax     = (int) round(($base + $service) * ((float)$cfg['tax_rate']) / 100);  // pajak atas base+service
+        if (!empty($cfg['svc_enabled'])) { $svcRate = (float)$cfg['svc_rate']; $service = (int) round($base * $svcRate / 100); }
+        if (!empty($cfg['tax_enabled'])) { $taxRate = (float)$cfg['tax_rate']; $tax = (int) round(($base + $service) * $taxRate / 100); }  // pajak atas base+service
     }
-    $pdo->prepare("REPLACE INTO notas (id,nota_no,ndate,store_id,created_by,session_id,pay_method,discount,service,tax) VALUES (?,?,?,?,?,?,?,?,?,?)")
-        ->execute([$id, $n['notaNo'] ?? '', $date, $storeId, $creator, $sessionId, $payMethod, $discount, $service, $tax]);
+    $pdo->prepare("REPLACE INTO notas (id,nota_no,ndate,store_id,created_by,session_id,pay_method,discount,service,tax,svc_rate,tax_rate) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")
+        ->execute([$id, $n['notaNo'] ?? '', $date, $storeId, $creator, $sessionId, $payMethod, $discount, $service, $tax, $svcRate, $taxRate]);
     $pdo->prepare("DELETE FROM distributions WHERE nota_id=?")->execute([$id]);
     $ins = $pdo->prepare("INSERT INTO distributions (id,nota_id,ddate,store_id,product_id,qty,harga,hpp,kind) VALUES (?,?,?,?,?,?,?,?,?)");
     foreach ($clean as $it)
@@ -1035,7 +1037,7 @@ function bootstrap($pdo) {
     foreach ($pdo->query("SELECT id,nota_id AS notaId,pdate AS date,amount,note FROM payments ORDER BY pdate,id") as $r) {
         $r['amount']=intval($r['amount']); $pay[$r['notaId']][] = $r;
     }
-    $notas = $pdo->query("SELECT id,nota_no AS notaNo,ndate AS date,store_id AS storeId,created_by AS createdBy,session_id AS sessionId,pay_method AS payMethod,discount,service,tax FROM notas ORDER BY ndate DESC,id DESC")->fetchAll();
+    $notas = $pdo->query("SELECT id,nota_no AS notaNo,ndate AS date,store_id AS storeId,created_by AS createdBy,session_id AS sessionId,pay_method AS payMethod,discount,service,tax,svc_rate AS svcRate,tax_rate AS taxRate FROM notas ORDER BY ndate DESC,id DESC")->fetchAll();
     foreach ($notas as &$n) { $n['discount']=intval($n['discount']); $n['items']=$items[$n['id']]??[]; $n['payments']=$pay[$n['id']]??[]; } unset($n);
 
     // Kas keluar (termasuk prive pemilik) hanya untuk pemilik / staf ber-akses Keuangan

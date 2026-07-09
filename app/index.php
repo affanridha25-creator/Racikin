@@ -680,6 +680,9 @@ const notaTax=n=>Math.max(0,+n.tax||0);           // pajak/PPN (Rp), beku per no
 const notaBase=n=>notaSubtotal(n)-notaDisc(n);    // penjualan bersih (tanpa service/pajak)
 const notaTotal=n=>notaBase(n)+notaService(n)+notaTax(n);
 const notaOmzet=n=>notaBase(n)+notaService(n);     // omzet/pendapatan = TANPA pajak (pajak = titipan negara)
+const notaSvcRate=n=>+n.svcRate||0;                // tarif service yg dipakai (beku per nota)
+const notaTaxRate=n=>+n.taxRate||0;                // tarif pajak yg dipakai
+const ratePct=r=>{r=+r||0;return r?" ("+(Number.isInteger(r)?r:(+r.toFixed(2)))+"%)":"";};   // "5"/"11.5", buang .00
 const notaProfit=n=>notaItems(n).reduce((a,it)=>a+(+it.qty||0)*((+it.harga||0)-(+it.hpp||0)),0)-notaDisc(n)+notaService(n);  // service = pemasukan; pajak = titipan (tak masuk laba)
 const notaQty=n=>notaItems(n).reduce((a,it)=>a+(+it.qty||0),0);
 const notaPaid=n=>(n.payments||[]).reduce((a,p)=>a+(+p.amount||0),0);
@@ -1315,7 +1318,11 @@ async function posFinalize(bayar,kembali,method){
     const res=await api("posSale",{nota});
     POS.cart={};POS.bayar="";POS.customer="";POS.disc=0;
     await reload();
-    posSuccess(res.id,tot,bayar,kembali,method);
+    // pakai total OTORITATIF dari server (bukan tot klien) → cocok dg struk & pembayaran tercatat
+    const sTot=(res&&res.total!=null)?res.total:tot;
+    const sBayar=method==="Tunai"?bayar:sTot;
+    const sKembali=method==="Tunai"?Math.max(0,bayar-sTot):0;
+    posSuccess(res.id,sTot,sBayar,sKembali,method);
   }catch(e){/* api sudah menampilkan toast error (mis. stok kurang) */}
 }
 function posSuccess(id,total,bayar,kembali,method){
@@ -1347,8 +1354,8 @@ function posReceiptText(id,bayar,kembali,method){
   t+=dash+"\n";
   const svc=notaService(n),tax=notaTax(n),base=notaBase(n);
   if(notaDisc(n)>0||svc>0||tax>0){t+=lr("Subtotal",rp(notaSubtotal(n)))+"\n";if(notaDisc(n)>0)t+=lr("Diskon","-"+rp(notaDisc(n)))+"\n";}
-  if(svc>0)t+=lr("Service"+(base>0?" ("+Math.round(svc/base*100)+"%)":""),rp(svc))+"\n";
-  if(tax>0)t+=lr("Pajak"+((base+svc)>0?" ("+Math.round(tax/(base+svc)*100)+"%)":""),rp(tax))+"\n";
+  if(svc>0)t+=lr("Service"+ratePct(notaSvcRate(n)),rp(svc))+"\n";
+  if(tax>0)t+=lr("Pajak"+ratePct(notaTaxRate(n)),rp(tax))+"\n";
   t+=lr("TOTAL",rp(notaTotal(n)))+"\n";
   if(method){t+=lr("Bayar ("+method+")",rp(bayar))+"\n";if(method==="Tunai")t+=lr("Kembalian",rp(kembali||0))+"\n";}
   if(notaDue(n)>0)t+=lr("Sisa",rp(notaDue(n)))+"\n";
@@ -1377,7 +1384,7 @@ function printReceipt(id,bayar,kembali,method){
     ${(p.address||contacts)?`<div class="rc">${p.address?esc(p.address):""}${p.address&&contacts?"<br>":""}${contacts}</div>`:""}
     <div class="rmeta">${esc(n.notaNo||"")}<br>${fmtDate(n.date)} · Kasir</div>
     ${items}
-    <div class="rtot">${(notaDisc(n)>0||notaService(n)>0||notaTax(n)>0)?`<div class="rrow"><span>Subtotal</span><span>${rp(notaSubtotal(n))}</span></div>${notaDisc(n)>0?`<div class="rrow"><span>Diskon</span><span>-${rp(notaDisc(n))}</span></div>`:""}${notaService(n)>0?`<div class="rrow"><span>Service</span><span>${rp(notaService(n))}</span></div>`:""}${notaTax(n)>0?`<div class="rrow"><span>Pajak</span><span>${rp(notaTax(n))}</span></div>`:""}`:""}<div class="rrow"><span>TOTAL</span><span>${rp(total)}</span></div>${bayar!=null?`<div class="rrow"><span>Bayar (${esc(method||"Tunai")})</span><span>${rp(bayar)}</span></div><div class="rrow"><span>Kembalian</span><span>${rp(kembali||0)}</span></div>`:""}${notaDue(n)>0?`<div class="rrow"><span>Sisa</span><span>${rp(notaDue(n))}</span></div>`:""}</div>
+    <div class="rtot">${(notaDisc(n)>0||notaService(n)>0||notaTax(n)>0)?`<div class="rrow"><span>Subtotal</span><span>${rp(notaSubtotal(n))}</span></div>${notaDisc(n)>0?`<div class="rrow"><span>Diskon</span><span>-${rp(notaDisc(n))}</span></div>`:""}${notaService(n)>0?`<div class="rrow"><span>Service${ratePct(notaSvcRate(n))}</span><span>${rp(notaService(n))}</span></div>`:""}${notaTax(n)>0?`<div class="rrow"><span>Pajak${ratePct(notaTaxRate(n))}</span><span>${rp(notaTax(n))}</span></div>`:""}`:""}<div class="rrow"><span>TOTAL</span><span>${rp(total)}</span></div>${bayar!=null?`<div class="rrow"><span>Bayar (${esc(method||"Tunai")})</span><span>${rp(bayar)}</span></div><div class="rrow"><span>Kembalian</span><span>${rp(kembali||0)}</span></div>`:""}${notaDue(n)>0?`<div class="rrow"><span>Sisa</span><span>${rp(notaDue(n))}</span></div>`:""}</div>
     <div class="rthx">${(p.footer||"").trim()?esc((p.footer||"").trim()):"Terima kasih 🙏"}<br>— ${esc(BIZ.name||"Racikin")} —</div>
   </div>`;
   window.print();
