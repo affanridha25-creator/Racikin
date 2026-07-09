@@ -1119,14 +1119,47 @@ function sessionTxnsModal(){
 }
 async function voidPosNota(id){
   const n=S.notas.find(x=>x.id===id);if(!n)return;
+  if(!isOwner()){voidOtpModal(id);return;}   // staf → wajib persetujuan owner (OTP)
   if(!confirm(`Batalkan transaksi ${n.notaNo||""}? Stok kembali & pembayaran dihapus.`))return;
+  await doVoidPos(id,null);
+}
+async function doVoidPos(id,otp){
   try{
-    await api("deleteNota",{id});
+    await api("deleteNota",otp?{id,otp}:{id});
     await reload();
     toast("Transaksi dibatalkan ✓");
     if(regOpen())sessionTxnsModal();else closeModal();
     rPOS();
-  }catch(e){/* api sudah menampilkan toast error (mis. sesi sudah ditutup) */}
+  }catch(e){/* api sudah menampilkan toast error */ throw e;}
+}
+// Alur persetujuan owner via OTP (untuk staf)
+function voidOtpModal(id){
+  const n=S.notas.find(x=>x.id===id);if(!n)return;
+  openModal(`<button class="close" onclick="closeModal()">×</button><h3>🔒 Perlu Izin Pemilik</h3>
+    <p class="mini" style="margin-bottom:12px">Pembatalan transaksi <b>${esc(n.notaNo||"-")}</b> (${rp(notaTotal(n))}) harus disetujui pemilik. Sistem akan mengirim <b>kode OTP</b> ke email pemilik.</p>
+    <button class="btn" id="otpReqBtn" style="width:100%" onclick="requestVoidOtp('${id}')">📧 Minta Kode ke Pemilik</button>
+    <div id="otpArea"></div>`);
+}
+async function requestVoidOtp(id){
+  const btn=document.getElementById("otpReqBtn");if(btn){btn.disabled=true;btn.textContent="Mengirim…";}
+  try{
+    const r=await api("requestVoidOtp",{notaId:id});
+    const owners=(r.owners||[]).join(", ")||"email pemilik";
+    document.getElementById("otpArea").innerHTML=`
+      <div class="mini" style="margin:14px 0 6px">Kode dikirim ke <b>${esc(owners)}</b>. Minta kodenya ke pemilik lalu masukkan (berlaku 10 menit):</div>
+      <input id="voidOtp" inputmode="numeric" maxlength="6" placeholder="6 digit" style="text-align:center;letter-spacing:8px;font-size:22px;font-weight:700" onkeydown="if(event.key==='Enter')submitVoidOtp('${id}')">
+      <button class="btn del" style="width:100%;margin-top:12px" id="voidGoBtn" onclick="submitVoidOtp('${id}')">Batalkan Transaksi</button>
+      <div class="mini" style="text-align:center;margin-top:8px"><a href="#" onclick="event.preventDefault();requestVoidOtp('${id}')">Kirim ulang kode</a></div>`;
+    if(btn)btn.style.display="none";
+    const f=document.getElementById("voidOtp");if(f)f.focus();
+  }catch(e){if(btn){btn.disabled=false;btn.textContent="📧 Minta Kode ke Pemilik";}}
+}
+async function submitVoidOtp(id){
+  const el=document.getElementById("voidOtp");const otp=(el?el.value:"").replace(/\D/g,"");
+  if(otp.length<6){toast("Masukkan 6 digit kode.");return;}
+  const b=document.getElementById("voidGoBtn");if(b){b.disabled=true;b.textContent="Memproses…";}
+  try{await doVoidPos(id,otp);}
+  catch(e){if(b){b.disabled=false;b.textContent="Batalkan Transaksi";}if(el){el.value="";el.focus();}}
 }
 
 function rPOS(){

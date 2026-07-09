@@ -311,6 +311,14 @@ function init_schema($pdo) {
     ensure_column($pdo, 'notas', 'tax', "tax INT DEFAULT 0");                // pajak/PPN (Rp), beku saat transaksi
     ensure_column($pdo, 'notas', 'svc_rate', "svc_rate DECIMAL(5,2) DEFAULT 0");   // tarif service yg dipakai (utk label struk presisi)
     ensure_column($pdo, 'notas', 'tax_rate', "tax_rate DECIMAL(5,2) DEFAULT 0");   // tarif pajak yg dipakai
+    // OTP persetujuan owner utk pembatalan transaksi kasir oleh staf (1 baris per nota, sekali pakai)
+    $pdo->exec("CREATE TABLE IF NOT EXISTS void_otps (
+        nota_id VARCHAR(32) PRIMARY KEY,
+        code VARCHAR(8) NOT NULL,
+        requested_by VARCHAR(160) DEFAULT '',
+        expires_at DATETIME NOT NULL,
+        attempts INT DEFAULT 0
+    ) ENGINE=InnoDB");
 
     // Sesi kasir (buka/tutup laci): modal awal, siapa yang buka, rekonsiliasi saat tutup
     $pdo->exec("CREATE TABLE IF NOT EXISTS register_sessions (

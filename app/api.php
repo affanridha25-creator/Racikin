@@ -358,6 +358,31 @@ function send_reset_email($to, $name, $alias, $tokenStr) {
     @mail($to, $subject, $body, $headers);
 }
 
+// email pemilik usaha (bisa lebih dari satu owner) dari DB master
+function owner_emails($alias) {
+    $q = master_pdo()->prepare("SELECT email,name FROM users WHERE alias=? AND role='owner'");
+    $q->execute([$alias]); return $q->fetchAll();
+}
+// samarkan email utk ditampilkan ke staf: an***@gmail.com
+function mask_email($e) {
+    $e = (string)$e; $at = strpos($e, '@'); if ($at === false) return $e;
+    $u = substr($e, 0, $at); $d = substr($e, $at);
+    $keep = min(2, max(1, strlen($u) - 1));
+    return substr($u, 0, $keep) . str_repeat('*', max(1, strlen($u) - $keep)) . $d;
+}
+// verifikasi OTP pembatalan (TIDAK meng-consume; lempar ApiError kalau tak valid). attempts di-increment saat salah.
+function verify_void_otp($pdo, $notaId, $otp) {
+    $otp = preg_replace('/\D/', '', (string)$otp);
+    $o = $pdo->prepare("SELECT code,expires_at,attempts FROM void_otps WHERE nota_id=?"); $o->execute([$notaId]); $o = $o->fetch();
+    if (!$o) throw new ApiError('Minta kode OTP ke owner dulu.');
+    if (strtotime($o['expires_at']) < time()) { $pdo->prepare("DELETE FROM void_otps WHERE nota_id=?")->execute([$notaId]); throw new ApiError('Kode OTP kedaluwarsa — minta lagi.'); }
+    if ((int)$o['attempts'] >= 5) { $pdo->prepare("DELETE FROM void_otps WHERE nota_id=?")->execute([$notaId]); throw new ApiError('Terlalu banyak percobaan salah — minta kode baru.'); }
+    if (!hash_equals((string)$o['code'], $otp)) {
+        $pdo->prepare("UPDATE void_otps SET attempts=attempts+1 WHERE nota_id=?")->execute([$notaId]);
+        throw new ApiError('Kode OTP salah.');
+    }
+}
+
 // Bangun HTML struk untuk dikirim via email — dari data nota di server (otoritatif, anti-injeksi)
 function build_receipt_html($pdo, $n) {
     $esc = function ($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); };
@@ -420,7 +445,7 @@ if (($_SESSION['role'] ?? 'owner') !== 'owner') {
     $OWNER_ONLY = ['reset', 'importAll', 'saveProfile'];   // hapus/timpa data & identitas usaha (incl. QRIS) = khusus pemilik
     $NEED = [
         'saveBatch'=>['produksi'], 'deleteBatch'=>['produksi'],
-        'saveNota'=>['pos','distribusi'], 'deleteNota'=>['pos','distribusi'], 'posSale'=>['pos'], 'emailReceipt'=>['pos','distribusi','pembayaran'],
+        'saveNota'=>['pos','distribusi'], 'deleteNota'=>['pos','distribusi'], 'posSale'=>['pos'], 'emailReceipt'=>['pos','distribusi','pembayaran'], 'requestVoidOtp'=>['pos'],
         'openRegister'=>['pos'], 'closeRegister'=>['pos'],
         'addPayment'=>['pos','pembayaran'], 'deletePayment'=>['pembayaran'],
         'saveCashOut'=>['keuangan'], 'deleteCashOut'=>['keuangan'],
@@ -510,11 +535,16 @@ try {
 
         case 'deleteNota': {
             $id = $in['id'];
-            // Lindungi sesi kasir yang sudah ditutup: transaksinya tak boleh dibatalkan (settlement sudah beku)
-            $st = $pdo->prepare("SELECT s.status FROM notas n JOIN register_sessions s ON s.id=n.session_id WHERE n.id=?");
-            $st->execute([$id]);
-            if ($st->fetchColumn() === 'closed') throw new ApiError('Transaksi dari sesi kasir yang sudah ditutup tak bisa dibatalkan.');
+            $meta = $pdo->prepare("SELECT n.session_id AS sid, s.status AS st FROM notas n LEFT JOIN register_sessions s ON s.id=n.session_id WHERE n.id=?");
+            $meta->execute([$id]); $meta = $meta->fetch();
+            if ($meta) {
+                // Lindungi sesi kasir yang sudah ditutup: transaksinya tak boleh dibatalkan (settlement sudah beku)
+                if (($meta['st'] ?? '') === 'closed') throw new ApiError('Transaksi dari sesi kasir yang sudah ditutup tak bisa dibatalkan.');
+                // Staf membatalkan transaksi KASIR → wajib OTP persetujuan owner (owner sendiri lolos)
+                if (($_SESSION['role'] ?? 'owner') !== 'owner' && !empty($meta['sid'])) verify_void_otp($pdo, $id, $in['otp'] ?? '');
+            }
             $pdo->beginTransaction();
+            $pdo->prepare("DELETE FROM void_otps WHERE nota_id=?")->execute([$id]);   // OTP sekali pakai
             $pdo->prepare("DELETE FROM payments WHERE nota_id=?")->execute([$id]);
             $pdo->prepare("DELETE FROM distributions WHERE nota_id=?")->execute([$id]);
             $pdo->prepare("DELETE FROM notas WHERE id=?")->execute([$id]);
@@ -549,6 +579,37 @@ try {
                 'cashSales' => $t['cash'], 'noncashSales' => $t['noncash'], 'count' => $t['count'],
                 'expected' => $expected, 'closing' => $closing, 'diff' => $closing - $expected,
             ]]);
+            break;
+        }
+
+        case 'requestVoidOtp': {
+            // Staf minta batalkan transaksi kasir → kirim OTP ke email owner untuk persetujuan
+            $notaId = safe_id($in['notaId'] ?? '');
+            $q = $pdo->prepare("SELECT n.nota_no, n.session_id, s.status FROM notas n LEFT JOIN register_sessions s ON s.id=n.session_id WHERE n.id=?");
+            $q->execute([$notaId]); $n = $q->fetch();
+            if (!$n) throw new ApiError('Transaksi tak ditemukan.');
+            if (empty($n['session_id'])) throw new ApiError('Hanya transaksi kasir yang butuh persetujuan ini.');
+            if (($n['status'] ?? '') === 'closed') throw new ApiError('Sesi kasir sudah ditutup — tak bisa dibatalkan.');
+            $tq = $pdo->prepare("SELECT COALESCE(SUM(d.qty*d.harga),0) - COALESCE(nn.discount,0) + COALESCE(nn.service,0) + COALESCE(nn.tax,0) AS total
+                FROM notas nn LEFT JOIN distributions d ON d.nota_id=nn.id WHERE nn.id=? GROUP BY nn.id, nn.discount, nn.service, nn.tax");
+            $tq->execute([$notaId]); $total = intval($tq->fetchColumn());
+            $code = str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+            $staff = $_SESSION['user_name'] ?? ($_SESSION['email'] ?? 'Kasir');
+            $pdo->prepare("REPLACE INTO void_otps (nota_id,code,requested_by,expires_at,attempts) VALUES (?,?,?, DATE_ADD(NOW(), INTERVAL 10 MINUTE), 0)")
+                ->execute([$notaId, $code, $staff]);
+            $alias = $_SESSION['alias'] ?? '';
+            $owners = owner_emails($alias);
+            $biz = current_business(); $bizName = $biz['name'] ?? 'Racikin';
+            $host = preg_replace('/:\d+$/', '', app_host());
+            $from = defined('RESET_FROM') && RESET_FROM ? RESET_FROM : ('noreply@' . preg_replace('/^www\./', '', $host));
+            $subject = "Kode OTP Pembatalan Transaksi - $bizName";
+            $body = "Halo,\n\nKasir \"$staff\" meminta MEMBATALKAN transaksi " . ($n['nota_no'] ?: $notaId)
+                  . " senilai Rp" . number_format($total, 0, ',', '.') . ".\n\n"
+                  . "Kode OTP: $code\n(berlaku 10 menit, sekali pakai)\n\n"
+                  . "Berikan kode ini ke kasir HANYA jika kamu menyetujui pembatalan. Abaikan jika tidak.\n\n— $bizName";
+            $headers = "From: " . mb_encode_mimeheader($bizName) . " <$from>\r\nReply-To: $from\r\nContent-Type: text/plain; charset=UTF-8\r\nMIME-Version: 1.0\r\n";
+            $sent = 0; foreach ($owners as $o) { if (@mail($o['email'], $subject, $body, $headers)) $sent++; }
+            echo json_encode(['ok' => true, 'sent' => $sent > 0, 'owners' => array_map(fn($o) => mask_email($o['email']), $owners)]);
             break;
         }
 
