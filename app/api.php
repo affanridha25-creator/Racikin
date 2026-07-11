@@ -805,8 +805,9 @@ try {
             $rate = function ($k) use ($p) { return max(0, min(100, round((float)($p[$k] ?? 0), 2))); };
             $svcOn = !empty($p['svc_enabled']) ? 1 : 0; $svcRate = $rate('svc_rate');
             $taxOn = !empty($p['tax_enabled']) ? 1 : 0; $taxRate = $rate('tax_rate');
-            $pdo->prepare("REPLACE INTO profile (id,address,phone,whatsapp,instagram,facebook,tiktok,logo,qris,footer,svc_enabled,svc_rate,tax_enabled,tax_rate) VALUES (1,?,?,?,?,?,?,?,?,?,?,?,?,?)")
-                ->execute([$g('address',255),$g('phone',60),$g('whatsapp',60),$g('instagram',120),$g('facebook',120),$g('tiktok',120),$logo,$qris,$footer,$svcOn,$svcRate,$taxOn,$taxRate]);
+            $oversell = !empty($p['oversell']) ? 1 : 0;
+            $pdo->prepare("REPLACE INTO profile (id,address,phone,whatsapp,instagram,facebook,tiktok,logo,qris,footer,svc_enabled,svc_rate,tax_enabled,tax_rate,oversell) VALUES (1,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+                ->execute([$g('address',255),$g('phone',60),$g('whatsapp',60),$g('instagram',120),$g('facebook',120),$g('tiktok',120),$logo,$qris,$footer,$svcOn,$svcRate,$taxOn,$taxRate,$oversell]);
             echo json_encode(['ok' => true]);
             break;
         }
@@ -988,9 +989,12 @@ function persist_nota($pdo, $n) {
     }
     if (!$clean) throw new ApiError('Nota harus punya minimal 1 item dengan qty > 0.');
     // validasi stok per produk (gabung qty item produk sama; item nota ini sendiri tak dihitung)
+    // kecuali pemilik mengaktifkan "boleh jual walau stok habis" → lewati blokir (stok boleh minus)
+    $oversell = !empty($pdo->query("SELECT oversell FROM profile WHERE id=1")->fetchColumn());
     $need = [];
     foreach ($clean as $it) $need[$it['productId']] = ($need[$it['productId']] ?? 0) + $it['qty'];
     foreach ($need as $pid => $q) {
+        if ($oversell) continue;
         $x = $pdo->prepare("SELECT COALESCE(SUM(qty),0) FROM batch_outputs WHERE product_id=?");
         $x->execute([$pid]); $produced = intval($x->fetchColumn());
         $x = $pdo->prepare("SELECT COALESCE(SUM(qty),0) FROM distributions WHERE product_id=? AND (nota_id<>? OR nota_id IS NULL)");
@@ -1106,7 +1110,7 @@ function bootstrap($pdo) {
     $cashOut = [];
     if ($seeKeu) foreach ($pdo->query("SELECT id,cdate AS date,category,amount,note FROM cash_out ORDER BY cdate DESC,id DESC") as $r) { $r['amount']=intval($r['amount']); $cashOut[] = $r; }
 
-    $profile = $pdo->query("SELECT address,phone,whatsapp,instagram,facebook,tiktok,logo,qris,footer,svc_enabled,svc_rate,tax_enabled,tax_rate FROM profile WHERE id=1")->fetch() ?: [];
+    $profile = $pdo->query("SELECT address,phone,whatsapp,instagram,facebook,tiktok,logo,qris,footer,svc_enabled,svc_rate,tax_enabled,tax_rate,oversell FROM profile WHERE id=1")->fetch() ?: [];
 
     // sesi kasir yang sedang terbuka (kalau ada) + riwayat sesi tertutup
     $register = $pdo->query("SELECT id,opened_by AS openedBy,opened_at AS openedAt,opening_float AS openingFloat FROM register_sessions WHERE status='open' LIMIT 1")->fetch() ?: null;
@@ -1178,9 +1182,9 @@ function import_all($pdo, $data) {
         if ($qris !== '' && !preg_match('/^[0-9A-Za-z.\- ]{20,600}$/', $qris)) $qris = '';
         $footer = mb_substr(preg_replace('/[\r\n\t]+/', ' ', (string)($pf['footer'] ?? '')), 0, 255);
         $clamp = function ($v) { return max(0, min(100, round((float)$v, 2))); };
-        $pdo->prepare("REPLACE INTO profile (id,address,phone,whatsapp,instagram,facebook,tiktok,logo,qris,footer,svc_enabled,svc_rate,tax_enabled,tax_rate) VALUES (1,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+        $pdo->prepare("REPLACE INTO profile (id,address,phone,whatsapp,instagram,facebook,tiktok,logo,qris,footer,svc_enabled,svc_rate,tax_enabled,tax_rate,oversell) VALUES (1,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
             ->execute([$pf['address']??'',$pf['phone']??'',$pf['whatsapp']??'',$pf['instagram']??'',$pf['facebook']??'',$pf['tiktok']??'',$logo,
-                $qris,$footer,!empty($pf['svc_enabled'])?1:0,$clamp($pf['svc_rate']??0),!empty($pf['tax_enabled'])?1:0,$clamp($pf['tax_rate']??0)]);
+                $qris,$footer,!empty($pf['svc_enabled'])?1:0,$clamp($pf['svc_rate']??0),!empty($pf['tax_enabled'])?1:0,$clamp($pf['tax_rate']??0),!empty($pf['oversell'])?1:0]);
     }
     $pdo->commit();
 }

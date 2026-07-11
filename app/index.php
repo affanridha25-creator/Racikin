@@ -291,6 +291,7 @@ label.f{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;font-w
 .pcard:hover{box-shadow:0 10px 22px rgba(40,40,60,.1)}
 .pcard:active{transform:scale(.97)}
 .pcard.out{opacity:.5;pointer-events:none}
+.pcard.low{opacity:.62}   /* stok habis tapi boleh dijual (oversell) — tetap bisa diklik */
 .pcard .pcimg{width:calc(100% + 26px);height:96px;margin:-13px -13px 10px;border-radius:16px 16px 0 0;overflow:hidden;background:var(--bg)}
 .pcard .pcimg img{width:100%;height:100%;object-fit:cover;display:block}
 .pcard .pn{font-weight:700;font-size:13.5px;line-height:1.25;margin-bottom:8px;min-height:34px;color:var(--ink)}
@@ -1101,6 +1102,7 @@ function posBase(){return posSubtotal()-posDisc();}
 function posService(){return Math.round(posBase()*posSvcRate()/100);}
 function posTax(){return Math.round((posBase()+posService())*posTaxRate()/100);}   // pajak atas base+service
 function posTotal(){return posBase()+posService()+posTax();}
+function canOversell(){return !!+((S.profile||{}).oversell);}   // +coerce: TINYINT datang sbg string "0"/"1"
 function posCount(){return Object.values(POS.cart).reduce((a,q)=>a+q,0);}
 // ---- sesi kasir (buka/tutup laci) ----
 function regOpen(){return S.register||null;}
@@ -1173,7 +1175,7 @@ function rPOS(){
   }
   const st=sessTotals(),laci=reg.openingFloat+st.cash;
   const grid=S.products.map(p=>{const s=stock(p.id);const q=POS.cart[p.id]||0;
-    return `<button class="pcard ${s<=0?"out":""} ${p.photo?"haspic":""}" data-n="${esc(p.name.toLowerCase())}" onclick="posAdd('${p.id}')">${q>0?`<span class="qbadge">${q}</span>`:""}${p.photo?`<div class="pcimg"><img src="${p.photo}" alt=""></div>`:""}<div class="pn">${esc(p.name)}</div><div class="pp">${rp(p.harga)}</div><div class="ps">stok ${s}</div></button>`;}).join("");
+    return `<button class="pcard ${s<=0?(canOversell()?"low":"out"):""} ${p.photo?"haspic":""}" data-n="${esc(p.name.toLowerCase())}" onclick="posAdd('${p.id}')">${q>0?`<span class="qbadge">${q}</span>`:""}${p.photo?`<div class="pcimg"><img src="${p.photo}" alt=""></div>`:""}<div class="pn">${esc(p.name)}</div><div class="pp">${rp(p.harga)}</div><div class="ps">${s<=0?"stok habis":"stok "+s}</div></button>`;}).join("");
   const cnt=posCount(),tot=posTotal();
   el.innerHTML=`
     <div class="pos-head"><div class="pt">🛒 Kasir</div><button class="btn sm del" onclick="closeRegisterModal()">🔓 Tutup Kasir</button></div>
@@ -1275,7 +1277,7 @@ function regReceiptText(s){
   return t;
 }
 function posFilterGrid(q){POS.q=q;q=(q||"").toLowerCase();document.querySelectorAll("#posGrid .pcard").forEach(c=>{c.style.display=c.dataset.n.includes(q)?"":"none";});}
-function posAdd(pid){const p=prod(pid);if(!p)return;const st=stock(pid);const q=POS.cart[pid]||0;if(q>=st){toast("Stok "+p.name+" tinggal "+st);return;}POS.cart[pid]=q+1;rPOS();}
+function posAdd(pid){const p=prod(pid);if(!p)return;const st=stock(pid);const q=POS.cart[pid]||0;if(!canOversell()&&q>=st){toast("Stok "+p.name+" tinggal "+st);return;}POS.cart[pid]=q+1;rPOS();}
 function posInc(pid){const st=stock(pid);const q=POS.cart[pid]||0;if(q>=st){toast("Stok tinggal "+st);return;}POS.cart[pid]=q+1;posCheckoutModal();}
 function posDec(pid){const q=POS.cart[pid]||0;if(q<=1)delete POS.cart[pid];else POS.cart[pid]=q-1;if(posCount()===0){closeModal();rPOS();}else posCheckoutModal();}
 function posCheckoutModal(){
@@ -2031,6 +2033,10 @@ function rProfile(){
       </div>
       <div class="mini" style="margin-top:8px">Pajak dihitung di atas (subtotal − diskon + service). Muncul terpisah di struk &amp; "Pajak Terkumpul" di Laba-Rugi (bukan laba).</div>
     </div>
+    <div style="border-top:1px solid var(--line);padding-top:16px;margin-top:16px">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="pfOversell" ${+_prof.oversell?"checked":""}> <span class="f" style="margin:0">Boleh jual walau stok habis</span></label>
+      <div class="mini" style="margin-top:6px">Kalau aktif, kasir &amp; distribusi tetap bisa jual meski stok 0 (stok jadi minus). Cocok untuk pre-order / stok tak selalu dicatat. Kalau nonaktif, penjualan melebihi stok ditolak.</div>
+    </div>
     <div style="text-align:right;margin-top:16px"><button class="btn" onclick="saveProfile()">💾 Simpan Profil</button></div>
   </div>
   <div class="panel" style="max-width:600px"><h3>🔒 Keamanan</h3>
@@ -2069,6 +2075,7 @@ async function saveProfile(){
   const prof={address:g("pfAddr"),phone:g("pfPhone"),whatsapp:g("pfWa"),instagram:g("pfIg"),facebook:g("pfFb"),tiktok:g("pfTt"),footer:g("pfFooter"),
     svc_enabled:document.getElementById("pfSvcOn").checked?1:0,svc_rate:nrate("pfSvcRate"),
     tax_enabled:document.getElementById("pfTaxOn").checked?1:0,tax_rate:nrate("pfTaxRate"),
+    oversell:document.getElementById("pfOversell").checked?1:0,
     logo:_prof.logo||"",qris};
   await api("saveProfile",{profile:prof});await reload();toast("Profil tersimpan ✓");rProfile();
 }

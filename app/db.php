@@ -398,6 +398,7 @@ function init_schema($pdo) {
     ensure_column($pdo, 'profile', 'svc_rate', "svc_rate DECIMAL(5,2) DEFAULT 0");          // tarif service charge (%)
     ensure_column($pdo, 'profile', 'tax_enabled', "tax_enabled TINYINT(1) DEFAULT 0");      // pajak/PPN on/off
     ensure_column($pdo, 'profile', 'tax_rate', "tax_rate DECIMAL(5,2) DEFAULT 0");          // tarif pajak (%)
+    ensure_column($pdo, 'profile', 'oversell', "oversell TINYINT(1) DEFAULT 0");            // boleh jual walau stok habis (stok minus)
 
     // Sekali jalan: isi ref titik harga 'batch' lama dengan mencocokkan batch (material+tanggal+harga).
     if (!$pdo->query("SELECT v FROM meta WHERE k='ref_backfill'")->fetchColumn()) {
