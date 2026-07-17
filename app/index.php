@@ -409,7 +409,7 @@ label.f{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;font-w
     <button data-v="rekap" data-label="Rekap Kasir"><span class="ic">🧾</span> Rekap Kasir</button>
     <button data-v="users" data-label="Pengguna"><span class="ic">👥</span> Pengguna</button>
     <button data-v="profile" data-label="Profil Usaha"><span class="ic">🏷️</span> Profil Usaha</button>
-    <button data-v="backup" data-label="Backup"><span class="ic">💾</span> Backup</button>
+    <button data-v="backup" data-label="Export Data"><span class="ic">📤</span> Export Data</button>
   </nav>
   <button class="logout" onclick="doLogout()"><span>⏻</span> Logout</button>
   <div class="role">ANNA Snack &amp; Kitchen</div>
@@ -440,9 +440,9 @@ label.f{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;font-w
 <div class="loginbg" id="subLock" style="display:none"><div class="loginbox" id="subLockBox" style="max-width:440px"></div></div>
 <nav class="botnav" id="botnav">
   <button data-v="dashboard" onclick="go('dashboard')"><span class="bic">📊</span>Beranda</button>
-  <button data-v="distribusi" onclick="go('distribusi')"><span class="bic">🚚</span>Distribusi</button>
+  <button id="bnSlot2" data-v="distribusi" onclick="go('distribusi')"><span class="bic">🚚</span>Distribusi</button>
   <button class="fab" onclick="fabAction()" aria-label="Tambah">+</button>
-  <button data-v="produksi" onclick="go('produksi')"><span class="bic">🏭</span>Produksi</button>
+  <button id="bnSlot4" data-v="produksi" onclick="go('produksi')"><span class="bic">🏭</span>Produksi</button>
   <button id="btnMore" onclick="openMore()"><span class="bic">☰</span>Lainnya</button>
 </nav>
 <div class="sheet-bg" id="sheetBg" onclick="closeMore(event)">
@@ -457,7 +457,7 @@ label.f{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;font-w
     <button onclick="go('rekap')"><span>🧾</span> Rekap Kasir</button>
     <button onclick="go('users')"><span>👥</span> Pengguna</button>
     <button onclick="go('profile')"><span>🏷️</span> Profil Usaha</button>
-    <button onclick="go('backup')"><span>💾</span> Backup</button>
+    <button onclick="go('backup')"><span>📤</span> Export Data</button>
     <button onclick="closeMore();doLogout()" style="color:var(--red)"><span>⏻</span> Keluar</button>
   </div>
 </div>
@@ -513,8 +513,30 @@ async function reload(){S=await api("bootstrap");_stockCache=null;if(S.biz)BIZ={
 const GRANT_VIEWS=[["dashboard","📊","Dashboard"],["pos","🛒","Kasir (POS)"],["distribusi","🚚","Distribusi"],["pembayaran","💰","Pembayaran"],["keuangan","💹","Keuangan"],["produksi","🏭","Produksi"],["bahan","🧂","Bahan Baku"],["produk","🫙","Produk"],["toko","🏪","Toko"]];
 const OWNER_ONLY=["rekap","users","profile","backup"];
 const isOwner=()=>(BIZ.role||"owner")==="owner";
-function canView(v){if(isOwner())return true;if(OWNER_ONLY.includes(v))return false;return (BIZ.perms||[]).includes(v);}
+// ---- tipe usaha: 'produksi' (default, alur batch→distribusi) vs 'fnb' (resto/warung, fokus kasir) ----
+const FNB_HIDDEN=["produksi","distribusi","pembayaran","toko"];   // menu yang tak relevan untuk F&B
+function bizType(){try{return (S.profile&&S.profile.biz_type)==="fnb"?"fnb":"produksi";}catch(e){return "produksi";}}
+// daftar perms yang relevan sesuai tipe usaha (utk checkbox akses staf)
+function grantViews(){return bizType()==="fnb"?GRANT_VIEWS.filter(([v])=>!FNB_HIDDEN.includes(v)):GRANT_VIEWS;}
+function canView(v){
+  if(bizType()==="fnb"&&FNB_HIDDEN.includes(v))return false;   // berlaku juga utk pemilik
+  if(isOwner())return true;if(OWNER_ONLY.includes(v))return false;return (BIZ.perms||[]).includes(v);}
+// sesuaikan label & tombol nav dengan tipe usaha (idempoten — aman dipanggil berulang)
+function adaptNavForType(){
+  const fnb=bizType()==="fnb";
+  const pb=document.querySelector('#nav button[data-v="produk"]');
+  if(pb){pb.dataset.label=fnb?"Menu":"Produk";pb.innerHTML=`<span class="ic">${fnb?"🍽️":"🫙"}</span> ${fnb?"Menu":"Produk"}`;}
+  const sp=[...document.querySelectorAll('.sheet button')].find(b=>(b.getAttribute("onclick")||"").includes("go('produk')"));
+  if(sp)sp.innerHTML=`<span>${fnb?"🍽️":"🫙"}</span> ${fnb?"Menu":"Produk"}`;
+  // botnav mobile: slot Distribusi/Produksi dipakai ulang jadi Kasir/Menu saat F&B
+  const b2=document.getElementById("bnSlot2"),b4=document.getElementById("bnSlot4");
+  if(b2){const v=fnb?"pos":"distribusi";b2.dataset.v=v;b2.setAttribute("onclick",`go('${v}')`);b2.innerHTML=`<span class="bic">${fnb?"🛒":"🚚"}</span>${fnb?"Kasir":"Distribusi"}`;}
+  if(b4){const v=fnb?"produk":"produksi";b4.dataset.v=v;b4.setAttribute("onclick",`go('${v}')`);b4.innerHTML=`<span class="bic">${fnb?"🍽️":"🏭"}</span>${fnb?"Menu":"Produksi"}`;}
+  const tb=document.querySelector('#nav button[data-v="'+curView+'"]');
+  const tt=document.getElementById("topTitle");if(tb&&tt)tt.textContent=tb.dataset.label||"";
+}
 function applyPerms(){
+  adaptNavForType();
   document.querySelectorAll('#nav button[data-v]').forEach(b=>{b.style.display=canView(b.dataset.v)?"":"none";});
   document.querySelectorAll('.botnav button[data-v]').forEach(b=>{b.style.display=canView(b.dataset.v)?"":"none";});
   document.querySelectorAll('.sheet button[onclick]').forEach(b=>{const mm=(b.getAttribute('onclick')||"").match(/go\('([^']+)'\)/);if(mm)b.style.display=canView(mm[1])?"":"none";});
@@ -741,7 +763,8 @@ document.querySelectorAll("#nav button").forEach(btn=>btn.onclick=()=>{
   const tt=document.getElementById("topTitle");if(tt)tt.textContent=btn.dataset.label||"";
   const bv=btn.dataset.v;
   document.querySelectorAll(".botnav button[data-v]").forEach(b=>b.classList.toggle("active",b.dataset.v===bv));
-  const more=document.getElementById("btnMore");if(more)more.classList.toggle("active",!["dashboard","distribusi","produksi"].includes(bv));
+  const botVs=[...document.querySelectorAll('.botnav button[data-v]')].map(b=>b.dataset.v);
+  const more=document.getElementById("btnMore");if(more)more.classList.toggle("active",!botVs.includes(bv));
   curView=bv;try{localStorage.setItem("anna_view",curView);}catch(e){}renderCur();
 });
 function go(v){const b=document.querySelector('#nav button[data-v="'+v+'"]');if(b)b.click();closeMore();window.scrollTo(0,0);}
@@ -749,7 +772,9 @@ function openMore(){document.getElementById("sheetBg").classList.add("open");}
 function closeMore(e){if(e&&e.target!==e.currentTarget)return;document.getElementById("sheetBg").classList.remove("open");}
 function isMobile(){return window.matchMedia("(max-width:820px)").matches;}
 try{window.matchMedia("(max-width:820px)").addEventListener("change",()=>{try{renderCur();}catch(e){}});}catch(e){}
-function fabAction(){const map={dashboard:"editNota",distribusi:"editNota",pembayaran:"editNota",keuangan:"editCash",produksi:"editBatch",bahan:"editMat",produk:"editProd",toko:"editStore"};const fn=map[curView];if(fn&&typeof window[fn]==="function")window[fn]();else toast("Tak ada aksi tambah di halaman ini.");}
+function fabAction(){
+  if(bizType()==="fnb"&&curView==="dashboard"){go("pos");return;}   // F&B: aksi utama = ke Kasir
+  const map={dashboard:"editNota",distribusi:"editNota",pembayaran:"editNota",keuangan:"editCash",produksi:"editBatch",bahan:"editMat",produk:"editProd",toko:"editStore"};const fn=map[curView];if(fn&&typeof window[fn]==="function")window[fn]();else toast("Tak ada aksi tambah di halaman ini.");}
 const MON=["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
 const monthLabel=k=>MON[(+String(k).slice(5,7))-1]||k;
 function donut(segs,cl){
@@ -1103,6 +1128,8 @@ function posService(){return Math.round(posBase()*posSvcRate()/100);}
 function posTax(){return Math.round((posBase()+posService())*posTaxRate()/100);}   // pajak atas base+service
 function posTotal(){return posBase()+posService()+posTax();}
 function canOversell(){return !!+((S.profile||{}).oversell);}   // +coerce: TINYINT datang sbg string "0"/"1"
+// produk "dilacak stoknya"? — F&B made-to-order set 0 → jual bebas tanpa blokir/label stok
+const tracksStock=p=>!p||p.trackStock==null||+p.trackStock!==0;
 function posCount(){return Object.values(POS.cart).reduce((a,q)=>a+q,0);}
 // ---- sesi kasir (buka/tutup laci) ----
 function regOpen(){return S.register||null;}
@@ -1174,8 +1201,8 @@ function rPOS(){
     return;
   }
   const st=sessTotals(),laci=reg.openingFloat+st.cash;
-  const grid=S.products.map(p=>{const s=stock(p.id);const q=POS.cart[p.id]||0;
-    return `<button class="pcard ${s<=0?(canOversell()?"low":"out"):""} ${p.photo?"haspic":""}" data-n="${esc(p.name.toLowerCase())}" onclick="posAdd('${p.id}')">${q>0?`<span class="qbadge">${q}</span>`:""}${p.photo?`<div class="pcimg"><img src="${p.photo}" alt=""></div>`:""}<div class="pn">${esc(p.name)}</div><div class="pp">${rp(p.harga)}</div><div class="ps">${s<=0?"stok habis":"stok "+s}</div></button>`;}).join("");
+  const grid=S.products.map(p=>{const tr=tracksStock(p);const s=stock(p.id);const q=POS.cart[p.id]||0;
+    return `<button class="pcard ${tr&&s<=0?(canOversell()?"low":"out"):""} ${p.photo?"haspic":""}" data-n="${esc(p.name.toLowerCase())}" onclick="posAdd('${p.id}')">${q>0?`<span class="qbadge">${q}</span>`:""}${p.photo?`<div class="pcimg"><img src="${p.photo}" alt=""></div>`:""}<div class="pn">${esc(p.name)}</div><div class="pp">${rp(p.harga)}</div><div class="ps">${tr?(s<=0?"stok habis":"stok "+s):"&nbsp;"}</div></button>`;}).join("");
   const cnt=posCount(),tot=posTotal();
   el.innerHTML=`
     <div class="pos-head"><div class="pt">🛒 Kasir</div><button class="btn sm del" onclick="closeRegisterModal()">🔓 Tutup Kasir</button></div>
@@ -1277,8 +1304,8 @@ function regReceiptText(s){
   return t;
 }
 function posFilterGrid(q){POS.q=q;q=(q||"").toLowerCase();document.querySelectorAll("#posGrid .pcard").forEach(c=>{c.style.display=c.dataset.n.includes(q)?"":"none";});}
-function posAdd(pid){const p=prod(pid);if(!p)return;const st=stock(pid);const q=POS.cart[pid]||0;if(!canOversell()&&q>=st){toast("Stok "+p.name+" tinggal "+st);return;}POS.cart[pid]=q+1;rPOS();}
-function posInc(pid){const st=stock(pid);const q=POS.cart[pid]||0;if(q>=st){toast("Stok tinggal "+st);return;}POS.cart[pid]=q+1;posCheckoutModal();}
+function posAdd(pid){const p=prod(pid);if(!p)return;const st=stock(pid);const q=POS.cart[pid]||0;if(tracksStock(p)&&!canOversell()&&q>=st){toast("Stok "+p.name+" tinggal "+st);return;}POS.cart[pid]=q+1;rPOS();}
+function posInc(pid){const p=prod(pid);const st=stock(pid);const q=POS.cart[pid]||0;if(tracksStock(p)&&!canOversell()&&q>=st){toast("Stok tinggal "+st);return;}POS.cart[pid]=q+1;posCheckoutModal();}
 function posDec(pid){const q=POS.cart[pid]||0;if(q<=1)delete POS.cart[pid];else POS.cart[pid]=q-1;if(posCount()===0){closeModal();rPOS();}else posCheckoutModal();}
 function posCheckoutModal(){
   if(posCount()===0){toast("Keranjang kosong.");return;}
@@ -1366,7 +1393,7 @@ function posSuccess(id,total,bayar,kembali,method){
     ${method==="Tunai"?`<div class="poskembali" style="justify-content:center;gap:14px;margin-bottom:16px">Kembalian <b>${rp(kembali)}</b></div>`:""}
     <div style="display:flex;flex-direction:column;gap:8px">
       <button class="btn" onclick="printRawBT(posReceiptText('${id}',${bayar},${kembali},'${esc(method)}'))">🖨 Cetak Struk (Printer Bluetooth)</button>
-      <div style="display:flex;gap:8px"><button class="btn ghost" style="flex:1" onclick="printReceipt('${id}',${bayar},${kembali},'${esc(method)}')">Struk PDF</button><button class="btn ghost" style="flex:1" onclick="emailReceiptModal('${id}')">✉️ Email</button></div>
+      <div style="display:flex;gap:8px"><button class="btn ghost" style="flex:1" onclick="printReceipt('${id}',${bayar},${kembali},'${esc(method)}')">Struk PDF</button><button class="btn ghost" style="flex:1" onclick="waReceipt('${id}',${bayar},${kembali},'${esc(method)}')">💬 WA</button><button class="btn ghost" style="flex:1" onclick="emailReceiptModal('${id}')">✉️ Email</button></div>
       <button class="btn" style="background:var(--green)" onclick="closeModal();rPOS()">+ Transaksi Baru</button>
       <div class="mini" style="text-align:center;margin-top:2px">Printer Bluetooth perlu app <b>RawBT</b> (Android).</div>
     </div></div>`);
@@ -1384,7 +1411,10 @@ function posReceiptText(id,bayar,kembali,method){
   if(kontak)t+=ctrWrap(kontak)+"\n";
   t+=dash+"\n";
   if(n.notaNo)t+=wrap(n.notaNo)+"\n";
-  t+=lr(fmtDate(n.date),"Kasir: "+(BIZ.user||"-"))+"\n"+dash+"\n";
+  t+=lr(fmtDate(n.date),"Kasir: "+(BIZ.user||"-"))+"\n";
+  // nama toko/pelanggan di struk (nota distribusi & POS dg pelanggan terpilih; toko internal kasir tak ditampilkan)
+  const _st=store(n.storeId);if(_st&&_st.name&&_st.name!==POS_NAME)t+=wrap("Kepada: "+_st.name)+"\n";
+  t+=dash+"\n";
   notaItems(n).forEach(it=>{const pr=prod(it.productId)||{};t+=wrap(pr.name||"?")+"\n"+lr("  "+it.qty+" x "+rp(it.harga),rp((+it.qty||0)*(+it.harga||0)))+"\n";});
   t+=dash+"\n";
   const svc=notaService(n),tax=notaTax(n),base=notaBase(n);
@@ -1417,7 +1447,7 @@ function printReceipt(id,bayar,kembali,method){
     <img class="rlogo" src="${p.logo||"icons/logo-bowl.png"}" alt="">
     <h4>${esc(BIZ.name||"Racikin")}</h4>
     ${(p.address||contacts)?`<div class="rc">${p.address?esc(p.address):""}${p.address&&contacts?"<br>":""}${contacts}</div>`:""}
-    <div class="rmeta">${esc(n.notaNo||"")}<br>${fmtDate(n.date)} · Kasir</div>
+    <div class="rmeta">${esc(n.notaNo||"")}<br>${fmtDate(n.date)} · Kasir${(()=>{const st=store(n.storeId);return st&&st.name&&st.name!==POS_NAME?`<br>Kepada: ${esc(st.name)}`:"";})()}</div>
     ${items}
     <div class="rtot">${(notaDisc(n)>0||notaService(n)>0||notaTax(n)>0)?`<div class="rrow"><span>Subtotal</span><span>${rp(notaSubtotal(n))}</span></div>${notaDisc(n)>0?`<div class="rrow"><span>Diskon</span><span>-${rp(notaDisc(n))}</span></div>`:""}${notaService(n)>0?`<div class="rrow"><span>Service${ratePct(notaSvcRate(n))}</span><span>${rp(notaService(n))}</span></div>`:""}${notaTax(n)>0?`<div class="rrow"><span>Pajak${ratePct(notaTaxRate(n))}</span><span>${rp(notaTax(n))}</span></div>`:""}`:""}<div class="rrow"><span>TOTAL</span><span>${rp(total)}</span></div>${bayar!=null?`<div class="rrow"><span>Bayar (${esc(method||"Tunai")})</span><span>${rp(bayar)}</span></div><div class="rrow"><span>Kembalian</span><span>${rp(kembali||0)}</span></div>`:""}${notaDue(n)>0?`<div class="rrow"><span>Sisa</span><span>${rp(notaDue(n))}</span></div>`:""}</div>
     <div class="rthx">${(p.footer||"").trim()?esc((p.footer||"").trim()):"Terima kasih 🙏"}<br>— ${esc(BIZ.name||"Racikin")} —</div>
@@ -1671,6 +1701,35 @@ function waTagih(id){
   window.open(url,"_blank");
   if(!phone)toast("Kontak toko kosong — pilih nomor tujuan di WhatsApp.");
 }
+// ---- Kirim struk via WhatsApp (teks polos, rapi di layar chat — bukan format 32 kolom) ----
+function waReceiptText(id,bayar,kembali,method){
+  const n=S.notas.find(x=>x.id===id);if(!n)return "";
+  const st=store(n.storeId)||{};
+  let t=`*${BIZ.name||"Racikin"}* — Struk\n`;
+  if(n.notaNo)t+=`${n.notaNo}\n`;
+  t+=fmtDate(n.date)+"\n";
+  if(st.name&&st.name!==POS_NAME)t+=`Kepada: ${st.name}\n`;
+  t+="\n"+notaItems(n).map(it=>{const p=prod(it.productId)||{};return `${it.qty}× ${p.name||"?"} = ${rp((+it.qty||0)*(+it.harga||0))}`;}).join("\n")+"\n";
+  const disc=notaDisc(n),svc=notaService(n),tax=notaTax(n);
+  if(disc>0||svc>0||tax>0)t+=`\nSubtotal: ${rp(notaSubtotal(n))}`;
+  if(disc>0)t+=`\nDiskon: -${rp(disc)}`;
+  if(svc>0)t+=`\nService${ratePct(notaSvcRate(n))}: ${rp(svc)}`;
+  if(tax>0)t+=`\nPajak${ratePct(notaTaxRate(n))}: ${rp(tax)}`;
+  t+=`\n*TOTAL: ${rp(notaTotal(n))}*`;
+  if(method){t+=`\nBayar (${method}): ${rp(bayar)}`;if(method==="Tunai")t+=`\nKembalian: ${rp(kembali||0)}`;}
+  if(notaDue(n)>0)t+=`\nSisa tagihan: ${rp(notaDue(n))}`;
+  const f=((S.profile||{}).footer||"").trim();
+  t+=`\n\n${f||"Terima kasih 🙏"}\n— ${BIZ.name||"Racikin"} —`;
+  return t;
+}
+function waReceipt(id,bayar,kembali,method){
+  const n=S.notas.find(x=>x.id===id);if(!n){toast("Nota tak ditemukan.");return;}
+  const st=store(n.storeId)||{};
+  const phone=(st.name&&st.name!==POS_NAME)?waPhone(st.contact):"";   // toko internal kasir tak punya nomor
+  const url=(phone?`https://wa.me/${phone}`:`https://wa.me/`)+"?text="+encodeURIComponent(waReceiptText(id,bayar,kembali,method));
+  window.open(url,"_blank");
+  if(!phone)toast("Pilih kontak tujuan di WhatsApp.");
+}
 
 // ================= BAHAN BAKU =================
 function rBahan(){
@@ -1771,19 +1830,22 @@ async function delPrice(pid,id){if(confirm("Hapus titik harga ini?")){await api(
 // ================= PRODUK =================
 function rProduk(){
   if(isMobile()){
-    const rows=S.products.map(p=>crow({icon:p.photo?`<img src="${p.photo}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">`:"🫙",title:esc(p.name),sub:`${esc(p.cat)} · ${p.gram}gr · stok ${stock(p.id)}`,badges:`<div class="csub">HPP ${rp(p.hpp)} · margin ${rp(p.harga-p.hpp)}</div>`,amt:rp(p.harga),acts:`<div class="cacts"><button class="btn sm" onclick="event.stopPropagation();stockAdjModal('${p.id}')">⚖️</button></div>`,onclick:`editProd('${p.id}')`,del:`delProd('${p.id}')`})).join("");
-    document.getElementById("v-produk").innerHTML=`<div class="desc">HPP terisi otomatis dari batch; bisa diubah manual.</div><button class="btn" style="width:100%;margin-bottom:14px" onclick="editProd()">+ Produk Baru</button>${S.products.length===0?'<div class="empty">Belum ada produk.</div>':`<div class="clist">${rows}</div>`}`;
+    const rows=S.products.map(p=>crow({icon:p.photo?`<img src="${p.photo}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">`:"🫙",title:esc(p.name),sub:`${esc(p.cat)} · ${p.gram}gr${tracksStock(p)?` · stok ${stock(p.id)}`:""}`,badges:`<div class="csub">HPP ${rp(p.hpp)} · margin ${rp(p.harga-p.hpp)}</div>`,amt:rp(p.harga),acts:tracksStock(p)?`<div class="cacts"><button class="btn sm" onclick="event.stopPropagation();stockAdjModal('${p.id}')">⚖️</button></div>`:"",onclick:`editProd('${p.id}')`,del:`delProd('${p.id}')`})).join("");
+    document.getElementById("v-produk").innerHTML=`<div class="desc">${bizType()==="fnb"?"Daftar menu &amp; harga jual. HPP bisa diisi manual dari perkiraan bahan.":"HPP terisi otomatis dari batch; bisa diubah manual."}</div><button class="btn" style="width:100%;margin-bottom:14px" onclick="editProd()">+ ${bizType()==="fnb"?"Menu":"Produk"} Baru</button>${S.products.length===0?'<div class="empty">Belum ada produk.</div>':`<div class="clist">${rows}</div>`}`;
     return;
   }
-  const rows=S.products.map(p=>`<tr><td><div style="display:flex;align-items:center;gap:9px">${p.photo?`<img src="${p.photo}" class="ptmb">`:'<span class="ptmb noimg">🫙</span>'}<span>${esc(p.name)}</span></div></td><td>${esc(p.cat)}</td><td class="num">${p.gram} gr</td><td class="num">${rp(p.hpp)}</td><td class="num">${rp(p.harga)}</td><td class="num" style="color:${p.harga-p.hpp>=0?'var(--green)':'var(--red)'}">${rp(p.harga-p.hpp)}</td><td class="num"><b>${stock(p.id)}</b></td><td class="num"><div class="acts"><button class="btn sm" onclick="stockAdjModal('${p.id}')">⚖️ Stok</button><button class="btn sm gray" onclick="editProd('${p.id}')">Edit</button><button class="btn sm del" onclick="delProd('${p.id}')">✕</button></div></td></tr>`).join("");
-  document.getElementById("v-produk").innerHTML=`<h2 class="title">Master Produk</h2><div class="desc">HPP terisi otomatis dari batch terakhir, tapi bisa diubah manual.</div>
-  <div class="flexbtns"><button class="btn" onclick="editProd()">+ Produk Baru</button></div>
+  const rows=S.products.map(p=>`<tr><td><div style="display:flex;align-items:center;gap:9px">${p.photo?`<img src="${p.photo}" class="ptmb">`:'<span class="ptmb noimg">🫙</span>'}<span>${esc(p.name)}</span></div></td><td>${esc(p.cat)}</td><td class="num">${p.gram} gr</td><td class="num">${rp(p.hpp)}</td><td class="num">${rp(p.harga)}</td><td class="num" style="color:${p.harga-p.hpp>=0?'var(--green)':'var(--red)'}">${rp(p.harga-p.hpp)}</td><td class="num"><b>${tracksStock(p)?stock(p.id):"—"}</b></td><td class="num"><div class="acts">${tracksStock(p)?`<button class="btn sm" onclick="stockAdjModal('${p.id}')">⚖️ Stok</button>`:""}<button class="btn sm gray" onclick="editProd('${p.id}')">Edit</button><button class="btn sm del" onclick="delProd('${p.id}')">✕</button></div></td></tr>`).join("");
+  document.getElementById("v-produk").innerHTML=`<h2 class="title">${bizType()==="fnb"?"Menu":"Master Produk"}</h2><div class="desc">${bizType()==="fnb"?"Daftar menu &amp; harga jual. HPP bisa diisi manual dari perkiraan bahan. Stok hanya dilacak untuk item yang diaktifkan.":"HPP terisi otomatis dari batch terakhir, tapi bisa diubah manual."}</div>
+  <div class="flexbtns"><button class="btn" onclick="editProd()">+ ${bizType()==="fnb"?"Menu":"Produk"} Baru</button></div>
   <div class="panel"><table><thead><tr><th>Nama</th><th>Kategori</th><th class="num">Ukuran</th><th class="num">HPP</th><th class="num">Harga</th><th class="num">Margin</th><th class="num">Stok</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 let _prodPhoto=null;   // null = tak diubah; "" = hapus; data URI = foto baru
 function editProd(id){const p=id?S.products.find(x=>x.id===id):{id:null,name:"",cat:"",gram:"",hpp:"",harga:"",photo:""};
   _prodPhoto=null;
-  openModal(`<button class="close" onclick="closeModal()">×</button><h3>${id?"Edit":"Tambah"} Produk</h3>
+  const fnb=bizType()==="fnb",uw=fnb?"porsi":"botol";
+  // produk baru: F&B default TIDAK lacak stok (made-to-order); produksi default lacak
+  const trk=id?tracksStock(p):!fnb;
+  openModal(`<button class="close" onclick="closeModal()">×</button><h3>${id?"Edit":"Tambah"} ${fnb?"Menu":"Produk"}</h3>
   <div style="display:flex;gap:14px;align-items:center;margin-bottom:14px">
     <div id="prodPhotoPrev" class="logobox" style="width:74px;height:74px">${p.photo?`<img src="${p.photo}" alt="">`:`<span>🫙</span>`}</div>
     <div><div class="flexbtns" style="margin-bottom:0"><button class="btn sm ghost" onclick="document.getElementById('prodPhotoInp').click()">📷 Foto Produk</button>${p.photo?`<button class="btn sm gray" onclick="rmProdPhoto()">Hapus</button>`:""}</div><div class="mini" style="margin-top:6px">Opsional — tampil di grid kasir. Maks 5MB.</div></div>
@@ -1791,13 +1853,15 @@ function editProd(id){const p=id?S.products.find(x=>x.id===id):{id:null,name:"",
   </div>
   <label class="f">Nama produk</label><input id="pn" value="${esc(p.name)}">
   <div class="grid2" style="margin:12px 0"><div><label class="f">Kategori</label><input id="pc" value="${esc(p.cat)}"></div><div><label class="f">Ukuran (gram)</label><input id="pg" type="number" value="${p.gram}"></div></div>
-  <div class="grid2"><div><label class="f">HPP / botol</label><input id="ph" inputmode="numeric" value="${p.hpp?grp(p.hpp):""}" oninput="this.value=grp(this.value)"></div><div><label class="f">Harga jual / botol</label><input id="phj" inputmode="numeric" value="${p.harga?grp(p.harga):""}" oninput="this.value=grp(this.value)"></div></div>
-  <p class="mini" style="margin-top:8px">Ukuran (gram) dipakai membagi HPP antar produk dalam 1 batch (per bobot).</p>
+  <div class="grid2"><div><label class="f">HPP / ${uw}</label><input id="ph" inputmode="numeric" value="${p.hpp?grp(p.hpp):""}" oninput="this.value=grp(this.value)"></div><div><label class="f">Harga jual / ${uw}</label><input id="phj" inputmode="numeric" value="${p.harga?grp(p.harga):""}" oninput="this.value=grp(this.value)"></div></div>
+  ${fnb?"":`<p class="mini" style="margin-top:8px">Ukuran (gram) dipakai membagi HPP antar produk dalam 1 batch (per bobot).</p>`}
+  <label style="display:flex;align-items:center;gap:8px;margin-top:14px;cursor:pointer"><input type="checkbox" id="pTrack" ${trk?"checked":""}> <span class="f" style="margin:0">Lacak stok ${fnb?"menu":"produk"} ini</span></label>
+  <p class="mini" style="margin-top:4px">${fnb?"Menu dimasak saat dipesan → biarkan mati (jual bebas). Nyalakan untuk item stok jadi (mis. air mineral, kemasan).":"Kalau dimatikan, penjualan tak dibatasi/dihitung stok (cocok untuk item pre-order / jasa)."}</p>
   <div style="margin-top:16px;text-align:right"><button class="btn gray" onclick="closeModal()">Batal</button> <button class="btn" onclick="saveProd('${id||""}')">Simpan</button></div>`);}
 function pickProdPhoto(inp){const f=inp.files[0];if(!f)return;if(!/^image\//.test(f.type)){toast("File harus gambar.");return;}if(f.size>5*1024*1024){toast("Maks 5MB.");return;}
   const rd=new FileReader();rd.onload=e=>{const img=new Image();img.onload=()=>{const max=360;let w=img.width,h=img.height;if(w>h&&w>max){h=Math.round(h*max/w);w=max;}else if(h>=w&&h>max){w=Math.round(w*max/h);h=max;}const cv=document.createElement("canvas");cv.width=w;cv.height=h;cv.getContext("2d").drawImage(img,0,0,w,h);_prodPhoto=cv.toDataURL("image/jpeg",0.82);document.getElementById("prodPhotoPrev").innerHTML=`<img src="${_prodPhoto}" alt="">`;};img.onerror=()=>toast("Gambar tak terbaca.");img.src=e.target.result;};rd.readAsDataURL(f);}
 function rmProdPhoto(){_prodPhoto="";document.getElementById("prodPhotoPrev").innerHTML=`<span>🫙</span>`;}
-async function saveProd(id){const o={id:id||null,name:document.getElementById("pn").value.trim(),cat:document.getElementById("pc").value.trim()||"Umum",gram:+document.getElementById("pg").value||1,hpp:+digits(document.getElementById("ph").value)||0,harga:+digits(document.getElementById("phj").value)||0};
+async function saveProd(id){const o={id:id||null,name:document.getElementById("pn").value.trim(),cat:document.getElementById("pc").value.trim()||"Umum",gram:+document.getElementById("pg").value||1,hpp:+digits(document.getElementById("ph").value)||0,harga:+digits(document.getElementById("phj").value)||0,trackStock:document.getElementById("pTrack").checked?1:0};
   if(_prodPhoto!==null)o.photo=_prodPhoto;   // hanya kirim kalau diubah (biar tak terhapus saat REPLACE)
   if(!o.name){toast("Nama wajib.");return;}await api("saveProduct",{product:o});await reload();closeModal();toast("Produk tersimpan ✓");rProduk();}
 // ---- penyesuaian / opname stok produk ----
@@ -1930,6 +1994,7 @@ function strukModal(id){const n=S.notas.find(x=>x.id===id);if(!n){toast("Nota ta
     <div style="display:flex;flex-direction:column;gap:8px">
       <button class="btn" onclick="printRawBT(posReceiptText('${id}',${bayar},0,'${esc(method)}'))">🖨 Struk Printer Bluetooth (RawBT)</button>
       <button class="btn ghost" onclick="printReceipt('${id}',${bayar},0,'${esc(method)}')">Struk PDF / Printer biasa</button>
+      <button class="btn ghost" onclick="waReceipt('${id}',${bayar},0,'${esc(method)}')">💬 Kirim via WhatsApp</button>
       <button class="btn ghost" onclick="emailReceiptModal('${id}')">✉️ Kirim ke Email</button>
     </div>
     <div class="mini" style="text-align:center;margin-top:10px">Printer Bluetooth perlu app RawBT (Android).</div>`);}
@@ -1975,7 +2040,7 @@ async function rUsers(){
 function editUserE(email){const u=(window._usersCache||[]).find(x=>x.email===email);if(u)editUser(u);}
 function editUser(u){
   const isEdit=!!u; u=u||{email:"",name:"",perms:[]};
-  const checks=GRANT_VIEWS.map(([v,ic,lbl])=>`<label class="permchk"><input type="checkbox" value="${v}" ${(u.perms||[]).includes(v)?"checked":""}> ${ic} ${lbl}</label>`).join("");
+  const checks=grantViews().map(([v,ic,lbl])=>`<label class="permchk"><input type="checkbox" value="${v}" ${(u.perms||[]).includes(v)?"checked":""}> ${ic} ${lbl}</label>`).join("");
   openModal(`<button class="close" onclick="closeModal()">×</button><h3>${isEdit?"Edit":"Tambah"} Pengguna</h3>
     <div class="grid2" style="margin-bottom:12px"><div><label class="f">Nama</label><input id="uName" value="${esc(u.name||"")}" placeholder="nama staf"></div><div><label class="f">Email (untuk login)</label><input id="uEmail" type="email" value="${esc(u.email||"")}" ${isEdit?"readonly style='background:#f4f4f4'":""} placeholder="email@staf.com" autocapitalize="none"></div></div>
     <label class="f">Password ${isEdit?"<span class='mini'>(kosongkan kalau tak diubah)</span>":"(min 8 karakter)"}</label><input id="uPass" type="password" placeholder="${isEdit?"••••••":"buat password staf"}" style="margin-bottom:14px">
@@ -2002,6 +2067,12 @@ function rProfile(){
   document.getElementById("v-profile").innerHTML=`<h2 class="title">Profil Usaha</h2>
   <div class="desc">Logo &amp; kontak muncul di aplikasi, <b>struk PDF</b>, &amp; kop laporan cetak. <span class="mini">(Struk thermal 58mm hanya teks — tak memuat gambar logo.)</span></div>
   <div class="panel" style="max-width:600px">
+    <label class="f">Jenis Usaha</label>
+    <div class="posseg" id="bizTypeSeg" style="margin-top:6px">
+      <button class="${(_prof.biz_type||"produksi")!=="fnb"?"on":""}" onclick="setBizType('produksi')">🏭 Produksi &amp; Distribusi</button>
+      <button class="${_prof.biz_type==="fnb"?"on":""}" onclick="setBizType('fnb')">🍽️ F&amp;B / Warung</button>
+    </div>
+    <div class="mini" id="bizTypeHint" style="margin:6px 0 18px">${_prof.biz_type==="fnb"?"Fokus Kasir — menu Produksi, Distribusi, Pembayaran &amp; Toko disembunyikan.":"Alur lengkap: produksi batch (HPP) → distribusi/titip ke toko → piutang."}</div>
     <div style="display:flex;gap:18px;align-items:center;margin-bottom:20px;flex-wrap:wrap">
       <div id="logoPrev" class="logobox">${logo?`<img src="${logo}" alt="logo">`:`<span>🍲</span>`}</div>
       <div style="flex:1;min-width:190px">
@@ -2044,6 +2115,11 @@ function rProfile(){
     <div style="text-align:right"><button class="btn ghost" onclick="doChangePassword()">Ubah Password</button></div>
   </div>`;
 }
+// pilih jenis usaha di Profil (tanpa rerender penuh — isian lain di form tak hilang)
+function setBizType(t){_prof.biz_type=t==="fnb"?"fnb":"produksi";
+  document.querySelectorAll("#bizTypeSeg button").forEach((b,i)=>b.classList.toggle("on",(i===1)===(t==="fnb")));
+  const h=document.getElementById("bizTypeHint");
+  if(h)h.innerHTML=t==="fnb"?"Fokus Kasir — menu Produksi, Distribusi, Pembayaran &amp; Toko disembunyikan.":"Alur lengkap: produksi batch (HPP) → distribusi/titip ke toko → piutang.";}
 async function doChangePassword(){
   const o=document.getElementById("cpOld").value,n=document.getElementById("cpNew").value;
   if(!o){toast("Isi password lama dulu.");return;}
@@ -2076,6 +2152,7 @@ async function saveProfile(){
     svc_enabled:document.getElementById("pfSvcOn").checked?1:0,svc_rate:nrate("pfSvcRate"),
     tax_enabled:document.getElementById("pfTaxOn").checked?1:0,tax_rate:nrate("pfTaxRate"),
     oversell:document.getElementById("pfOversell").checked?1:0,
+    biz_type:_prof.biz_type==="fnb"?"fnb":"produksi",
     logo:_prof.logo||"",qris};
   await api("saveProfile",{profile:prof});await reload();toast("Profil tersimpan ✓");rProfile();
 }
@@ -2087,18 +2164,15 @@ function printHead(title,sub){
   <h1>${title}</h1>${sub?`<div class="psub">${sub}</div>`:""}`;
 }
 
-// ================= BACKUP =================
+// ================= EXPORT DATA =================
+// Backup/restore JSON & reset DIHILANGKAN dari UI pelanggan (berisiko merusak data;
+// pemulihan/restore ditangani developer dari sisi server). Yang tersisa: export CSV read-only.
 function rBackup(){
-  document.getElementById("v-backup").innerHTML=`<h2 class="title">Backup &amp; Data</h2><div class="desc">Data tersimpan di database MySQL (XAMPP). Backup berkala tetap disarankan.</div>
-  <div class="panel"><h3>Backup / Restore</h3><p class="mini" style="margin-bottom:14px">Simpan seluruh data ke file .json, atau muat kembali (menimpa data sekarang).</p>
-  <div class="flexbtns"><button class="btn" onclick="exportJSON()">⬇ Download Backup (.json)</button><button class="btn ghost" onclick="document.getElementById('imp').click()">⬆ Restore dari file</button><input type="file" id="imp" accept=".json" style="display:none" onchange="importJSON(this)"></div></div>
-  <div class="panel"><h3>Export Excel/CSV</h3><div class="flexbtns"><button class="btn dark" onclick="exportCSV('batches')">Batch Produksi</button><button class="btn dark" onclick="exportCSV('distributions')">Distribusi</button><button class="btn dark" onclick="exportCSV('payments')">Pembayaran</button><button class="btn dark" onclick="exportCSV('materials')">Harga Bahan</button></div></div>
-  <div class="panel"><h3>Harga Bahan</h3><p class="mini" style="margin-bottom:14px">Selaraskan harga master &amp; riwayat bahan dari harga yang dipakai di batch (harga batch tanggal terbaru jadi harga terkini).</p><button class="btn ghost" onclick="resyncPrices()">🔄 Sinkron Ulang Harga Bahan</button></div>
-  <div class="panel"><h3>Reset</h3><p class="mini" style="margin-bottom:14px">Hapus semua data &amp; kembali ke contoh awal.</p><button class="btn gray" onclick="resetAll()">Reset Semua Data</button></div>`;
+  const fnb=bizType()==="fnb";
+  document.getElementById("v-backup").innerHTML=`<h2 class="title">Export Data</h2><div class="desc">Unduh data usahamu sebagai file Excel/CSV. Cadangan database dikelola dari sisi server — hubungi admin Racikin bila butuh pemulihan data.</div>
+  <div class="panel"><h3>Export Excel/CSV</h3><div class="flexbtns">${fnb?"":`<button class="btn dark" onclick="exportCSV('batches')">Batch Produksi</button>`}<button class="btn dark" onclick="exportCSV('distributions')">${fnb?"Penjualan":"Distribusi"}</button><button class="btn dark" onclick="exportCSV('payments')">Pembayaran</button><button class="btn dark" onclick="exportCSV('materials')">Harga Bahan</button></div></div>
+  ${fnb?"":`<div class="panel"><h3>Harga Bahan</h3><p class="mini" style="margin-bottom:14px">Selaraskan harga master &amp; riwayat bahan dari harga yang dipakai di batch (harga batch tanggal terbaru jadi harga terkini).</p><button class="btn ghost" onclick="resyncPrices()">🔄 Sinkron Ulang Harga Bahan</button></div>`}`;
 }
-function exportJSON(){dl("anna-backup-"+today()+".json",JSON.stringify(S,null,2),"application/json");}
-async function importJSON(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();
-  r.onload=async e=>{try{const d=JSON.parse(e.target.result);if(!d.products)throw 0;await api("importAll",{data:d});await reload();toast("Data dimuat ✓");document.querySelector('#nav button').click();}catch(err){toast("File tidak valid.");}};r.readAsText(f);}
 function csvCell(v){v=v==null?"":String(v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}
 function exportCSV(type){let rows=[];
   if(type==="batches"){rows.push(["Tanggal","Catatan","Produk Jadi","Botol","Bahan","Ops","Total Modal","HPP rata/botol"]);S.batches.forEach(b=>{const c=batchCalc(b);rows.push([b.date,b.note,(b.outputs||[]).map(o=>`${(prod(o.productId)||{}).name} x${o.qty}`).join("; "),c.bottles,c.mat,c.ops,c.total,Math.round(c.avg)]);});}
@@ -2107,7 +2181,6 @@ function exportCSV(type){let rows=[];
   else{rows.push(["Tanggal Bayar","No. Nota","Toko","Jumlah","Catatan"]);S.notas.forEach(n=>(n.payments||[]).forEach(p=>rows.push([p.date,n.notaNo,(store(n.storeId)||{}).name,p.amount,p.note])));}
   dl(type+"-"+today()+".csv","﻿"+rows.map(r=>r.map(csvCell).join(",")).join("\n"),"text/csv");}
 function dl(name,content,mime){const b=new Blob([content],{type:mime}),u=URL.createObjectURL(b),a=document.createElement("a");a.href=u;a.download=name;a.click();URL.revokeObjectURL(u);}
-async function resetAll(){if(confirm("Yakin hapus SEMUA data? Tidak bisa dibatalkan.")){await api("reset");await reload();toast("Data direset.");document.querySelector('#nav button').click();}}
 async function resyncPrices(){const r=await api("resyncPrices");await reload();toast(`Harga ${r.materials||0} bahan disinkron ✓`);rBackup();}
 
 // ---------- boot ----------

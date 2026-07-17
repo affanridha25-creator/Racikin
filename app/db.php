@@ -198,6 +198,8 @@ function init_schema($pdo) {
     ) ENGINE=InnoDB");
     // foto produk (data URI, opsional) — tampil di grid kasir
     ensure_column($pdo, 'products', 'photo', "photo MEDIUMTEXT DEFAULT NULL");
+    // lacak stok? 0 = made-to-order (F&B) → penjualan tak dibatasi/dihitung stok
+    ensure_column($pdo, 'products', 'track_stock', "track_stock TINYINT(1) DEFAULT 1");
 
     // Penyesuaian stok produk (rusak/hilang/pakai sendiri/koreksi/opname). qty bertanda:
     // negatif = stok berkurang, positif = bertambah. Stok = produksi − terjual + Σ penyesuaian.
@@ -399,6 +401,7 @@ function init_schema($pdo) {
     ensure_column($pdo, 'profile', 'tax_enabled', "tax_enabled TINYINT(1) DEFAULT 0");      // pajak/PPN on/off
     ensure_column($pdo, 'profile', 'tax_rate', "tax_rate DECIMAL(5,2) DEFAULT 0");          // tarif pajak (%)
     ensure_column($pdo, 'profile', 'oversell', "oversell TINYINT(1) DEFAULT 0");            // boleh jual walau stok habis (stok minus)
+    ensure_column($pdo, 'profile', 'biz_type', "biz_type VARCHAR(16) DEFAULT 'produksi'");  // jenis usaha: produksi | fnb (resto/warung)
 
     // Sekali jalan: isi ref titik harga 'batch' lama dengan mencocokkan batch (material+tanggal+harga).
     if (!$pdo->query("SELECT v FROM meta WHERE k='ref_backfill'")->fetchColumn()) {

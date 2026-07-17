@@ -19,6 +19,11 @@ define('DB_TENANT_PREFIX', 'NAMACPANEL_');
 // VPS dengan hak CREATE DATABASE -> true (usaha baru bikin DB sendiri).
 define('DB_ALLOW_CREATE', false);
 
+// ---- Restore/reset data (khusus developer) ----
+// Endpoint importAll & reset DIBLOKIR default (pelanggan bisa tak sengaja menghapus datanya).
+// Saat perlu pemulihan data tenant, set sementara ke true, lalu kembalikan ke false.
+// define('ALLOW_RESTORE', true);
+
 // ---- Panel Admin (admin.php) ----
 // Password untuk masuk panel aktivasi usaha. WAJIB ganti yang kuat.
 define('ADMIN_PASS', 'GANTI_PASSWORD_ADMIN');

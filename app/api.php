@@ -421,7 +421,7 @@ function build_receipt_html($pdo, $n) {
         . ($addr ? '<div style="font-size:12px;color:#666;margin-top:4px">' . $esc($addr) . '</div>' : '')
         . ($kontak ? '<div style="font-size:12px;color:#666">' . $kontak . '</div>' : '')
         . '</div>'
-        . '<div style="font-size:13px;color:#444;margin-bottom:10px">' . $esc($n['nota_no'] ?: '') . '<br>' . $esc($n['ndate']) . ($n['store_name'] ? ' &middot; ' . $esc($n['store_name']) : '') . '</div>'
+        . '<div style="font-size:13px;color:#444;margin-bottom:10px">' . $esc($n['nota_no'] ?: '') . '<br>' . $esc($n['ndate']) . (($n['store_name'] && $n['store_name'] !== 'Umum (Kasir)') ? ' &middot; ' . $esc($n['store_name']) : '') . '</div>'
         . '<table style="width:100%;border-collapse:collapse;font-size:14px;border-bottom:1px dashed #ccc;margin-bottom:8px">' . $rows . '</table>'
         . '<table style="width:100%;border-collapse:collapse;font-size:14px">' . $tot . '</table>'
         . '<div style="text-align:center;color:#666;font-size:12px;margin-top:16px;border-top:1px dashed #ccc;padding-top:12px">' . $esc($footer) . '<br>&mdash; ' . $esc($bizName) . ' &mdash;</div>'
@@ -675,18 +675,22 @@ try {
         case 'saveProduct': {
             $p = $in['product'];
             $id = safe_id($p['id'] ?? '') ?: gid('p');
-            // foto: kalau key 'photo' dikirim → pakai (boleh '' utk hapus); kalau tidak → pertahankan yang lama (REPLACE bersifat destruktif)
+            // REPLACE bersifat destruktif → kolom yang tak dikirim klien diambil dari baris lama
+            $q = $pdo->prepare("SELECT photo, track_stock FROM products WHERE id=?"); $q->execute([$id]); $old = $q->fetch() ?: null;
+            // foto: kalau key 'photo' dikirim → pakai (boleh '' utk hapus); kalau tidak → pertahankan yang lama
             if (array_key_exists('photo', $p)) {
                 $photo = (string)$p['photo'];
                 if ($photo !== '' && !is_img_datauri($photo)) { http_response_code(400); echo json_encode(['error' => 'Foto harus berupa gambar.']); break; }
                 if (strlen($photo) > 900000) { http_response_code(400); echo json_encode(['error' => 'Foto terlalu besar (maks ~600KB).']); break; }
                 $photo = ($photo === '') ? null : $photo;
             } else {
-                $q = $pdo->prepare("SELECT photo FROM products WHERE id=?"); $q->execute([$id]); $photo = $q->fetchColumn() ?: null;
+                $photo = $old['photo'] ?? null;
             }
-            $pdo->prepare("REPLACE INTO products (id,name,cat,gram,harga,hpp,photo) VALUES (?,?,?,?,?,?,?)")
+            // lacak stok: 0 = made-to-order (F&B), penjualan tak dibatasi stok. Default 1.
+            $track = array_key_exists('trackStock', $p) ? (!empty($p['trackStock']) ? 1 : 0) : (int)($old['track_stock'] ?? 1);
+            $pdo->prepare("REPLACE INTO products (id,name,cat,gram,harga,hpp,photo,track_stock) VALUES (?,?,?,?,?,?,?,?)")
                 ->execute([$id, $p['name'], $p['cat'] ?: 'Umum', intval($p['gram']) ?: 1,
-                    intval($p['harga']), intval($p['hpp']), $photo]);
+                    intval($p['harga']), intval($p['hpp']), $photo, $track]);
             echo json_encode(['ok' => true, 'id' => $id]);
             break;
         }
@@ -806,18 +810,25 @@ try {
             $svcOn = !empty($p['svc_enabled']) ? 1 : 0; $svcRate = $rate('svc_rate');
             $taxOn = !empty($p['tax_enabled']) ? 1 : 0; $taxRate = $rate('tax_rate');
             $oversell = !empty($p['oversell']) ? 1 : 0;
-            $pdo->prepare("REPLACE INTO profile (id,address,phone,whatsapp,instagram,facebook,tiktok,logo,qris,footer,svc_enabled,svc_rate,tax_enabled,tax_rate,oversell) VALUES (1,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
-                ->execute([$g('address',255),$g('phone',60),$g('whatsapp',60),$g('instagram',120),$g('facebook',120),$g('tiktok',120),$logo,$qris,$footer,$svcOn,$svcRate,$taxOn,$taxRate,$oversell]);
+            // jenis usaha: produksi (default) | fnb — menentukan menu yang tampil di app
+            $bizType = in_array(($p['biz_type'] ?? ''), ['produksi','fnb'], true) ? $p['biz_type'] : 'produksi';
+            $pdo->prepare("REPLACE INTO profile (id,address,phone,whatsapp,instagram,facebook,tiktok,logo,qris,footer,svc_enabled,svc_rate,tax_enabled,tax_rate,oversell,biz_type) VALUES (1,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+                ->execute([$g('address',255),$g('phone',60),$g('whatsapp',60),$g('instagram',120),$g('facebook',120),$g('tiktok',120),$logo,$qris,$footer,$svcOn,$svcRate,$taxOn,$taxRate,$oversell,$bizType]);
             echo json_encode(['ok' => true]);
             break;
         }
 
+        // importAll & reset DISEMBUNYIKAN dari UI pelanggan (berisiko menghapus/menimpa data →
+        // boomerang ke developer). Endpoint diblokir juga di server; developer bisa membuka
+        // sementara via define('ALLOW_RESTORE', true) di config.php saat perlu pemulihan data.
         case 'importAll':
+            if (!defined('ALLOW_RESTORE') || !ALLOW_RESTORE) throw new ApiError('Fitur restore dinonaktifkan. Hubungi admin Racikin bila perlu pemulihan data.');
             import_all($pdo, $in['data']);
             echo json_encode(['ok' => true]);
             break;
 
         case 'reset':
+            if (!defined('ALLOW_RESTORE') || !ALLOW_RESTORE) throw new ApiError('Fitur reset dinonaktifkan. Hubungi admin Racikin bila perlu pengosongan data.');
             foreach (TABLES as $t)
                 $pdo->exec("DROP TABLE IF EXISTS $t");
             $pdo->exec("DROP TABLE IF EXISTS meta");   // buang flag seed → init_schema isi contoh awal lagi
@@ -995,6 +1006,10 @@ function persist_nota($pdo, $n) {
     foreach ($clean as $it) $need[$it['productId']] = ($need[$it['productId']] ?? 0) + $it['qty'];
     foreach ($need as $pid => $q) {
         if ($oversell) continue;
+        // produk tanpa lacak stok (made-to-order F&B / jasa) → tak dibatasi stok
+        $x = $pdo->prepare("SELECT track_stock FROM products WHERE id=?");
+        $x->execute([$pid]); $ts = $x->fetchColumn();
+        if ($ts !== false && (int)$ts === 0) continue;
         $x = $pdo->prepare("SELECT COALESCE(SUM(qty),0) FROM batch_outputs WHERE product_id=?");
         $x->execute([$pid]); $produced = intval($x->fetchColumn());
         $x = $pdo->prepare("SELECT COALESCE(SUM(qty),0) FROM distributions WHERE product_id=? AND (nota_id<>? OR nota_id IS NULL)");
@@ -1059,8 +1074,8 @@ function session_totals($pdo, $sid) {
 }
 
 function bootstrap($pdo) {
-    $products = $pdo->query("SELECT id,name,cat,gram,harga,hpp,photo FROM products ORDER BY name")->fetchAll();
-    foreach ($products as &$p) { $p['gram']=intval($p['gram']); $p['harga']=intval($p['harga']); $p['hpp']=intval($p['hpp']); } unset($p);
+    $products = $pdo->query("SELECT id,name,cat,gram,harga,hpp,photo,track_stock AS trackStock FROM products ORDER BY name")->fetchAll();
+    foreach ($products as &$p) { $p['gram']=intval($p['gram']); $p['harga']=intval($p['harga']); $p['hpp']=intval($p['hpp']); $p['trackStock']=intval($p['trackStock']); } unset($p);
     // penyesuaian stok produk (rusak/hilang/koreksi/opname) — utk stok akurat & riwayat
     $stockAdj = [];
     foreach ($pdo->query("SELECT id,product_id AS productId,adate AS date,qty,reason,note FROM stock_adjustments ORDER BY adate DESC,id DESC") as $r) { $r['qty']=intval($r['qty']); $stockAdj[] = $r; }
@@ -1110,7 +1125,7 @@ function bootstrap($pdo) {
     $cashOut = [];
     if ($seeKeu) foreach ($pdo->query("SELECT id,cdate AS date,category,amount,note FROM cash_out ORDER BY cdate DESC,id DESC") as $r) { $r['amount']=intval($r['amount']); $cashOut[] = $r; }
 
-    $profile = $pdo->query("SELECT address,phone,whatsapp,instagram,facebook,tiktok,logo,qris,footer,svc_enabled,svc_rate,tax_enabled,tax_rate,oversell FROM profile WHERE id=1")->fetch() ?: [];
+    $profile = $pdo->query("SELECT address,phone,whatsapp,instagram,facebook,tiktok,logo,qris,footer,svc_enabled,svc_rate,tax_enabled,tax_rate,oversell,biz_type FROM profile WHERE id=1")->fetch() ?: [];
 
     // sesi kasir yang sedang terbuka (kalau ada) + riwayat sesi tertutup
     $register = $pdo->query("SELECT id,opened_by AS openedBy,opened_at AS openedAt,opening_float AS openingFloat FROM register_sessions WHERE status='open' LIMIT 1")->fetch() ?: null;
@@ -1182,9 +1197,10 @@ function import_all($pdo, $data) {
         if ($qris !== '' && !preg_match('/^[0-9A-Za-z.\- ]{20,600}$/', $qris)) $qris = '';
         $footer = mb_substr(preg_replace('/[\r\n\t]+/', ' ', (string)($pf['footer'] ?? '')), 0, 255);
         $clamp = function ($v) { return max(0, min(100, round((float)$v, 2))); };
-        $pdo->prepare("REPLACE INTO profile (id,address,phone,whatsapp,instagram,facebook,tiktok,logo,qris,footer,svc_enabled,svc_rate,tax_enabled,tax_rate,oversell) VALUES (1,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+        $bt = in_array(($pf['biz_type'] ?? ''), ['produksi','fnb'], true) ? $pf['biz_type'] : 'produksi';
+        $pdo->prepare("REPLACE INTO profile (id,address,phone,whatsapp,instagram,facebook,tiktok,logo,qris,footer,svc_enabled,svc_rate,tax_enabled,tax_rate,oversell,biz_type) VALUES (1,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
             ->execute([$pf['address']??'',$pf['phone']??'',$pf['whatsapp']??'',$pf['instagram']??'',$pf['facebook']??'',$pf['tiktok']??'',$logo,
-                $qris,$footer,!empty($pf['svc_enabled'])?1:0,$clamp($pf['svc_rate']??0),!empty($pf['tax_enabled'])?1:0,$clamp($pf['tax_rate']??0),!empty($pf['oversell'])?1:0]);
+                $qris,$footer,!empty($pf['svc_enabled'])?1:0,$clamp($pf['svc_rate']??0),!empty($pf['tax_enabled'])?1:0,$clamp($pf['tax_rate']??0),!empty($pf['oversell'])?1:0,$bt]);
     }
     $pdo->commit();
 }
