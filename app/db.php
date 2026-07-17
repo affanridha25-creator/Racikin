@@ -304,6 +304,8 @@ function init_schema($pdo) {
         INDEX(store_id)
     ) ENGINE=InnoDB");
     ensure_column($pdo, 'notas', 'created_by', "created_by VARCHAR(160) DEFAULT ''");
+    // waktu nota dibuat (tanggal+jam) — untuk stempel "Dibuat" di struk (ndate hanya tanggal bisnis)
+    ensure_column($pdo, 'notas', 'created', "created DATETIME DEFAULT NULL");
     // sesi kasir & metode bayar (khusus penjualan POS; distribusi biasa kosong)
     ensure_column($pdo, 'notas', 'session_id', "session_id VARCHAR(32) DEFAULT NULL");
     ensure_column($pdo, 'notas', 'pay_method', "pay_method VARCHAR(16) DEFAULT ''");
@@ -368,6 +370,8 @@ function init_schema($pdo) {
         INDEX(nota_id), INDEX(distribution_id)
     ) ENGINE=InnoDB");
     ensure_column($pdo, 'payments', 'nota_id', "nota_id VARCHAR(32) DEFAULT NULL");
+    // waktu pembayaran (tanggal+jam) — untuk stempel "Dibayar" di struk (pdate hanya tanggal)
+    ensure_column($pdo, 'payments', 'created', "created DATETIME DEFAULT NULL");
 
     // Kas keluar: prive (ambil pemilik), operasional, modal (beli bahan), lain
     $pdo->exec("CREATE TABLE IF NOT EXISTS cash_out (

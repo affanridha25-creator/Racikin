@@ -383,6 +383,20 @@ function verify_void_otp($pdo, $notaId, $otp) {
     }
 }
 
+// Pilih stempel: tanggal bisnis + jam hanya bila entri sistem di hari yg sama (backdate → tanggal saja).
+function stamp_of($bizDate, $sysTs) {
+    $b = (string)$bizDate; $s = (string)$sysTs;
+    return ($s !== '' && substr($s, 0, 10) === substr($b, 0, 10)) ? $s : ($b !== '' ? $b : $s);
+}
+// Format stempel "YYYY-MM-DD[ HH:MM:SS]" → "11 Jul 2026" atau "11 Jul 2026 · 14.35" (aman, hanya dari angka).
+function fmt_stamp_id($s) {
+    $s = (string)$s; if ($s === '') return '';
+    if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}))?/', $s, $m)) return htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
+    $mon = ['','Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+    $d = (int)$m[3] . ' ' . $mon[(int)$m[2]] . ' ' . $m[1];
+    return isset($m[4]) ? $d . ' &middot; ' . $m[4] . '.' . $m[5] : $d;
+}
+
 // Bangun HTML struk untuk dikirim via email — dari data nota di server (otoritatif, anti-injeksi)
 function build_receipt_html($pdo, $n) {
     $esc = function ($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); };
@@ -395,6 +409,17 @@ function build_receipt_html($pdo, $n) {
     $disc = min(max(0, (int)$n['discount']), $sub);
     $svc = (int)$n['service']; $tax = (int)$n['tax'];
     $total = $sub - $disc + $svc + $tax;
+    // Stempel waktu struk: lunas → tanggal dibayar terakhir; belum → tanggal nota dibuat.
+    $pq = $pdo->prepare("SELECT COALESCE(SUM(amount),0) FROM payments WHERE nota_id=?");
+    $pq->execute([$n['id']]); $paidSum = (int)$pq->fetchColumn();
+    $isPaid = $total > 0 && $paidSum >= $total;
+    if ($isPaid) {
+        $lp = $pdo->prepare("SELECT pdate, created FROM payments WHERE nota_id=? ORDER BY COALESCE(created,pdate) DESC, id DESC LIMIT 1");
+        $lp->execute([$n['id']]); $lp = $lp->fetch() ?: [];
+        $whenLbl = 'Dibayar'; $whenStr = fmt_stamp_id(stamp_of($lp['pdate'] ?? $n['ndate'], $lp['created'] ?? null));
+    } else {
+        $whenLbl = 'Dibuat'; $whenStr = fmt_stamp_id(stamp_of($n['ndate'], $n['created'] ?? null));
+    }
     $phone = $esc($pf['phone'] ?? ''); $wa = $esc($pf['whatsapp'] ?? '');
     $kontak = ($phone && $wa) ? ($phone === $wa ? "Telp/WA $phone" : "Telp $phone &middot; WA $wa") : ($phone ? "Telp $phone" : ($wa ? "WA $wa" : ''));
     $rows = '';
@@ -421,7 +446,7 @@ function build_receipt_html($pdo, $n) {
         . ($addr ? '<div style="font-size:12px;color:#666;margin-top:4px">' . $esc($addr) . '</div>' : '')
         . ($kontak ? '<div style="font-size:12px;color:#666">' . $kontak . '</div>' : '')
         . '</div>'
-        . '<div style="font-size:13px;color:#444;margin-bottom:10px">' . $esc($n['nota_no'] ?: '') . '<br>' . $esc($n['ndate']) . (($n['store_name'] && $n['store_name'] !== 'Umum (Kasir)') ? ' &middot; ' . $esc($n['store_name']) : '') . '</div>'
+        . '<div style="font-size:13px;color:#444;margin-bottom:10px">' . $esc($n['nota_no'] ?: '') . '<br>' . $esc($whenLbl) . ' ' . $whenStr . (($n['store_name'] && $n['store_name'] !== 'Umum (Kasir)') ? ' &middot; ' . $esc($n['store_name']) : '') . '</div>'
         . '<table style="width:100%;border-collapse:collapse;font-size:14px;border-bottom:1px dashed #ccc;margin-bottom:8px">' . $rows . '</table>'
         . '<table style="width:100%;border-collapse:collapse;font-size:14px">' . $tot . '</table>'
         . '<div style="text-align:center;color:#666;font-size:12px;margin-top:16px;border-top:1px dashed #ccc;padding-top:12px">' . $esc($footer) . '<br>&mdash; ' . $esc($bizName) . ' &mdash;</div>'
@@ -526,8 +551,9 @@ try {
             $pdo->beginTransaction();
             $r = persist_nota($pdo, $n);
             if ($r['total'] > 0)   // catat pembayaran penuh (tunai/non-tunai) sebesar total setelah diskon
-                $pdo->prepare("INSERT INTO payments (nota_id,pdate,amount,note) VALUES (?,?,?,?)")
-                    ->execute([$r['id'], today(), $r['total'], 'POS ' . ($r['payMethod'] ?: 'Tunai')]);
+                // pdate & created dari jam MySQL yang sama (CURDATE()/NOW()) → tanggal & jam struk konsisten
+                $pdo->prepare("INSERT INTO payments (nota_id,pdate,amount,note,created) VALUES (?,CURDATE(),?,?,NOW())")
+                    ->execute([$r['id'], $r['total'], 'POS ' . ($r['payMethod'] ?: 'Tunai')]);
             $pdo->commit();
             echo json_encode(['ok' => true, 'id' => $r['id'], 'total' => $r['total']]);
             break;
@@ -644,7 +670,7 @@ try {
             $remaining = max(0, $total - $paid);
             $amount = min($amount, $remaining);
             if ($amount <= 0) { echo json_encode(['ok' => true, 'skipped' => true]); break; }
-            $pdo->prepare("INSERT INTO payments (nota_id,pdate,amount,note) VALUES (?,?,?,?)")
+            $pdo->prepare("INSERT INTO payments (nota_id,pdate,amount,note,created) VALUES (?,?,?,?,NOW())")
                 ->execute([$notaId, $in['date'] ?: today(), $amount, $in['note'] ?? '']);
             echo json_encode(['ok' => true, 'amount' => $amount]);
             break;
@@ -1023,7 +1049,7 @@ function persist_nota($pdo, $n) {
         }
     }
     // catat kasir/pembuat + sesi kasir + metode bayar: pertahankan nilai asli saat edit, isi baru saat pertama
-    $ex = $pdo->prepare("SELECT created_by, session_id, pay_method, service, tax, svc_rate, tax_rate FROM notas WHERE id=?"); $ex->execute([$id]); $ex = $ex->fetch();
+    $ex = $pdo->prepare("SELECT created_by, session_id, pay_method, service, tax, svc_rate, tax_rate, created FROM notas WHERE id=?"); $ex->execute([$id]); $ex = $ex->fetch();
     if ($ex === false) {   // nota baru
         $creator   = $_SESSION['email'] ?? '';
         $sessionId = safe_id($n['sessionId'] ?? '') ?: null;
@@ -1050,6 +1076,9 @@ function persist_nota($pdo, $n) {
     }
     $pdo->prepare("REPLACE INTO notas (id,nota_no,ndate,store_id,created_by,session_id,pay_method,discount,service,tax,svc_rate,tax_rate) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")
         ->execute([$id, $n['notaNo'] ?? '', $date, $storeId, $creator, $sessionId, $payMethod, $discount, $service, $tax, $svcRate, $taxRate]);
+    // waktu dibuat: nota baru → NOW(); edit → pertahankan nilai lama (REPLACE mengosongkan kolom yg tak diisi)
+    if ($ex === false) $pdo->prepare("UPDATE notas SET created=NOW() WHERE id=?")->execute([$id]);
+    elseif (!empty($ex['created'])) $pdo->prepare("UPDATE notas SET created=? WHERE id=?")->execute([$ex['created'], $id]);
     $pdo->prepare("DELETE FROM distributions WHERE nota_id=?")->execute([$id]);
     $ins = $pdo->prepare("INSERT INTO distributions (id,nota_id,ddate,store_id,product_id,qty,harga,hpp,kind) VALUES (?,?,?,?,?,?,?,?,?)");
     foreach ($clean as $it)
@@ -1114,10 +1143,10 @@ function bootstrap($pdo) {
         $items[$r['notaId']][] = $r;
     }
     $pay = [];
-    foreach ($pdo->query("SELECT id,nota_id AS notaId,pdate AS date,amount,note FROM payments ORDER BY pdate,id") as $r) {
+    foreach ($pdo->query("SELECT id,nota_id AS notaId,pdate AS date,amount,note,created AS createdAt FROM payments ORDER BY pdate,id") as $r) {
         $r['amount']=intval($r['amount']); $pay[$r['notaId']][] = $r;
     }
-    $notas = $pdo->query("SELECT id,nota_no AS notaNo,ndate AS date,store_id AS storeId,created_by AS createdBy,session_id AS sessionId,pay_method AS payMethod,discount,service,tax,svc_rate AS svcRate,tax_rate AS taxRate FROM notas ORDER BY ndate DESC,id DESC")->fetchAll();
+    $notas = $pdo->query("SELECT id,nota_no AS notaNo,ndate AS date,store_id AS storeId,created_by AS createdBy,created AS createdAt,session_id AS sessionId,pay_method AS payMethod,discount,service,tax,svc_rate AS svcRate,tax_rate AS taxRate FROM notas ORDER BY ndate DESC,id DESC")->fetchAll();
     foreach ($notas as &$n) { $n['discount']=intval($n['discount']); $n['items']=$items[$n['id']]??[]; $n['payments']=$pay[$n['id']]??[]; } unset($n);
 
     // Kas keluar (termasuk prive pemilik) hanya untuk pemilik / staf ber-akses Keuangan

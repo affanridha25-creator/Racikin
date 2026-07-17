@@ -1398,6 +1398,24 @@ function posSuccess(id,total,bayar,kembali,method){
       <div class="mini" style="text-align:center;margin-top:2px">Printer Bluetooth perlu app <b>RawBT</b> (Android).</div>
     </div></div>`);
 }
+// Stempel waktu struk: "11 Jul 2026" atau "11 Jul 2026 · 14.35" (dari "YYYY-MM-DD[ HH:MM]")
+function fmtStamp(s,sep){
+  if(!s)return "-";
+  const m=String(s).match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}))?/);
+  if(!m)return "-";
+  const d=(+m[3])+" "+MON[(+m[2])-1]+" "+m[1];
+  return m[4]?d+(sep||" ")+m[4]+"."+m[5]:d;
+}
+// Pilih stempel: pakai tanggal bisnis (ndate/pdate); sertakan JAM hanya bila entri sistem di hari yg sama
+// (kalau nota/bayar di-backdate, jam entri tak relevan → tampilkan tanggal saja).
+function stampOf(bizDate,sysTs){return (sysTs&&String(sysTs).slice(0,10)===String(bizDate||"").slice(0,10))?sysTs:(bizDate||sysTs);}
+// pembayaran terakhir sebuah nota (berdasar waktu entri, jatuh ke tanggal)
+function lastPay(n){const ps=n.payments||[];if(!ps.length)return null;let best=null,bk="";ps.forEach(p=>{const k=p.createdAt||((p.date||"")+" 00:00");if(k>=bk){bk=k;best=p;}});return best;}
+// Stempel untuk struk: lunas → "Dibayar" + tanggal bayar; belum → "Dibuat" + tanggal nota dibuat.
+function notaWhen(n){
+  if(notaTotal(n)>0&&notaDue(n)<=0){const p=lastPay(n);if(p)return {label:"Dibayar",stamp:stampOf(p.date,p.createdAt)};}
+  return {label:"Dibuat",stamp:stampOf(n.date,n.createdAt)};
+}
 // Struk teks 58mm (32 kolom) untuk printer thermal
 function posReceiptText(id,bayar,kembali,method){
   const n=S.notas.find(x=>x.id===id);if(!n)return "";
@@ -1411,7 +1429,9 @@ function posReceiptText(id,bayar,kembali,method){
   if(kontak)t+=ctrWrap(kontak)+"\n";
   t+=dash+"\n";
   if(n.notaNo)t+=wrap(n.notaNo)+"\n";
-  t+=lr(fmtDate(n.date),"Kasir: "+(BIZ.user||"-"))+"\n";
+  const _w=notaWhen(n);
+  t+=lr(_w.label,fmtStamp(_w.stamp))+"\n";
+  t+=lr("Kasir",(BIZ.user||"-"))+"\n";
   // nama toko/pelanggan di struk (nota distribusi & POS dg pelanggan terpilih; toko internal kasir tak ditampilkan)
   const _st=store(n.storeId);if(_st&&_st.name&&_st.name!==POS_NAME)t+=wrap("Kepada: "+_st.name)+"\n";
   t+=dash+"\n";
@@ -1447,7 +1467,7 @@ function printReceipt(id,bayar,kembali,method){
     <img class="rlogo" src="${p.logo||"icons/logo-bowl.png"}" alt="">
     <h4>${esc(BIZ.name||"Racikin")}</h4>
     ${(p.address||contacts)?`<div class="rc">${p.address?esc(p.address):""}${p.address&&contacts?"<br>":""}${contacts}</div>`:""}
-    <div class="rmeta">${esc(n.notaNo||"")}<br>${fmtDate(n.date)} · Kasir${(()=>{const st=store(n.storeId);return st&&st.name&&st.name!==POS_NAME?`<br>Kepada: ${esc(st.name)}`:"";})()}</div>
+    <div class="rmeta">${esc(n.notaNo||"")}<br>${(()=>{const w=notaWhen(n);return esc(w.label+" "+fmtStamp(w.stamp," · "));})()} · Kasir${(()=>{const st=store(n.storeId);return st&&st.name&&st.name!==POS_NAME?`<br>Kepada: ${esc(st.name)}`:"";})()}</div>
     ${items}
     <div class="rtot">${(notaDisc(n)>0||notaService(n)>0||notaTax(n)>0)?`<div class="rrow"><span>Subtotal</span><span>${rp(notaSubtotal(n))}</span></div>${notaDisc(n)>0?`<div class="rrow"><span>Diskon</span><span>-${rp(notaDisc(n))}</span></div>`:""}${notaService(n)>0?`<div class="rrow"><span>Service${ratePct(notaSvcRate(n))}</span><span>${rp(notaService(n))}</span></div>`:""}${notaTax(n)>0?`<div class="rrow"><span>Pajak${ratePct(notaTaxRate(n))}</span><span>${rp(notaTax(n))}</span></div>`:""}`:""}<div class="rrow"><span>TOTAL</span><span>${rp(total)}</span></div>${bayar!=null?`<div class="rrow"><span>Bayar (${esc(method||"Tunai")})</span><span>${rp(bayar)}</span></div><div class="rrow"><span>Kembalian</span><span>${rp(kembali||0)}</span></div>`:""}${notaDue(n)>0?`<div class="rrow"><span>Sisa</span><span>${rp(notaDue(n))}</span></div>`:""}</div>
     <div class="rthx">${(p.footer||"").trim()?esc((p.footer||"").trim()):"Terima kasih 🙏"}<br>— ${esc(BIZ.name||"Racikin")} —</div>
@@ -1707,7 +1727,7 @@ function waReceiptText(id,bayar,kembali,method){
   const st=store(n.storeId)||{};
   let t=`*${BIZ.name||"Racikin"}* — Struk\n`;
   if(n.notaNo)t+=`${n.notaNo}\n`;
-  t+=fmtDate(n.date)+"\n";
+  const w=notaWhen(n);t+=`${w.label} ${fmtStamp(w.stamp," · ")}\n`;
   if(st.name&&st.name!==POS_NAME)t+=`Kepada: ${st.name}\n`;
   t+="\n"+notaItems(n).map(it=>{const p=prod(it.productId)||{};return `${it.qty}× ${p.name||"?"} = ${rp((+it.qty||0)*(+it.harga||0))}`;}).join("\n")+"\n";
   const disc=notaDisc(n),svc=notaService(n),tax=notaTax(n);
