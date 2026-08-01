@@ -18,7 +18,7 @@ if (!is_array($in)) $in = [];
 $action = $in['action'] ?? 'bootstrap';   // JANGAN ambil dari $_GET (cegah CSRF via navigasi)
 
 // ---- AUTENTIKASI (tak butuh login dulu) ----
-if (in_array($action, ['authStatus','authLogin','authRegister','authLogout','authResetRequest','authResetConfirm','authChangePassword','usersList','userSave','userDelete','subInfo','startRenewal','submitProof'], true)) {
+if (in_array($action, ['authStatus','authLogin','authRegister','authLogout','authResetRequest','authResetConfirm','authChangePassword','usersList','userSave','userDelete','subInfo','startRenewal','submitProof','savePushToken','deletePushToken'], true)) {
     try { handle_auth($action, $in); }
     catch (Exception $e) { error_log('auth: '.$e->getMessage()); http_response_code(500); echo json_encode(['error' => 'Terjadi kesalahan pada server.']); }
     exit;
@@ -107,6 +107,22 @@ function pw_problem($pass) {
 function handle_auth($action, $in) {
     global $DB_HOST, $DB_USER, $DB_PASS;
     $m = master_pdo();
+    // ---- token push notification (dipanggil aplikasi Android setelah login) ----
+    if ($action === 'savePushToken' || $action === 'deletePushToken') {
+        $b = current_business();
+        if (!$b) { http_response_code(401); echo json_encode(['error' => 'Belum login.']); return; }
+        $token = mb_substr(trim((string)($in['token'] ?? '')), 0, 255);
+        if ($token === '') { http_response_code(400); echo json_encode(['error' => 'Token kosong.']); return; }
+        if ($action === 'deletePushToken') {
+            $m->prepare("DELETE FROM push_tokens WHERE token=?")->execute([$token]);
+        } else {
+            $plat = preg_replace('/[^a-z]/', '', strtolower((string)($in['platform'] ?? 'android')));
+            $m->prepare("INSERT INTO push_tokens (alias,email,token,platform,updated) VALUES (?,?,?,?,NOW())
+                ON DUPLICATE KEY UPDATE alias=VALUES(alias), email=VALUES(email), platform=VALUES(platform), updated=NOW()")
+              ->execute([$b['alias'], $_SESSION['email'] ?? '', $token, $plat ?: 'android']);
+        }
+        echo json_encode(['ok' => true]); return;
+    }
     if ($action === 'authStatus') {
         $b = current_business();
         if (!$b) {
@@ -358,6 +374,8 @@ function send_reset_email($to, $name, $alias, $tokenStr) {
     @mail($to, $subject, $body, $headers);
 }
 
+require_once __DIR__ . '/push.php';   // helper FCM (fcm_send, push_tokens_for) — dipakai juga oleh cron
+
 // email pemilik usaha (bisa lebih dari satu owner) dari DB master
 function owner_emails($alias) {
     $q = master_pdo()->prepare("SELECT email,name FROM users WHERE alias=? AND role='owner'");
@@ -545,6 +563,14 @@ try {
             // Transaksi kasir ATOMIK: simpan nota + catat pembayaran dalam SATU transaksi DB.
             // Cegah "piutang hantu" bila pencatatan bayar gagal setelah nota tersimpan.
             $n = $in['nota'] ?? [];
+            // IDEMPOTENSI (sinkron offline / retry jaringan): kalau nota dg id ini sudah tercatat & terbayar,
+            // kembalikan hasilnya tanpa mencatat ulang (cegah dobel-transaksi). Hanya aktif bila klien kirim id.
+            $preId = safe_id($n['id'] ?? '');
+            if ($preId !== '') {
+                $q = $pdo->prepare("SELECT COALESCE(SUM(amount),0) FROM payments WHERE nota_id=?"); $q->execute([$preId]);
+                $prePaid = intval($q->fetchColumn());
+                if ($prePaid > 0) { echo json_encode(['ok'=>true, 'id'=>$preId, 'total'=>$prePaid, 'duplicate'=>true]); break; }
+            }
             $sid = safe_id($n['sessionId'] ?? '');
             $open = $pdo->query("SELECT id FROM register_sessions WHERE status='open' LIMIT 1")->fetchColumn();
             if ($sid === '' || $open !== $sid) throw new ApiError('Kasir belum dibuka atau sesi berbeda. Muat ulang halaman.');

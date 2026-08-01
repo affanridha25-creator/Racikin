@@ -1,0 +1,15 @@
+{
+  "appId": "com.racikin.app",
+  "appName": "Racikin",
+  "webDir": "www",
+  "server": {
+    "url": "https://login.racikin.com",
+    "androidScheme": "https",
+    "cleartext": false,
+    "errorPath": "offline.html"
+  },
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#FBEEE7"
+  }
+}

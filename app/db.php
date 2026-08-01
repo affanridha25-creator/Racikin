@@ -94,6 +94,17 @@ function master_pdo() {
         UNIQUE KEY uq_pr_selector (selector),
         INDEX(alias, email)
     ) ENGINE=InnoDB");
+    // token push notification (FCM) per perangkat — dipakai kirim pengingat ke HP pemilik/staf
+    $p->exec("CREATE TABLE IF NOT EXISTS push_tokens (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        alias VARCHAR(32),
+        email VARCHAR(160),
+        token VARCHAR(255),
+        platform VARCHAR(16) DEFAULT 'android',
+        updated DATETIME,
+        UNIQUE KEY uq_token (token),
+        INDEX(alias)
+    ) ENGINE=InnoDB");
     // pengaturan aplikasi (harga paket, info rekening) — editable dari panel admin
     $p->exec("CREATE TABLE IF NOT EXISTS app_settings (
         k VARCHAR(50) PRIMARY KEY,

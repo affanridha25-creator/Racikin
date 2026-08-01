@@ -24,6 +24,14 @@ define('DB_ALLOW_CREATE', false);
 // Saat perlu pemulihan data tenant, set sementara ke true, lalu kembalikan ke false.
 // define('ALLOW_RESTORE', true);
 
+// ---- Push Notification (FCM) untuk aplikasi Android (opsional) ----
+// 1. Buat project di Firebase Console → tambah app Android package "com.racikin.app".
+// 2. Unduh google-services.json → taruh di mobile/android/app/ (ganti placeholder), rebuild APK.
+// 3. Project Settings → Service accounts → Generate new private key → simpan .json di server.
+// Isi 2 baris ini agar server bisa mengirim notifikasi (kosongkan = fitur push mati, aman):
+// define('FIREBASE_PROJECT_ID', 'racikin-xxxxx');
+// define('FIREBASE_SA', __DIR__ . '/firebase-sa.json');   // path service-account.json (jangan di-commit)
+
 // ---- Panel Admin (admin.php) ----
 // Password untuk masuk panel aktivasi usaha. WAJIB ganti yang kuat.
 define('ADMIN_PASS', 'GANTI_PASSWORD_ADMIN');
