@@ -1488,7 +1488,7 @@ function posSuccess(id,total,bayar,kembali,method,pending){
       <button class="btn" onclick="printRawBT(posReceiptText('${id}',${bayar},${kembali},'${esc(method)}'))">🖨 Cetak Struk (Printer Bluetooth)</button>
       <div style="display:flex;gap:8px"><button class="btn ghost" style="flex:1" onclick="printReceipt('${id}',${bayar},${kembali},'${esc(method)}')">Struk PDF</button><button class="btn ghost" style="flex:1" onclick="waReceipt('${id}',${bayar},${kembali},'${esc(method)}')">💬 WA</button><button class="btn ghost" style="flex:1" onclick="emailReceiptModal('${id}')">✉️ Email</button></div>
       <button class="btn" style="background:var(--green)" onclick="closeModal();rPOS()">+ Transaksi Baru</button>
-      <div class="mini" style="text-align:center;margin-top:2px">Printer Bluetooth perlu app <b>RawBT</b> (Android).</div>
+      ${NativePrinter.isNative()?"":'<div class="mini" style="text-align:center;margin-top:2px">Printer Bluetooth perlu app <b>RawBT</b> (Android).</div>'}
     </div></div>`);
 }
 // Stempel waktu struk: "11 Jul 2026" atau "11 Jul 2026 · 14.35" (dari "YYYY-MM-DD[ HH:MM]")
@@ -2197,12 +2197,12 @@ function strukModal(id){const n=S.notas.find(x=>x.id===id);if(!n){toast("Nota ta
   openModal(`<button class="close" onclick="closeModal()">×</button><h3>🖨 Cetak Ulang Struk</h3>
     <p class="mini" style="margin-bottom:14px">${esc(n.notaNo||"-")} · ${esc((store(n.storeId)||{}).name||"?")} · ${fmtDate(n.date)} · ${rp(notaTotal(n))}</p>
     <div style="display:flex;flex-direction:column;gap:8px">
-      <button class="btn" onclick="printRawBT(posReceiptText('${id}',${bayar},0,'${esc(method)}'))">🖨 Struk Printer Bluetooth (RawBT)</button>
+      <button class="btn" onclick="printRawBT(posReceiptText('${id}',${bayar},0,'${esc(method)}'))">🖨 ${NativePrinter.isNative()?"Cetak Struk (Printer Bluetooth)":"Struk Printer Bluetooth (RawBT)"}</button>
       <button class="btn ghost" onclick="printReceipt('${id}',${bayar},0,'${esc(method)}')">Struk PDF / Printer biasa</button>
       <button class="btn ghost" onclick="waReceipt('${id}',${bayar},0,'${esc(method)}')">💬 Kirim via WhatsApp</button>
       <button class="btn ghost" onclick="emailReceiptModal('${id}')">✉️ Kirim ke Email</button>
     </div>
-    <div class="mini" style="text-align:center;margin-top:10px">Printer Bluetooth perlu app RawBT (Android).</div>`);}
+    ${NativePrinter.isNative()?"":'<div class="mini" style="text-align:center;margin-top:10px">Printer Bluetooth perlu app RawBT (Android).</div>'}`);}
 // ---- Kirim struk ke email pelanggan ----
 function emailReceiptModal(id){const n=S.notas.find(x=>x.id===id);if(!n){toast("Nota tak ditemukan.");return;}
   openModal(`<button class="close" onclick="closeModal()">×</button><h3>✉️ Kirim Struk ke Email</h3>
