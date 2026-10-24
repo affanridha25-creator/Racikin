@@ -65,7 +65,7 @@ function smtp_send($to, $subject, $body, $headers) {
     $ctx = stream_context_create(['ssl' => ['verify_peer' => true, 'verify_peer_name' => true]]);
     $fp = @stream_socket_client(($secure === 'ssl' ? 'ssl://' : 'tcp://') . $host . ':' . $port, $en, $es, 10, STREAM_CLIENT_CONNECT, $ctx);
     if (!$fp) { $GLOBALS['smtp_last_error'] = "tidak bisa terhubung ke $host:$port ($es). Cek SMTP_HOST/SMTP_PORT/SMTP_SECURE."; error_log("smtp connect gagal: $es"); return false; }
-    stream_set_timeout($fp, 25);
+    stream_set_timeout($fp, (int)($GLOBALS['smtp_io_timeout'] ?? 25));
     try {
         if (!smtp_cmd($fp, null, '220')) throw new Exception('greeting');
         $ehlo = preg_replace('/[^A-Za-z0-9.\-]/', '', (string)($_SERVER['SERVER_NAME'] ?? 'localhost')) ?: 'localhost';
@@ -113,6 +113,25 @@ function app_mail($to, $subject, $body, $headers = '') {
 }
 
 
+// Jalankan $fn SETELAH respons HTTP selesai dikirim ke pengguna (bila hosting mendukung), supaya server mail yang lambat
+// tidak menahan pendaftaran/pembayaran. Tanpa dukungan itu, $fn jalan di akhir skrip (tetap aman, hanya lebih lambat).
+function defer_after_response(callable $fn) {
+    static $registered = false, $queue = [];
+    $queue[] = $fn;
+    if ($registered) return;
+    $registered = true;
+    register_shutdown_function(function () use (&$queue) {
+        try {
+            while (ob_get_level() > 0) @ob_end_flush();
+            @flush();
+            if (function_exists('fastcgi_finish_request')) @fastcgi_finish_request();
+            elseif (function_exists('litespeed_finish_request')) @litespeed_finish_request();
+        } catch (Throwable $e) { }
+        @ignore_user_abort(true); @set_time_limit(120);
+        $GLOBALS['smtp_io_timeout'] = 10;
+        foreach ($queue as $f) { try { $f(); } catch (Throwable $e) { error_log('defer: ' . $e->getMessage()); } }
+    });
+}
 // Kode versi berkas ini (8 karakter pertama md5). Dipakai untuk memastikan versi yang berjalan di server sama dengan yang di-deploy.
 function mail_build() { return substr((string)@md5_file(__FILE__), 0, 8); }
 // Email bantuan untuk pelanggan (config.php: define('SUPPORT_EMAIL', '...')). Dipakai sebagai Reply-To semua email ke klien.
@@ -133,8 +152,10 @@ function admin_recipients() {
     return array_values(array_unique(array_filter(array_map('trim', explode(',', $list)), function ($x) { return filter_var($x, FILTER_VALIDATE_EMAIL); })));
 }
 // Kirim email teks biasa ke semua penerima admin. Aman dipanggil kapan saja (tak pernah melempar).
-function notify_admin($subject, $body) {
+function notify_admin($subject, $body, $now = false) {
+    if (!$now && PHP_SAPI !== 'cli') { defer_after_response(function () use ($subject, $body) { notify_admin($subject, $body, true); }); return 0; }
     try {
+        $GLOBALS['smtp_io_timeout'] = 10;
         $to = admin_recipients(); if (!$to) return 0;
         $headers = "From: Racikin <" . mail_from_addr() . ">\r\nContent-Type: text/plain; charset=UTF-8\r\nMIME-Version: 1.0\r\n";
         $n = 0; foreach ($to as $t) if (app_mail($t, preg_replace('/[\r\n]+/', ' ', $subject), $body, $headers)) $n++;
@@ -215,6 +236,7 @@ function run_mail_test() {
     catch (Throwable $e) { error_log('run_mail_test: ' . $e->getMessage()); return [false, 'Tes gagal karena error PHP: ' . get_class($e) . ': ' . $e->getMessage() . ' (' . basename($e->getFile()) . ':' . $e->getLine() . '). Kirim pesan ini ke pengembang.']; }
 }
 function run_mail_test_inner() {
+    $GLOBALS['smtp_io_timeout'] = 8;
     $list = defined('ADMIN_EMAIL') ? (string)ADMIN_EMAIL : '';
     try { $st = settings_all(); $list .= ',' . ($st['notify_email'] ?? ''); } catch (Throwable $e) { }
     $to = array_values(array_unique(array_filter(array_map('trim', explode(',', $list)), function ($x) { return filter_var($x, FILTER_VALIDATE_EMAIL); })));
