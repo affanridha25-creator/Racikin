@@ -239,6 +239,16 @@ function init_schema($pdo) {
         created DATETIME DEFAULT NULL
     ) ENGINE=InnoDB");
     ensure_column($pdo, 'batches', 'created', "created DATETIME DEFAULT NULL");
+    ensure_column($pdo, 'batches', 'batch_no', "batch_no VARCHAR(40) DEFAULT ''");
+    // backfill nomor untuk batch lama (urut per tanggal)
+    if ((int)$pdo->query("SELECT COUNT(*) FROM batches WHERE batch_no IS NULL OR batch_no=''")->fetchColumn() > 0) {
+        $seq = []; $upd = $pdo->prepare("UPDATE batches SET batch_no=? WHERE id=?");
+        foreach ($pdo->query("SELECT id,bdate FROM batches ORDER BY bdate, created, id")->fetchAll() as $r) {
+            $ymd = str_replace('-', '', (string)$r['bdate']);
+            $seq[$ymd] = ($seq[$ymd] ?? 0) + 1;
+            $upd->execute(['BATCH-' . $ymd . '-' . str_pad($seq[$ymd], 3, '0', STR_PAD_LEFT), $r['id']]);
+        }
+    }
 
     // Master bahan baku
     $pdo->exec("CREATE TABLE IF NOT EXISTS materials (

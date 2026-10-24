@@ -517,8 +517,12 @@ try {
             // bahan yang sebelumnya ada (untuk sinkron ulang harga bila ada yang dibuang saat edit)
             $om = $pdo->prepare("SELECT material_id FROM batch_materials WHERE batch_id=? AND material_id IS NOT NULL");
             $om->execute([$id]); $oldMats = $om->fetchAll(PDO::FETCH_COLUMN);
-            $pdo->prepare("REPLACE INTO batches (id,bdate,note,created) VALUES (?,?,?,NOW())")
-                ->execute([$id, $b['date'] ?: today(), $b['note'] ?? '']);
+            $bdate = $b['date'] ?: today();
+            $ob = $pdo->prepare("SELECT batch_no FROM batches WHERE id=?");
+            $ob->execute([$id]); $batchNo = (string)$ob->fetchColumn();
+            if ($batchNo === '') $batchNo = next_batch_no($pdo, $bdate);
+            $pdo->prepare("REPLACE INTO batches (id,bdate,note,batch_no,created) VALUES (?,?,?,?,NOW())")
+                ->execute([$id, $bdate, $b['note'] ?? '', $batchNo]);
             foreach (BATCH_CHILDREN as $t)
                 $pdo->prepare("DELETE FROM $t WHERE batch_id=?")->execute([$id]);
             insert_batch_children($pdo, $id, $b);
@@ -954,6 +958,15 @@ function resync_materials($pdo, $matIds) {
     }
 }
 
+// Nomor batch berurutan per tanggal: BATCH-YYYYMMDD-001
+function next_batch_no($pdo, $date) {
+    $ymd = str_replace('-', '', $date);
+    $q = $pdo->prepare("SELECT batch_no FROM batches WHERE batch_no LIKE ?");
+    $q->execute(["BATCH-$ymd-%"]);
+    $max = 0;
+    foreach ($q->fetchAll(PDO::FETCH_COLUMN) as $no) $max = max($max, (int)substr($no, -3));
+    return 'BATCH-' . $ymd . '-' . str_pad($max + 1, 3, '0', STR_PAD_LEFT);
+}
 function insert_batch_children($pdo, $id, $b) {
     $sm = $pdo->prepare("INSERT INTO batch_materials (batch_id,material_id,name,qty,unit,price,target_product) VALUES (?,?,?,?,?,?,?)");
     foreach ($b['materials'] ?? [] as $m)
@@ -1156,7 +1169,7 @@ function bootstrap($pdo) {
     } unset($m);
 
     // batches nested
-    $batches = $pdo->query("SELECT id,bdate AS date,note FROM batches ORDER BY bdate DESC,id DESC")->fetchAll();
+    $batches = $pdo->query("SELECT id,bdate AS date,note,batch_no AS batchNo FROM batches ORDER BY bdate DESC,id DESC")->fetchAll();
     $bm=[]; foreach ($pdo->query("SELECT batch_id,material_id AS materialId,name,qty,unit,price,target_product AS targetProduct FROM batch_materials") as $r){$r['qty']=floatval($r['qty']);$r['price']=intval($r['price']);$bm[$r['batch_id']][]=$r;}
     $bo=[]; foreach ($pdo->query("SELECT batch_id,name,amount FROM batch_ops") as $r){$r['amount']=intval($r['amount']);$bo[$r['batch_id']][]=$r;}
     $bp=[]; foreach ($pdo->query("SELECT batch_id,product_id AS productId,qty FROM batch_outputs") as $r){$r['qty']=intval($r['qty']);$bp[$r['batch_id']][]=$r;}
@@ -1226,9 +1239,9 @@ function import_all($pdo, $data) {
         foreach ($m['history'] ?? [] as $h)
             $smh->execute([$m['id'],$h['date'],intval($h['price']),$h['source']??'manual',($h['ref']??'')?:null]);
     }
-    $sb = $pdo->prepare("INSERT INTO batches (id,bdate,note) VALUES (?,?,?)");
+    $sb = $pdo->prepare("INSERT INTO batches (id,bdate,note,batch_no) VALUES (?,?,?,?)");
     foreach ($data['batches'] ?? [] as $b) {
-        $sb->execute([$b['id'],$b['date'],$b['note']??'']);
+        $sb->execute([$b['id'],$b['date'],$b['note']??'',($b['batchNo']??'')?:next_batch_no($pdo,$b['date'])]);
         insert_batch_children($pdo, $b['id'], $b);
     }
     $sn = $pdo->prepare("INSERT INTO notas (id,nota_no,ndate,store_id) VALUES (?,?,?,?)");

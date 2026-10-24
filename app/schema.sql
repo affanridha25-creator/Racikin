@@ -41,7 +41,8 @@ CREATE TABLE IF NOT EXISTS material_prices (
 CREATE TABLE IF NOT EXISTS batches (
   id VARCHAR(32) PRIMARY KEY,
   bdate DATE,
-  note TEXT
+  note TEXT,
+  batch_no VARCHAR(40) DEFAULT ''
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS batch_materials (
