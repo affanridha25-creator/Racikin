@@ -160,8 +160,14 @@ main{flex:1;padding:16px 30px 60px}
 .botnav .fab{flex:0 0 auto;width:56px;height:56px;border-radius:50%;background:linear-gradient(145deg,var(--orange),var(--red));color:#fff;font-size:30px;font-weight:300;line-height:1;box-shadow:0 10px 22px rgba(213,62,15,.5);margin-top:-26px;display:flex;align-items:center;justify-content:center;padding:0;border:4px solid var(--bg)}
 .botnav .fab:active{transform:scale(.95)}
 /* ---- login ---- */
-.loginbg{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;padding:calc(20px + var(--sat)) 20px calc(20px + var(--sab));background:#FBEEE7 linear-gradient(160deg,#FFF4EC 0%,#FCE0CF 55%,#F6D6C6 100%)}
-.loginbox{background:#fff;border-radius:24px;padding:26px 24px;width:100%;max-width:384px;box-shadow:0 24px 60px rgba(126,3,6,.20)}
+.loginbg{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;padding:calc(20px + var(--sat)) 20px calc(20px + var(--sab));overflow:hidden;background:linear-gradient(160deg,#FFF4EC 0%,#FCE0CF 50%,#F6D6C6 100%);background-size:220% 220%;animation:lgBg 22s ease-in-out infinite}
+.loginbg::before,.loginbg::after{content:"";position:absolute;border-radius:50%;filter:blur(70px);pointer-events:none;opacity:.55}
+.loginbg::before{width:52vmax;height:52vmax;left:-14vmax;top:-18vmax;background:radial-gradient(circle,#FFB27A 0%,rgba(255,178,122,0) 70%);animation:lgDrift1 24s ease-in-out infinite alternate}
+.loginbg::after{width:46vmax;height:46vmax;right:-14vmax;bottom:-16vmax;background:radial-gradient(circle,#F2705A 0%,rgba(242,112,90,0) 70%);animation:lgDrift2 28s ease-in-out infinite alternate}
+.lfx{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.lfx span{position:absolute;bottom:-12%;left:var(--x);font-size:var(--s,26px);opacity:0;filter:saturate(1.1);animation:lgFloat var(--d,18s) linear var(--w,0s) infinite}
+.loginbox{position:relative;z-index:1;background:rgba(255,255,255,.93);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.8);border-radius:26px;padding:28px 26px 24px;width:100%;max-width:392px;box-shadow:0 30px 70px rgba(126,3,6,.20),0 2px 0 rgba(255,255,255,.9) inset}
+.loginbox.intro{animation:lgIn .75s cubic-bezier(.2,.8,.2,1) both}
 .loginbox .lgo{width:76px;height:76px;object-fit:contain;margin:0 auto 2px;display:block}
 .loginbox .lword{height:34px;object-fit:contain;display:block;margin:0 auto 8px}
 .loginbox h2{text-align:center;font-size:21px;font-weight:800;margin-bottom:2px}
@@ -174,6 +180,50 @@ main{flex:1;padding:16px 30px 60px}
 .lerr{background:#fbe7e5;color:var(--red);font-size:12px;padding:9px 11px;border-radius:9px;margin-bottom:12px;display:none}
 .lremember{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);margin:2px 0 12px;cursor:pointer}
 .lremember input{width:auto;min-width:0;margin:0;flex-shrink:0}
+.loginbox .lgo{filter:drop-shadow(0 8px 14px rgba(194,58,11,.28));animation:lgBob 4.6s ease-in-out infinite}
+.loginbox.intro .lgo{animation:lgPop .85s .1s cubic-bezier(.3,1.5,.5,1) both,lgBob 4.6s 1s ease-in-out infinite}
+.loginbox.intro .lword{animation:lgUp .6s .35s both}
+.loginbox.intro .lsub{animation:lgUp .6s .45s both}
+.ltabs{position:relative}
+.ltabs::before{content:"";position:absolute;top:4px;bottom:4px;left:4px;width:calc(50% - 4px);background:#fff;border-radius:9px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.ltabs[data-m="reg"]::before{transform:translateX(100%)}
+.ltabs.slide[data-m="reg"]::before{animation:lgSlideR .35s cubic-bezier(.4,0,.2,1)}
+.ltabs.slide[data-m="login"]::before{animation:lgSlideL .35s cubic-bezier(.4,0,.2,1)}
+.ltabs button{position:relative;z-index:1;background:none!important;box-shadow:none!important;transition:color .25s}
+.lform>*{animation:lgUp .45s cubic-bezier(.2,.8,.2,1) both}
+.lform>*:nth-child(1){animation-delay:.02s}.lform>*:nth-child(2){animation-delay:.07s}.lform>*:nth-child(3){animation-delay:.12s}.lform>*:nth-child(4){animation-delay:.17s}.lform>*:nth-child(5){animation-delay:.22s}.lform>*:nth-child(6){animation-delay:.27s}.lform>*:nth-child(7){animation-delay:.32s}.lform>*:nth-child(8){animation-delay:.37s}.lform>*:nth-child(9){animation-delay:.42s}
+.loginbox .lfield input{padding:11px 13px;border-radius:12px;border-color:#e3e1e0;background:#fdfcfb;transition:border-color .2s,box-shadow .2s,background .2s}
+.loginbox .lfield input:focus{background:#fff;border-color:var(--red);box-shadow:0 0 0 4px rgba(213,62,15,.12)}
+.lfield label{transition:color .2s}
+.lfield:focus-within label{color:var(--red)}
+.pwwrap{position:relative}
+.pwwrap input{padding-right:44px!important}
+.pwtog{position:absolute;right:5px;top:50%;transform:translateY(-50%);border:none;background:none;cursor:pointer;font-size:16px;line-height:1;padding:7px 8px;opacity:.55;transition:opacity .2s,transform .2s}
+.pwtog:hover{opacity:1;transform:translateY(-50%) scale(1.12)}
+.lsubmit{position:relative;overflow:hidden;background:linear-gradient(135deg,#E5561F 0%,#C23A0B 100%);padding:13px;border-radius:13px;font-size:14px;letter-spacing:.01em;box-shadow:0 10px 22px rgba(213,62,15,.30);transition:transform .15s,box-shadow .2s,filter .2s}
+.lsubmit:hover{background:linear-gradient(135deg,#E5561F 0%,#C23A0B 100%);transform:translateY(-2px);box-shadow:0 14px 28px rgba(213,62,15,.36);filter:brightness(1.04)}
+.lsubmit:active{transform:translateY(0) scale(.985)}
+.lsubmit::after{content:"";position:absolute;top:0;left:-70%;width:45%;height:100%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.35),transparent);transform:skewX(-18deg);transition:left .6s}
+.lsubmit:hover::after{left:130%}
+.lsubmit.busy{pointer-events:none;filter:saturate(.85) brightness(.97)}
+.lsubmit.busy::before{content:"";display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.45);border-top-color:#fff;border-radius:50%;margin-right:9px;vertical-align:-2px;animation:lgSpin .7s linear infinite}
+.lerr{animation:lgShake .45s}
+.lfoot{text-align:center;font-size:11px;color:var(--muted);margin-top:16px;opacity:.85}
+.lcopy{text-align:center;font-size:10.5px;color:var(--muted);margin-top:10px;padding-top:10px;border-top:1px solid var(--line);letter-spacing:.02em}
+@keyframes lgBg{0%,100%{background-position:0% 30%}50%{background-position:100% 70%}}
+@keyframes lgDrift1{to{transform:translate(9vmax,7vmax) scale(1.12)}}
+@keyframes lgDrift2{to{transform:translate(-8vmax,-6vmax) scale(1.1)}}
+@keyframes lgFloat{0%{transform:translateY(0) rotate(0);opacity:0}10%{opacity:.26}85%{opacity:.2}100%{transform:translateY(-118vh) rotate(40deg);opacity:0}}
+@keyframes lgIn{from{opacity:0;transform:translateY(26px) scale(.96)}to{opacity:1;transform:none}}
+@keyframes lgPop{from{opacity:0;transform:scale(.5) rotate(-12deg)}to{opacity:1;transform:none}}
+@keyframes lgBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+@keyframes lgUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes lgSlideR{from{transform:translateX(0)}to{transform:translateX(100%)}}
+@keyframes lgSlideL{from{transform:translateX(100%)}to{transform:translateX(0)}}
+@keyframes lgSpin{to{transform:rotate(360deg)}}
+@keyframes lgShake{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(3px)}}
+@media (prefers-reduced-motion:reduce){.loginbg,.loginbg::before,.loginbg::after,.loginbox,.loginbox *,.lfx span{animation:none!important;transition:none!important}.lfx{display:none}}
+
 @media(max-width:820px){
   body{display:block}
   .sidebar{display:none}
@@ -454,7 +504,7 @@ label.f{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;font-w
 <div class="modal-bg" id="modalBg"><div class="modal" id="modal"></div></div>
 <div id="toast"></div>
 <div id="printArea"></div>
-<div class="loginbg" id="loginScreen" style="display:flex"><div class="loginbox" id="loginBox"></div></div>
+<div class="loginbg" id="loginScreen" style="display:flex"><div class="lfx" aria-hidden="true"><span style="--x:6%;--s:30px;--d:19s;--w:0s">🌶️</span><span style="--x:19%;--s:24px;--d:23s;--w:-7s">🧅</span><span style="--x:33%;--s:28px;--d:21s;--w:-12s">🍤</span><span style="--x:52%;--s:26px;--d:25s;--w:-4s">🧄</span><span style="--x:67%;--s:32px;--d:20s;--w:-15s">🍅</span><span style="--x:81%;--s:24px;--d:24s;--w:-9s">🥘</span><span style="--x:92%;--s:28px;--d:22s;--w:-18s">🍋</span></div><div class="loginbox intro" id="loginBox"></div></div>
 <div class="loginbg" id="subLock" style="display:none"><div class="loginbox" id="subLockBox" style="max-width:440px"></div></div>
 <nav class="botnav" id="botnav">
   <button data-v="dashboard" onclick="go('dashboard')"><span class="bic">📊</span>Beranda</button>
@@ -2622,8 +2672,14 @@ async function resyncPrices(){const r=await api("resyncPrices");await reload();t
 // ---------- boot ----------
 // ---------- login ----------
 const llink='style="color:var(--red);font-size:13px;font-weight:700;cursor:pointer;text-decoration:none"';
+function pwField(id,ph){return `<div class="pwwrap"><input id="${id}" type="password" placeholder="${ph}"><button type="button" class="pwtog" onclick="togPw(this)" tabindex="-1" aria-label="Tampilkan password">👁️</button></div>`;}
+function togPw(b){const i=b.parentNode.querySelector("input"),show=i.type==="password";i.type=show?"text":"password";b.textContent=show?"🙈":"👁️";}
+function lBusy(on,txt){const b=document.querySelector("#loginBox .lsubmit");if(!b)return;if(on){b.dataset.t=b.innerHTML;b.innerHTML=txt||"Memproses…";b.classList.add("busy");}else{if(b.dataset.t)b.innerHTML=b.dataset.t;b.classList.remove("busy");}}
 function renderLogin(mode){
   const box=document.getElementById("loginBox");
+  const prevMode=box.dataset.mode;box.dataset.mode=mode;
+  const slide=(prevMode==="login"&&mode==="reg")||(prevMode==="reg"&&mode==="login");
+  if(!box.dataset.shown){box.dataset.shown="1";}else box.classList.remove("intro");   // animasi masuk kartu hanya sekali
   let form;
   if(mode==='forgot'){
     form=`<div class="lerr" id="lerr"></div>
@@ -2631,33 +2687,34 @@ function renderLogin(mode){
       <p class="lsub" style="margin-bottom:16px">Isi kode usaha &amp; email. Link reset akan dikirim ke email itu.</p>
       <div class="lfield"><label>Kode Usaha</label><input id="fCode" placeholder="mis. anna" autocapitalize="none"></div>
       <div class="lfield"><label>Email</label><input id="fEmail" type="email" placeholder="email terdaftar" autocapitalize="none"></div>
-      <button class="btn" style="width:100%;margin-top:6px" onclick="doForgot()">Kirim Link Reset</button>
+      <button class="btn lsubmit" style="width:100%;margin-top:6px" onclick="doForgot()">Kirim Link Reset</button>
       <div style="text-align:center;margin-top:14px"><a ${llink} onclick="renderLogin('login')">← Kembali masuk</a></div>`;
   } else if(mode==='reset'){
     form=`<div class="lerr" id="lerr"></div>
       <h3 style="text-align:center;margin-bottom:4px">Buat Password Baru</h3>
       <p class="lsub" style="margin-bottom:16px">Masukkan password baru untuk akunmu.</p>
-      <div class="lfield"><label>Password Baru (min 8 karakter)</label><input id="rpNew" type="password" placeholder="password baru"></div>
-      <div class="lfield"><label>Ulangi Password</label><input id="rpNew2" type="password" placeholder="ulangi password"></div>
-      <button class="btn" style="width:100%;margin-top:6px" onclick="doResetConfirm()">Simpan Password</button>`;
+      <div class="lfield"><label>Password Baru (min 8 karakter)</label>${pwField("rpNew","password baru")}</div>
+      <div class="lfield"><label>Ulangi Password</label>${pwField("rpNew2","ulangi password")}</div>
+      <button class="btn lsubmit" style="width:100%;margin-top:6px" onclick="doResetConfirm()">Simpan Password</button>`;
   } else {
-    const tab=`<div class="ltabs"><button class="${mode!=='reg'?'on':''}" onclick="renderLogin('login')">Masuk</button><button class="${mode==='reg'?'on':''}" onclick="renderLogin('reg')">Daftar Usaha</button></div><div class="lerr" id="lerr"></div>`;
+    const tab=`<div class="ltabs${slide?' slide':''}" data-m="${mode==='reg'?'reg':'login'}"><button class="${mode!=='reg'?'on':''}" onclick="renderLogin('login')">Masuk</button><button class="${mode==='reg'?'on':''}" onclick="renderLogin('reg')">Daftar Usaha</button></div><div class="lerr" id="lerr"></div>`;
     form=mode==='reg'
     ?`${tab}<div class="lfield"><label>Nama Usaha</label><input id="rName" placeholder="mis. ANNA Snack & Kitchen"></div>
       <div class="lfield"><label>Kode Usaha <span style="font-weight:400">(huruf kecil/angka, tanpa spasi)</span></label><input id="rCode" placeholder="mis. anna" autocapitalize="none"></div>
       <div class="lfield"><label>Nama Kamu</label><input id="rUser" placeholder="mis. Anna"></div>
       <div class="lfield"><label>Email</label><input id="rEmail" type="email" placeholder="email@usaha.com" autocapitalize="none"></div>
-      <div class="lfield"><label>Password (min 8 karakter)</label><input id="rPass" type="password" placeholder="buat password"></div>
+      <div class="lfield"><label>Password (min 8 karakter)</label>${pwField("rPass","buat password")}</div>
       <label class="lremember"><input type="checkbox" id="rRemember" checked> Ingat saya (tetap masuk 30 hari)</label>
-      <button class="btn" style="width:100%;margin-top:6px" onclick="doRegister()">Daftar &amp; Masuk</button>`
+      <button class="btn lsubmit" style="width:100%;margin-top:6px" onclick="doRegister()">Daftar &amp; Masuk</button>`
     :`${tab}<div class="lfield"><label>Kode Usaha</label><input id="lCode" placeholder="mis. anna" autocapitalize="none"></div>
       <div class="lfield"><label>Email</label><input id="lEmail" type="email" placeholder="email kamu" autocapitalize="none"></div>
-      <div class="lfield"><label>Password</label><input id="lPass" type="password" placeholder="password"></div>
+      <div class="lfield"><label>Password</label>${pwField("lPass","password")}</div>
       <label class="lremember"><input type="checkbox" id="lRemember" checked> Ingat saya (tetap masuk 30 hari)</label>
-      <button class="btn" style="width:100%;margin-top:6px" onclick="doLogin()">Masuk</button>
+      <button class="btn lsubmit" style="width:100%;margin-top:6px" onclick="doLogin()">Masuk</button>
       <div style="text-align:center;margin-top:14px"><a ${llink} onclick="renderLogin('forgot')">Lupa password?</a></div>`;
   }
-  box.innerHTML=`<img class="lgo" src="icons/logo-bowl.png" alt=""><img class="lword" src="icons/logo-word.png" alt="Racikin"><div class="lsub">Kelola produksi, HPP &amp; penjualan UMKM</div>${form}`;
+  box.innerHTML=`<img class="lgo" src="icons/logo-bowl.png" alt=""><img class="lword" src="icons/logo-word.png" alt="Racikin"><div class="lsub">Kelola produksi, HPP &amp; penjualan UMKM</div><div class="lform">${form}</div>${mode==='login'||mode==='reg'?'<div class="lfoot">🔒 Data tiap usaha tersimpan terpisah</div>':""}<div class="lcopy">© ${new Date().getFullYear()} Racikin · Developer: Ahmad Affan Ridha</div>`;
+  box.onkeydown=e=>{if(e.key!=="Enter"||e.target.tagName!=="INPUT"||e.target.type==="checkbox")return;const b=box.querySelector(".lsubmit");if(b&&!b.classList.contains("busy")){e.preventDefault();b.click();}};
 }
 async function doForgot(){
   const code=document.getElementById("fCode").value.trim().toLowerCase(),email=document.getElementById("fEmail").value.trim().toLowerCase();
@@ -2675,16 +2732,17 @@ async function doResetConfirm(){
     document.getElementById("loginBox").innerHTML=`<img class="lgo" src="icons/logo-bowl.png" alt=""><img class="lword" src="icons/logo-word.png" alt="Racikin"><div style="text-align:center;padding:6px 0"><div style="font-size:42px">✅</div><h3 style="margin:8px 0 6px">Password Diubah</h3><p class="lsub">Silakan masuk dengan password baru.</p><button class="btn" style="width:100%;margin-top:16px" onclick="renderLogin('login')">Masuk Sekarang</button></div>`;
   }catch(e){loginErr(e.message||"Link reset tidak valid atau kadaluarsa.");}
 }
-function loginErr(m){const e=document.getElementById("lerr");if(e){e.textContent=m;e.style.display="block";}}
-async function doLogin(){const code=document.getElementById("lCode").value.trim().toLowerCase(),email=document.getElementById("lEmail").value.trim().toLowerCase(),password=document.getElementById("lPass").value,remember=document.getElementById("lRemember").checked;if(!code||!email||!password){loginErr("Isi kode usaha, email & password.");return;}try{BIZ=await api("authLogin",{code,email,password,remember},{silent:true});await afterAuth();}catch(e){loginErr(e.message||"Gagal masuk.");}}
+function loginErr(m){const e=document.getElementById("lerr");if(e){e.textContent=m;e.style.display="block";e.style.animation="none";void e.offsetWidth;e.style.animation="";}}
+async function doLogin(){const code=document.getElementById("lCode").value.trim().toLowerCase(),email=document.getElementById("lEmail").value.trim().toLowerCase(),password=document.getElementById("lPass").value,remember=document.getElementById("lRemember").checked;if(!code||!email||!password){loginErr("Isi kode usaha, email & password.");return;}lBusy(true,"Masuk…");try{BIZ=await api("authLogin",{code,email,password,remember},{silent:true});await afterAuth();}catch(e){lBusy(false);loginErr(e.message||"Gagal masuk.");}}
 async function doRegister(){const name=document.getElementById("rName").value.trim(),code=document.getElementById("rCode").value.trim().toLowerCase(),user=document.getElementById("rUser").value.trim(),email=document.getElementById("rEmail").value.trim().toLowerCase(),password=document.getElementById("rPass").value;if(!name||!code||!user||!email||!password){loginErr("Lengkapi semua kolom.");return;}
   {const pe=pwProblem(password);if(pe){loginErr(pe);return;}}
+  lBusy(true,"Mendaftar…");
   try{const r=await api("authRegister",{name,code,user,email,password},{silent:true});
     if(r.trial){   // free trial aktif → langsung masuk app
       BIZ=r;await afterAuth();toast(`Selamat datang! Trial gratis ${r.trialDays||30} hari aktif 🎉`);return;
     }
     document.getElementById("loginBox").innerHTML=`<img class="lgo" src="icons/logo-bowl.png" alt=""><img class="lword" src="icons/logo-word.png" alt="Racikin"><div style="text-align:center;padding:6px 0"><div style="font-size:42px">🎉</div><h3 style="margin:8px 0 6px">Pendaftaran Berhasil!</h3><p class="lsub">Usaha <b>${esc(r.name||name)}</b> (kode: <b>${esc(r.alias||code)}</b>) terdaftar. Kami siapkan akunmu dulu (biasanya beberapa jam), lalu kamu dapat <b>30 hari GRATIS</b> — kami kabari via WhatsApp untuk mulai. 🙏</p><button class="btn ghost" style="width:100%;margin-top:16px" onclick="renderLogin('login')">Kembali ke Masuk</button></div>`;
-  }catch(e){loginErr(e.message||"Gagal daftar.");}}
+  }catch(e){lBusy(false);loginErr(e.message||"Gagal daftar.");}}
 async function doLogout(){if(!confirm("Keluar dari "+(BIZ.name||"usaha")+"?"))return;try{await api("authLogout");}catch(e){}location.reload();}
 // ================= LANGGANAN (perpanjangan + bukti transfer) =================
 let SUB={};   // status langganan terkini {paidUntil,daysLeft,expired}
