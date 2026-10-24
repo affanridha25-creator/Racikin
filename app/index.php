@@ -1668,7 +1668,7 @@ function printReceipt(id,bayar,kembali,method){
     <div class="rtot">${(notaDisc(n)>0||notaService(n)>0||notaTax(n)>0)?`<div class="rrow"><span>Subtotal</span><span>${rp(notaSubtotal(n))}</span></div>${notaDisc(n)>0?`<div class="rrow"><span>Diskon</span><span>-${rp(notaDisc(n))}</span></div>`:""}${notaService(n)>0?`<div class="rrow"><span>Service${ratePct(notaSvcRate(n))}</span><span>${rp(notaService(n))}</span></div>`:""}${notaTax(n)>0?`<div class="rrow"><span>Pajak${ratePct(notaTaxRate(n))}</span><span>${rp(notaTax(n))}</span></div>`:""}`:""}<div class="rrow"><span>TOTAL</span><span>${rp(total)}</span></div>${bayar!=null?`<div class="rrow"><span>Bayar (${esc(method||"Tunai")})</span><span>${rp(bayar)}</span></div><div class="rrow"><span>Kembalian</span><span>${rp(kembali||0)}</span></div>`:""}${notaDue(n)>0?`<div class="rrow"><span>Sisa</span><span>${rp(notaDue(n))}</span></div>`:""}</div>
     <div class="rthx">${(p.footer||"").trim()?esc((p.footer||"").trim()):"Terima kasih 🙏"}<br>— ${esc(BIZ.name||"Racikin")} —</div>
   </div>`;
-  window.print();
+  printTitled(["Struk",n.notaNo].filter(Boolean).join(" "));
 }
 
 // ================= PRODUKSI =================
@@ -1738,6 +1738,14 @@ function cmpBatch(pid){
   ${Object.keys(ops).length?sec("Biaya operasional (per botol)")+Object.values(ops).map(opRow).join(""):""}
   </tbody></table></div>`);
 }
+// cetak dengan judul dokumen sementara → jadi nama file default saat "Simpan sebagai PDF"
+function printTitled(title){
+  const old=document.title;document.title=String(title||old).replace(/[\\/:*?"<>|]+/g," ").replace(/\s+/g," ").trim()||old;
+  const back=()=>{document.title=old;window.removeEventListener("afterprint",back);};
+  window.addEventListener("afterprint",back);
+  window.print();
+  setTimeout(back,60000);   // jaga-jaga kalau afterprint tak terpanggil
+}
 // ---- detail batch (preview sebelum cetak/edit) ----
 function viewBatch(id){
   const b=S.batches.find(x=>x.id===id);if(!b)return;
@@ -1787,7 +1795,7 @@ function printBatch(id){
     </tbody></table>
     <div class="psub" style="margin-top:18px;text-align:left">Dicetak ${fmtDate(today())} — Racikin</div>
   </div>`;
-  window.print();
+  printTitled([b.batchNo||"Batch",b.note,BIZ.name].filter(Boolean).join(" - "));
 }
 function matDefault(){return {materialId:"",name:"",unit:"kg",qty:"",price:"",targetProduct:"",custom:false};}
 // ---- draft batch (disimpan di browser, tidak menyentuh database) ----
