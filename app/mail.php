@@ -91,6 +91,36 @@ function app_mail($to, $subject, $body, $headers = '') {
     return @mail($to, $subject, $body, $headers);
 }
 
+
+// Alamat pengirim default (SMTP_FROM / SMTP_USER bila SMTP aktif, selain itu RESET_FROM atau noreply@host)
+function mail_from_addr() {
+    if (defined('SMTP_HOST') && SMTP_HOST !== '') return (defined('SMTP_FROM') && SMTP_FROM) ? SMTP_FROM : (defined('SMTP_USER') ? SMTP_USER : '');
+    $host = preg_replace('/:\d+$/', '', app_host());
+    return (defined('RESET_FROM') && RESET_FROM) ? RESET_FROM : ('noreply@' . preg_replace('/^www\./', '', $host));
+}
+// Penerima pemberitahuan admin: ADMIN_EMAIL (config) + pengaturan notify_email (admin.php).
+function admin_recipients() {
+    $list = defined('ADMIN_EMAIL') ? (string)ADMIN_EMAIL : '';
+    try { $st = settings_all(); $list .= ',' . ($st['notify_email'] ?? ''); } catch (Throwable $e) { }
+    return array_values(array_unique(array_filter(array_map('trim', explode(',', $list)), function ($x) { return filter_var($x, FILTER_VALIDATE_EMAIL); })));
+}
+// Kirim email teks biasa ke semua penerima admin. Aman dipanggil kapan saja (tak pernah melempar).
+function notify_admin($subject, $body) {
+    try {
+        $to = admin_recipients(); if (!$to) return 0;
+        $headers = "From: Racikin <" . mail_from_addr() . ">\r\nContent-Type: text/plain; charset=UTF-8\r\nMIME-Version: 1.0\r\n";
+        $n = 0; foreach ($to as $t) if (app_mail($t, preg_replace('/[\r\n]+/', ' ', $subject), $body, $headers)) $n++;
+        return $n;
+    } catch (Throwable $e) { error_log('notify_admin: ' . $e->getMessage()); return 0; }
+}
+// Email ke klien (satu penerima), teks biasa.
+function mail_client($to, $subject, $body) {
+    try {
+        if (!filter_var($to, FILTER_VALIDATE_EMAIL)) return false;
+        $headers = "From: Racikin <" . mail_from_addr() . ">\r\nContent-Type: text/plain; charset=UTF-8\r\nMIME-Version: 1.0\r\n";
+        return app_mail($to, preg_replace('/[\r\n]+/', ' ', $subject), $body, $headers);
+    } catch (Throwable $e) { error_log('mail_client: ' . $e->getMessage()); return false; }
+}
 // Uji kirim dari halaman admin: kirim email percobaan ke penerima pemberitahuan. Return [bool ok, string pesan].
 function run_mail_test() {
     $list = defined('ADMIN_EMAIL') ? (string)ADMIN_EMAIL : '';

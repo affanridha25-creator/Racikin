@@ -28,7 +28,7 @@ function showSubLock(){
 function subBanner(){
   const el=document.getElementById("subBanner");if(!el)return;
   const d=SUB&&SUB.daysLeft;
-  if(SUB&&!SUB.expired&&d!=null&&d<=7){
+  if(SUB&&!SUB.expired&&d!=null&&d<=14){
     el.style.display="block";
     el.innerHTML=`<div class="subbn"><span class="sb-ic">⏰</span><span class="sb-tx">Langganan habis ${d<=0?"hari ini":"dalam <b>"+d+" hari</b>"} <small>(${esc(SUB.paidUntil||"")})</small></span><button onclick="openRenew()">Perpanjang</button></div>`;
   }else{el.style.display="none";el.innerHTML="";}

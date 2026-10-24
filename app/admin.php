@@ -86,6 +86,13 @@ if ($isAdmin && in_array($do, ['save_settings','approve','reject','extend','test
                 $mo = plan_months($r['plan']); if ($mo <= 0) $mo = 1;
                 $m->prepare("UPDATE businesses SET active=1, paid_until = DATE_ADD(GREATEST(COALESCE(paid_until,CURDATE()),CURDATE()), INTERVAL ? MONTH) WHERE alias=?")->execute([$mo, $r['alias']]);
                 $msg = "Perpanjangan \"{$r['alias']}\" disetujui (+{$mo} bulan). ✓";
+                try {   // konfirmasi ke klien
+                    $bq = $m->prepare("SELECT name, paid_until FROM businesses WHERE alias=?"); $bq->execute([$r['alias']]); $bq = $bq->fetch() ?: [];
+                    $sent = mail_client($r['email'], 'Perpanjangan Racikin disetujui ✓',
+                        "Halo,\n\nTerima kasih! Pembayaran perpanjangan untuk usaha \"" . ($bq['name'] ?? $r['alias']) . "\" sudah kami verifikasi.\n\n"
+                      . "Masa aktif sekarang sampai: " . ($bq['paid_until'] ?? '-') . "\n\nSemua datamu tetap utuh dan aplikasi siap dipakai: " . app_base_url() . "\n\nTerima kasih sudah memakai Racikin 🙏\n— Tim Racikin");
+                    $msg .= $sent ? ' Email konfirmasi terkirim ke klien.' : ' (Email konfirmasi ke klien tidak terkirim.)';
+                } catch (Throwable $e) { }
             }
         }
     }
@@ -94,6 +101,14 @@ if ($isAdmin && in_array($do, ['save_settings','approve','reject','extend','test
         $m->prepare("UPDATE renewal_requests SET status='rejected', admin_note=?, reviewed_at=NOW() WHERE id=? AND status='pending'")
           ->execute([mb_substr(trim($_POST['admin_note'] ?? ''), 0, 255), $rid]);
         $msg = 'Pengajuan ditolak.';
+        try {   // beri tahu klien + alasannya
+            $rq = $m->prepare("SELECT email, alias FROM renewal_requests WHERE id=?"); $rq->execute([$rid]); $rq = $rq->fetch();
+            if ($rq) { $why = mb_substr(trim($_POST['admin_note'] ?? ''), 0, 255);
+                if (mail_client($rq['email'], 'Perpanjangan Racikin belum bisa kami proses',
+                    "Halo,\n\nMaaf, bukti transfer perpanjanganmu belum bisa kami verifikasi" . ($why !== '' ? ":\n\"$why\"" : '.') . "\n\n"
+                  . "Silakan buka " . app_base_url() . " lalu ajukan perpanjangan dan unggah bukti transfer yang benar, atau hubungi kami lewat WhatsApp: https://wa.me/6281325523999\n\n— Tim Racikin")) $msg .= ' Email pemberitahuan terkirim ke klien.';
+            }
+        } catch (Throwable $e) { }
     }
     elseif ($do === 'extend') {
         $alias = preg_replace('/[^a-z0-9]/', '', strtolower($_POST['alias'] ?? ''));

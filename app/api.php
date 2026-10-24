@@ -354,26 +354,35 @@ function handle_auth($action, $in) {
             // maksimum 1 pending per usaha (cegah antrian & storage membengkak)
             $m->prepare("DELETE FROM renewal_requests WHERE alias=? AND status='pending' AND id<>?")->execute([$alias, $rid]);
             $m->prepare("UPDATE renewal_requests SET proof=?, note=?, status='pending', created=NOW() WHERE id=?")->execute([$proof, $note, $rid]);
+            // beri tahu admin: bukti transfer masuk, siap diverifikasi di admin.php
+            try {
+                $rq = $m->prepare("SELECT plan, amount FROM renewal_requests WHERE id=?"); $rq->execute([$rid]); $rq = $rq->fetch() ?: [];
+                $bq = $m->prepare("SELECT name, wa, paid_until FROM businesses WHERE alias=?"); $bq->execute([$alias]); $bq = $bq->fetch() ?: [];
+                $planLbl = ['1bln' => '1 bulan', '3bln' => '3 bulan', '1thn' => '1 tahun'][$rq['plan'] ?? ''] ?? ($rq['plan'] ?? '-');
+                $cl = function ($v) { return trim(preg_replace('/[\r\n]+/', ' ', (string)$v)); };
+                notify_admin('Bukti transfer masuk: ' . $cl($bq['name'] ?? $alias) . ' (' . $planLbl . ')',
+                    "Ada bukti transfer perpanjangan yang perlu diverifikasi.\n\n"
+                  . "Usaha    : " . $cl($bq['name'] ?? $alias) . " (" . $cl($alias) . ")\n"
+                  . "Paket    : " . $planLbl . "\n"
+                  . "Nominal  : Rp" . number_format((int)($rq['amount'] ?? 0), 0, ',', '.') . "  ← harus cocok dengan mutasi rekening\n"
+                  . "Masa aktif sekarang: " . ($bq['paid_until'] ?? '-') . "\n"
+                  . "Email    : " . $cl($email) . "\n"
+                  . (!empty($bq['wa']) ? "WhatsApp : https://wa.me/" . $cl($bq['wa']) . "\n" : '')
+                  . ($note !== '' ? "Catatan  : " . $cl($note) . "\n" : '')
+                  . "\nPeriksa mutasi rekening, lalu Setujui di: " . app_base_url() . "/admin.php\n\n— Racikin");
+            } catch (Throwable $e) { error_log('notif bukti: ' . $e->getMessage()); }
             echo json_encode(['ok' => true]); return;
         }
     }
 }
 
 function notify_admin_signup($name, $alias, $user, $email, $status, $wa = '') {
-    $list = (defined('ADMIN_EMAIL') ? (string)ADMIN_EMAIL : '');
-    try { $st = settings_all(); $list .= ',' . ($st['notify_email'] ?? ''); } catch (Throwable $e) { }
-    $recipients = array_values(array_unique(array_filter(array_map('trim', explode(',', $list)), function ($x) { return filter_var($x, FILTER_VALIDATE_EMAIL); })));
-    if (!$recipients) return;
     $clean = function ($v) { return trim(preg_replace('/[\r\n]+/', ' ', (string)$v)); };   // cegah header injection
-    $host = preg_replace('/:\d+$/', '', app_host());
-    $from = defined('RESET_FROM') && RESET_FROM ? RESET_FROM : ('noreply@' . preg_replace('/^www\./', '', $host));
-    $subject = 'Pendaftar baru Racikin: ' . $clean($name) . ' (' . $clean($alias) . ')';
-    $body = "Ada usaha baru mendaftar di Racikin.\n\n"
-          . "Usaha   : " . $clean($name) . "\nKode    : " . $clean($alias) . "\nPemilik : " . $clean($user) . "\nEmail   : " . $clean($email) . "\nWhatsApp: " . ($wa !== '' ? '+' . $clean($wa) . '  → https://wa.me/' . $clean($wa) : '-') . "\n"
-          . "Status  : " . $status . "\nWaktu   : " . gmdate('Y-m-d H:i', time() + 7 * 3600) . " WIB\nIP      : " . $clean($_SERVER['REMOTE_ADDR'] ?? '?') . "\n\n"
-          . "Kelola di: " . app_base_url() . "/admin.php\n\n— Racikin";
-    $headers = "From: Racikin <$from>\r\nContent-Type: text/plain; charset=UTF-8\r\nMIME-Version: 1.0\r\n";
-    foreach ($recipients as $to) app_mail($to, $subject, $body, $headers);
+    notify_admin('Pendaftar baru Racikin: ' . $clean($name) . ' (' . $clean($alias) . ')',
+        "Ada usaha baru mendaftar di Racikin.\n\n"
+      . "Usaha   : " . $clean($name) . "\nKode    : " . $clean($alias) . "\nPemilik : " . $clean($user) . "\nEmail   : " . $clean($email) . "\nWhatsApp: " . ($wa !== '' ? '+' . $clean($wa) . '  → https://wa.me/' . $clean($wa) : '-') . "\n"
+      . "Status  : " . $status . "\nWaktu   : " . gmdate('Y-m-d H:i', time() + 7 * 3600) . " WIB\nIP      : " . $clean($_SERVER['REMOTE_ADDR'] ?? '?') . "\n\n"
+      . "Kelola di: " . app_base_url() . "/admin.php\n\n— Racikin");
 }
 function send_reset_email($to, $name, $alias, $tokenStr) {
     $link = app_base_url() . '/?reset=' . $tokenStr;
