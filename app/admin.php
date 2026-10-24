@@ -298,7 +298,9 @@ body.lg::after{width:46vmax;height:46vmax;right:-14vmax;bottom:-16vmax;backgroun
   .rq-img.noimg{height:60px}
   .urow{grid-template-columns:1fr;gap:12px}
   .agrp{grid-column:auto}
-  .tools{flex-direction:column;align-items:stretch}
+  .tools{flex-direction:column;align-items:stretch;min-width:0}
+  .tools>*,.search{min-width:0;max-width:100%;width:100%}
+  .chips{max-width:100%}
   .chips{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;margin:0 -2px;scrollbar-width:none}
   .chips::-webkit-scrollbar{display:none}
   .chip{flex-shrink:0}
