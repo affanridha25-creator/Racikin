@@ -1,5 +1,5 @@
 /* p-keuangan.css — Keuangan v2 (prefix kn-): hero, tab pil, air terjun laba rugi, tren, kas, modal */
-.kn{max-width:1100px}
+.kn{max-width:none}
 /* ---- hero ---- */
 .kn-hero{position:relative;display:grid;grid-template-columns:1.5fr 1fr;gap:22px;align-items:stretch;color:#fff;border-radius:28px;padding:24px 28px;margin-bottom:16px;overflow:hidden;background:linear-gradient(140deg,#F26A2E -10%,#D53E0F 44%,#7E0306 115%);box-shadow:0 22px 46px rgba(126,3,6,.26)}
 .kn-hero.kas{background:linear-gradient(140deg,#FA8743 -10%,#D53E0F 48%,#5c0204 120%)}

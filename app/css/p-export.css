@@ -1,5 +1,5 @@
 /* p-export.css — Export Data v2 (prefix ex-) */
-.ex{max-width:1000px}
+.ex{max-width:none}
 .ex-hero{position:relative;display:flex;align-items:center;justify-content:space-between;gap:20px;color:#fff;border-radius:28px;padding:26px 30px;margin-bottom:18px;overflow:hidden;background:linear-gradient(140deg,#F26A2E -10%,#D53E0F 44%,#7E0306 115%);box-shadow:0 22px 46px rgba(126,3,6,.26)}
 .ex-hm{position:relative;z-index:1;max-width:560px}
 .ex-hi{font-size:13px;font-weight:700;opacity:.9}

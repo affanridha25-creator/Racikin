@@ -1,6 +1,6 @@
 /* profil.css — halaman Profil Usaha */
 /* ---- Profil Usaha ---- */
-.pf-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:18px;align-items:start;max-width:1100px}
+.pf-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:18px;align-items:start;max-width:none}
 .pf-col{display:flex;flex-direction:column;gap:18px;min-width:0}
 .pfc{background:#fff;border-radius:24px;padding:20px 20px 18px;box-shadow:0 8px 22px rgba(40,40,60,.06);animation:dUp .6s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--k,0)*90ms)}
 .pfc h3{font-size:15.5px;font-weight:800;margin-bottom:14px;display:flex;align-items:center;gap:8px}
@@ -42,7 +42,7 @@
 .sw>input[type=checkbox]:checked{background:var(--red)}
 .sw>input[type=checkbox]:checked::after{transform:translateX(19px)}
 .sw>input[type=checkbox]:focus-visible{outline:3px solid rgba(213,62,15,.3);outline-offset:2px}
-.pf-save{position:sticky;bottom:14px;z-index:6;max-width:1100px;margin-top:18px;display:flex;justify-content:flex-end;pointer-events:none}
+.pf-save{position:sticky;bottom:14px;z-index:6;max-width:none;margin-top:18px;display:flex;justify-content:flex-end;pointer-events:none}
 .pf-savein{pointer-events:auto;display:flex;align-items:center;gap:14px;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);border:1px solid rgba(0,0,0,.06);border-radius:999px;padding:8px 8px 8px 18px;box-shadow:0 14px 34px rgba(40,40,60,.18)}
 .pf-dirty{font-size:12px;color:var(--muted);font-weight:600;opacity:.0;max-width:0;overflow:hidden;white-space:nowrap;transition:opacity .3s,max-width .35s}
 .pf-dirty.on{opacity:1;max-width:240px;color:var(--amber)}
