@@ -39,20 +39,30 @@ function rToko(){
   const card=(l,v,cl)=>`<div class="card ${cl||""}"><div class="lbl">${l}</div><div class="val">${v}</div></div>`;
   const chip=(v,l)=>`<button class="btn sm ${TOKO_SORT===v?"":"gray"}" onclick="setTokoSort('${v}')">${l}</button>`;
   const el=document.getElementById("v-toko");
-  el.innerHTML=`${mob?"":`<h2 class="title">Master Toko</h2><div class="desc">Daftar toko/warung tempat titip atau jual produk — lengkap dengan omzet &amp; piutang tiap toko.</div>`}
-  <div class="cards">${card("Jumlah Toko",cnt(d.length,"num"))}${card("Total Omzet",cnt(totO))}${card("Total Piutang",cnt(totD),"amber")}${card("Toko Berpiutang",cnt(nD,"num"))}</div>
-  <div class="flexbtns" style="align-items:center;flex-wrap:wrap;margin-bottom:16px"><button class="btn" onclick="editStore()">+ Toko Baru</button>
-    <input type="search" placeholder="Cari toko / kontak / alamat…" value="${esc(TOKO_Q)}" oninput="setTokoQ(this.value)" style="flex:1;min-width:150px">
-    ${chip("omzet","Omzet")}${chip("piutang","Piutang")}${chip("terbaru","Terbaru")}${chip("nama","A–Z")}</div>
+  // mobile: hero gradasi + statistik ringkas; desktop: judul + kartu angka
+  const top=mob?`<div class="tk-hero"><div class="pf-hbg" aria-hidden="true"><i></i><i></i></div>
+      <div class="tk-hl">🏪 ${d.length} toko mitra</div><div class="tk-hv">${cnt(totO)}</div><div class="tk-hs">total omzet dari semua toko</div>
+      <div class="tk-hrow"><div><span>Piutang</span><b>${cnt(totD)}</b></div><div><span>Berpiutang</span><b>${cnt(nD,"num")} toko</b></div></div></div>`
+    :`<h2 class="title">Master Toko</h2><div class="desc">Daftar toko/warung tempat titip atau jual produk — lengkap dengan omzet &amp; piutang tiap toko.</div>
+  <div class="cards">${card("Jumlah Toko",cnt(d.length,"num"))}${card("Total Omzet",cnt(totO))}${card("Total Piutang",cnt(totD),"amber")}${card("Toko Berpiutang",cnt(nD,"num"))}</div>`;
+  el.innerHTML=`${top}
+  <div class="tk-tools"><input type="search" placeholder="Cari toko / kontak / alamat…" value="${esc(TOKO_Q)}" oninput="setTokoQ(this.value)">
+    <div class="tk-sort">${chip("omzet","Omzet")}${chip("piutang","Piutang")}${chip("terbaru","Terbaru")}${chip("nama","A–Z")}</div>
+    <button class="btn tk-add" onclick="editStore()">+ Toko Baru</button></div>
   <div id="tokoList">${tokoListHtml()}</div>`;
   runCounts(el);
 }
+// modal tambah/edit toko: kepala gradasi + avatar yang ikut berubah saat mengetik
+function tokoAvPrev(){const v=(document.getElementById("sn")||{}).value||"";const a=document.getElementById("snAv");if(!a)return;
+  const h=avHue(v||"?");a.textContent=(v.trim()[0]||"🏪").toUpperCase();a.style.background=`hsl(${h},75%,92%)`;a.style.color=`hsl(${h},55%,32%)`;}
 function editStore(id){const s=id?S.stores.find(x=>x.id===id):{id:null,name:"",contact:"",address:""};
-  openModal(`<button class="close" onclick="closeModal()">×</button><h3>${id?"Edit":"Tambah"} Toko</h3>
-  <label class="f">Nama toko</label><input id="sn" value="${esc(s.name)}">
-  <div style="margin:12px 0"><label class="f">Kontak / No. HP</label><input id="sc" value="${esc(s.contact||"")}"></div>
-  <label class="f">Alamat</label><input id="sa" value="${esc(s.address||"")}">
-  <div style="margin-top:16px;text-align:right"><button class="btn gray" onclick="closeModal()">Batal</button> <button class="btn" onclick="saveStore('${id||""}')">Simpan</button></div>`);}
+  const h=avHue(s.name||"?");
+  openModal(`<div class="tk-md"><div class="tk-mh"><button class="close" onclick="closeModal()">×</button>
+    <div class="tk-mhrow"><div class="tc-av" id="snAv" style="background:hsl(${h},75%,92%);color:hsl(${h},55%,32%)">${esc((s.name[0]||"🏪").toUpperCase())}</div><div><div class="tk-mt">${id?"Edit":"Tambah"} Toko</div><div class="tk-ms">${id?"Perbarui data toko / warung":"Toko atau warung tempat titip &amp; jual produkmu"}</div></div></div></div>
+  <div class="tk-mb"><label class="f">🏪 Nama toko</label><input id="sn" value="${esc(s.name)}" oninput="tokoAvPrev()" placeholder="mis. Warung Bu Sari">
+  <label class="f" style="margin-top:12px">📞 Kontak / No. HP</label><input id="sc" value="${esc(s.contact||"")}" inputmode="tel" placeholder="0812xxxx">
+  <label class="f" style="margin-top:12px">📍 Alamat</label><input id="sa" value="${esc(s.address||"")}" placeholder="jalan, kecamatan">
+  <div class="tk-mact"><button class="btn gray" onclick="closeModal()">Batal</button> <button class="btn" onclick="saveStore('${id||""}')">Simpan</button></div></div></div>`);}
 async function saveStore(id){const o={id:id||null,name:document.getElementById("sn").value.trim(),contact:document.getElementById("sc").value.trim(),address:document.getElementById("sa").value.trim()};
   if(!o.name){toast("Nama toko wajib.");return;}await api("saveStore",{store:o});await reload();closeModal();toast("Toko tersimpan ✓");rToko();}
 async function delStore(id){if(S.notas.some(n=>n.storeId===id)){toast("Toko punya nota/distribusi.");return;}if(confirm("Hapus toko ini?")){await api("deleteStore",{id});await reload();rToko();}}

@@ -20,7 +20,7 @@ function rProfile(){
       <div class="pf-hbg" aria-hidden="true"><i></i><i></i></div>
       <div class="pf-hmain"><div id="logoPrev" class="logobox">${logo?`<img src="${logo}" alt="logo">`:`<span>🍲</span>`}</div>
         <div class="pf-hid"><div class="pf-name">${esc(BIZ.name||"Usaha")}</div><div class="pf-badge">${fnb?"🍽️ F&amp;B / Warung":"🏭 Produksi &amp; Distribusi"}</div>
-          <div class="flexbtns" style="margin:10px 0 0"><button class="btn sm" style="background:#fff;color:var(--red)" onclick="document.getElementById('logoInp').click()">⬆ Unggah Logo</button><button class="btn sm" style="background:rgba(255,255,255,.2)" id="logoDel" onclick="removeLogo()" ${logo?"":'style="display:none"'}>Hapus</button></div>
+          <div class="flexbtns" style="margin:10px 0 0"><button class="btn sm" style="background:#fff;color:var(--red)" onclick="document.getElementById('logoInp').click()">⬆ Unggah Logo</button><button class="btn sm" style="background:rgba(255,255,255,.2)${logo?"":";display:none"}" id="logoDel" onclick="removeLogo()">Hapus</button></div>
           <input type="file" id="logoInp" accept="image/*" style="display:none" onchange="pickLogo(this)"></div></div>
       <div class="pf-meter"><div class="pf-mt"><span>Kelengkapan profil</span><b>${pct}%</b></div><div class="pf-mbar"><i style="width:${pct}%"></i></div>
         <div class="pf-chips">${chk.map(c=>`<span class="${c[1]?"ok":""}">${c[1]?"✓":"○"} ${c[0]}</span>`).join("")}</div></div>
@@ -65,7 +65,7 @@ function rProfile(){
     </div>
    </div>
   </div>
-  <div class="pf-save"><div class="pf-savein"><span class="pf-dirty" id="pfDirty">● Ada perubahan belum disimpan</span><button class="btn" onclick="saveProfile()">💾 Simpan Profil</button></div></div>`;
+  <div class="pf-save"><div class="pf-savein"><span class="pf-dirty" id="pfDirty">● Belum disimpan</span><button class="btn" onclick="saveProfile()">💾 Simpan Profil</button></div></div>`;
   el.oninput=el.onchange=()=>{const d=document.getElementById("pfDirty");if(d)d.classList.add("on");};
 }
 // pilih jenis usaha di Profil (tanpa rerender penuh — isian lain di form tak hilang)
