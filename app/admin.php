@@ -262,9 +262,11 @@ label.fl{font-size:12px;color:var(--muted);display:block;margin-bottom:5px;font-
 .rpf input{padding-left:42px!important}
 .prev{display:block;font-size:12px;color:var(--muted);margin:5px 0 0 6px;font-variant-numeric:tabular-nums;min-height:16px}
 .prev b{color:var(--red)}
-input[type=password],input[inputmode=numeric],textarea{width:100%;padding:12px 16px;border:1.5px solid #eadfd8;border-radius:999px;font-size:15px;font-family:inherit;background:#fffdfb;color:var(--ink);transition:border-color .2s,box-shadow .2s,background .2s}
+input[type=password],input[inputmode=numeric],input.fi,textarea{width:100%;padding:12px 16px;border:1.5px solid #eadfd8;border-radius:999px;font-size:15px;font-family:inherit;background:#fffdfb;color:var(--ink);transition:border-color .2s,box-shadow .2s,background .2s}
 textarea{border-radius:20px;resize:vertical;font-size:14px;line-height:1.5}
 input:focus,textarea:focus{outline:none;border-color:var(--red);background:#fff;box-shadow:0 0 0 4px rgba(213,62,15,.12)}
+.fhint{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5}
+.fhint b{color:var(--ink)}
 .ck{display:flex;align-items:center;gap:10px;margin-top:14px;font-size:13px;background:var(--cream);border:1px solid var(--line);padding:11px 16px;border-radius:999px;cursor:pointer}
 .ck input{width:18px;height:18px;accent-color:var(--red);flex-shrink:0}
 /* ---- daftar usaha ---- */
@@ -459,9 +461,9 @@ body.lg::after{width:46vmax;height:46vmax;right:-14vmax;bottom:-16vmax;backgroun
       </div>
       <label class="fl" style="margin-top:14px">Info Rekening / Cara Bayar (tampil ke pelanggan saat perpanjang)</label>
       <textarea name="bank_info" rows="3" placeholder="mis. BCA 1234567890 a.n. Nama Pemilik"><?= h($settings['bank_info']??'') ?></textarea>
-      <label style="display:block;margin-top:14px">Email pemberitahuan pendaftar baru <span style="font-weight:400;color:var(--muted)">(boleh beberapa, pisah koma)</span></label>
-      <input type="text" name="notify_email" value="<?= h($settings['notify_email'] ?? '') ?>" placeholder="mis. kamu@gmail.com" autocomplete="off" inputmode="email">
-      <div class="mini" style="margin-top:6px;color:var(--muted);font-size:12px">Pengirim: <b><?= h((defined('SMTP_HOST') && SMTP_HOST !== '') ? ((defined('SMTP_FROM') && SMTP_FROM) ? SMTP_FROM : (defined('SMTP_USER') ? SMTP_USER : '-')) : 'mail() bawaan hosting (belum pakai SMTP)') ?></b> · simpan dulu, lalu klik <b>Kirim email tes</b> di bawah.</div>
+      <label class="fl" style="margin-top:14px">Email pemberitahuan pendaftar baru <span style="font-weight:400">(boleh beberapa, pisah koma)</span></label>
+      <input class="fi" type="text" name="notify_email" value="<?= h($settings['notify_email'] ?? '') ?>" placeholder="mis. kamu@gmail.com, mitra@gmail.com" autocomplete="off" inputmode="email" aria-label="Email pemberitahuan pendaftar baru">
+      <div class="fhint">Pengirim: <b><?= h((defined('SMTP_HOST') && SMTP_HOST !== '') ? ((defined('SMTP_FROM') && SMTP_FROM) ? SMTP_FROM : (defined('SMTP_USER') ? SMTP_USER : '-')) : 'mail() bawaan hosting (belum pakai SMTP)') ?></b> · simpan dulu, lalu klik <b>Kirim email tes</b> di bawah.</div>
       <label class="ck"><input type="checkbox" name="uniq_on" value="1" <?= ($settings['uniq_on']??'1')==='1'?'checked':'' ?>> <span>Aktifkan kode unik nominal (1–50) — memudahkan cek transfer</span></label>
       <button class="btn" style="margin-top:16px">Simpan Pengaturan</button>
     </form>
