@@ -224,6 +224,7 @@ input,select,textarea{font-family:inherit;font-size:13px;padding:8px 10px;border
 /* iOS/Safari: date/time input abaikan width:100% & melebar sesuai isi → normalkan */
 input[type="date"],input[type="time"],input[type="datetime-local"]{-webkit-appearance:none;appearance:none}
 input:focus,select:focus{outline:none;border-color:var(--red)}
+label>input[type="checkbox"],label>input[type="radio"]{width:auto;min-width:0;margin:0;flex-shrink:0}
 label.f{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;font-weight:500}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .pill{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700}
