@@ -149,6 +149,47 @@ function mail_client($to, $subject, $body) {
         return app_mail($to, preg_replace('/[\r\n]+/', ' ', $subject), $body, $headers);
     } catch (Throwable $e) { error_log('mail_client: ' . $e->getMessage()); return false; }
 }
+// Diagnosa SMTP: coba beberapa jalur (host/port/enkripsi) sampai tahap penerima, TANPA mengirim email.
+// Return teks multi-baris berisi hasil + waktu tiap langkah. Dipakai tombol "Diagnosa SMTP" di admin.php.
+function smtp_probe($host, $port, $secure, array $rcpts, $timeout = 8) {
+    $user = defined('SMTP_USER') ? (string)SMTP_USER : ''; $pass = defined('SMTP_PASS') ? (string)SMTP_PASS : '';
+    $from = (defined('SMTP_FROM') && SMTP_FROM) ? (string)SMTP_FROM : $user;
+    $lab = "$host:$port/" . ($secure === '' ? 'polos' : $secure);
+    $steps = []; $t = function () { return microtime(true); };
+    $t0 = $t();
+    $ctx = stream_context_create(['ssl' => ['verify_peer' => false, 'verify_peer_name' => false]]);   // diagnosa saja: abaikan sertifikat agar masalah lain terlihat
+    $fp = @stream_socket_client(($secure === 'ssl' ? 'ssl://' : 'tcp://') . $host . ':' . $port, $en, $es, $timeout, STREAM_CLIENT_CONNECT, $ctx);
+    if (!$fp) return "$lab → TIDAK BISA TERHUBUNG (" . round($t() - $t0, 1) . "s: " . trim($es) . ")";
+    stream_set_timeout($fp, $timeout);
+    $step = function ($name, $cmd, $ok) use ($fp, &$steps, $t) {
+        $a = $t(); $good = smtp_cmd($fp, $cmd, $ok); $d = round($t() - $a, 1);
+        $rep = (string)($GLOBALS['smtp_last_reply'] ?? ''); $steps[] = ($good ? '✓' : '✗') . " $name " . $d . 's' . ($good ? '' : ' → ' . mb_substr($rep, 0, 140));
+        return $good;
+    };
+    $ehlo = preg_replace('/[^A-Za-z0-9.\-]/', '', (string)($_SERVER['SERVER_NAME'] ?? 'localhost')) ?: 'localhost';
+    $okAll = $step('sambutan', null, '220') && $step('EHLO', "EHLO $ehlo", '250');
+    if ($okAll && $secure === 'tls') { $okAll = $step('STARTTLS', 'STARTTLS', '220'); if ($okAll) { $okAll = @stream_socket_enable_crypto($fp, true, STREAM_CRYPTO_METHOD_TLS_CLIENT); $steps[] = ($okAll ? '✓' : '✗') . ' TLS'; if ($okAll) $okAll = $step('EHLO2', "EHLO $ehlo", '250'); } }
+    if ($okAll && $user !== '') $okAll = $step('login', 'AUTH LOGIN', '334') && $step('user', base64_encode($user), '334') && $step('sandi', base64_encode($pass), '235');
+    if ($okAll) $okAll = $step('MAIL FROM', "MAIL FROM:<$from>", '250');
+    if ($okAll) { foreach ($rcpts as $r) { $step("RCPT $r", "RCPT TO:<$r>", '250'); if (empty($GLOBALS['smtp_last_reply']) || strpos((string)$GLOBALS['smtp_last_reply'], '(server') === 0) break; } @fwrite($fp, "RSET\r\nQUIT\r\n"); }
+    @fclose($fp);
+    return "$lab → " . implode(' · ', $steps);
+}
+function run_smtp_diagnose() {
+    try {
+        $lines = [];
+        if (function_exists('pool_diagnose')) { try { $lines = pool_diagnose(master_pdo()); $lines[] = ''; } catch (Throwable $e) { $lines[] = 'Diagnosa kolam gagal: ' . $e->getMessage(); $lines[] = ''; } }
+        if (!(defined('SMTP_HOST') && SMTP_HOST !== '')) { $lines[] = 'SMTP belum aktif: SMTP_HOST kosong di config.php. Versi mail.php v' . mail_build(); return [true, implode("\n", $lines)]; }
+        @set_time_limit(180);
+        $to = admin_recipients(); $rc = array_values(array_unique(array_filter(array_merge($to, ['info@racikin.com']))));
+        $h = (string)SMTP_HOST; $local = ['127.0.0.1'];
+        $combos = [[$h, 465, 'ssl'], [$h, 587, 'tls'], [$local[0], 25, '']];
+        $lines[] = 'Diagnosa SMTP (tanpa mengirim email) — penerima uji: ' . implode(', ', $rc);
+        foreach ($combos as [$hh, $pp, $sc]) $lines[] = smtp_probe($hh, $pp, $sc, $rc);
+        $lines[] = 'Versi mail.php v' . mail_build();
+        return [true, implode("\n", $lines)];
+    } catch (Throwable $e) { return [false, 'Diagnosa gagal: ' . get_class($e) . ': ' . $e->getMessage() . ' (' . basename($e->getFile()) . ':' . $e->getLine() . ')']; }
+}
 // Uji kirim dari halaman admin: kirim email percobaan ke penerima pemberitahuan. Return [bool ok, string pesan].
 function run_mail_test() {
     try { return run_mail_test_inner(); }

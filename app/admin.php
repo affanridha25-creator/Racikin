@@ -58,8 +58,12 @@ if ($isAdmin && in_array($do, ['activate','deactivate','delete','set_wa'], true)
 }
 
 // --- Pengaturan langganan + verifikasi bukti transfer ---
-if ($isAdmin && in_array($do, ['save_settings','approve','reject','extend','test_mail'], true)) {
+if ($isAdmin && in_array($do, ['save_settings','approve','reject','extend','test_mail','diag_mail'], true)) {
     if (!isset($_POST['csrf']) || !hash_equals($csrf, $_POST['csrf'])) { $err = 'Sesi kadaluarsa, ulangi.'; }
+    elseif ($do === 'diag_mail') {
+        [$okD, $infoD] = run_smtp_diagnose();
+        if ($okD) { $msg = $infoD; $msgPre = true; } else $err = $infoD;
+    }
     elseif ($do === 'test_mail') {
         [$okMail, $infoMail] = run_mail_test();
         if ($okMail) $msg = $infoMail; else $err = $infoMail;
@@ -391,7 +395,7 @@ body.lg::after{width:46vmax;height:46vmax;right:-14vmax;bottom:-16vmax;backgroun
     <div class="brand"><img src="icons/logo-bowl.png" alt="">Racikin<small>ADMIN</small></div>
     <a class="logout" href="admin.php?logout=1">Keluar ⏻</a>
   </div>
-  <?php if ($msg): ?><div class="msg ok"><span>✅</span><span><?= h($msg) ?></span></div><?php endif; ?>
+  <?php if ($msg): ?><div class="msg ok"><span><?= !empty($msgPre) ? '🔍' : '✅' ?></span><span<?= !empty($msgPre) ? ' style="white-space:pre-line;font-size:12.5px;font-weight:600;line-height:1.75;word-break:break-word"' : '' ?>><?= h($msg) ?></span></div><?php endif; ?>
   <?php if ($err): ?><div class="msg err"><span>⚠️</span><span><?= h($err) ?></span></div><?php endif; ?>
 
   <!-- Hero ringkasan -->
@@ -470,6 +474,10 @@ body.lg::after{width:46vmax;height:46vmax;right:-14vmax;bottom:-16vmax;backgroun
     <form method="post" style="margin-top:10px">
       <input type="hidden" name="csrf" value="<?= h($csrf) ?>"><input type="hidden" name="do" value="test_mail">
       <button class="btn sm" style="background:#fff;color:var(--red);border:1.5px solid #f0c9bb">✉️ Kirim email tes</button>
+    </form>
+    <form method="post" style="margin-top:8px">
+      <input type="hidden" name="csrf" value="<?= h($csrf) ?>"><input type="hidden" name="do" value="diag_mail">
+      <button class="btn sm" style="background:#fff;color:var(--ink);border:1.5px solid #e6d9d1" title="Memeriksa kolam database trial dan mencoba beberapa jalur SMTP, tanpa mengirim email">🔍 Diagnosa SMTP &amp; kolam</button>
     </form>
   </details>
 

@@ -216,6 +216,32 @@ function pool_db_free($m, $name) {   // true bila DB ada, bisa diakses, kosong (
     } catch (Exception $e) { return false; }
 }
 function pool_free_count($m) { $n = 0; foreach (pool_names() as $nm) if (pool_db_free($m, $nm)) $n++; return $n; }
+// Penjelasan kenapa sebuah DB kolam dianggap bebas/tidak (untuk diagnosa di admin.php).
+function pool_explain($m, $name) {
+    global $DB_HOST, $DB_USER, $DB_PASS;
+    $q = $m->prepare("SELECT alias FROM businesses WHERE db_name=?"); $q->execute([$name]); $al = $q->fetchColumn();
+    if ($al !== false) return "sudah dipakai usaha \"$al\"";
+    try {
+        $p = new PDO("mysql:host=$DB_HOST;dbname=$name;charset=utf8mb4", $DB_USER, $DB_PASS, _pdo_opt());
+        $n = (int)$p->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()")->fetchColumn();
+        return $n === 0 ? 'KOSONG & bisa diakses ✓' : "berisi $n tabel (tidak kosong)";
+    } catch (Throwable $e) { return 'TIDAK BISA DIAKSES user aplikasi (beri ALL PRIVILEGES di cPanel)'; }
+}
+// Laporan diagnosa kolam trial: awalan, DB yang terlihat aplikasi, dan status tiap kandidat.
+function pool_diagnose($m) {
+    $out = [];
+    $pre = defined('TRIAL_POOL_PREFIX') ? (string)TRIAL_POOL_PREFIX : '';
+    $out[] = 'Kolam trial — TRIAL_POOL_PREFIX: ' . ($pre !== '' ? "\"$pre\"" : '(KOSONG / belum ada di config.php)') . ' · TRIAL_POOL manual: ' . count(defined('TRIAL_POOL') && is_array(TRIAL_POOL) ? TRIAL_POOL : []) . ' DB';
+    try {
+        $vis = server_pdo()->query("SHOW DATABASES")->fetchAll(PDO::FETCH_COLUMN);
+        $vis = array_values(array_filter($vis, function ($d) { return !in_array($d, ['information_schema', 'performance_schema', 'mysql', 'sys'], true); }));
+        $out[] = 'Database yang terlihat oleh aplikasi (' . count($vis) . '): ' . ($vis ? implode(', ', array_slice($vis, 0, 25)) : '(tidak ada — user MySQL aplikasi belum diberi hak ke database manapun?)');
+    } catch (Throwable $e) { $out[] = 'SHOW DATABASES gagal: ' . $e->getMessage(); }
+    $names = pool_names();
+    if (!$names) { $out[] = 'Kandidat kolam: 0 → tidak ada database yang namanya berawalan ' . ($pre !== '' ? "\"$pre\"" : '(awalan belum diisi)') . ' dan terlihat oleh aplikasi.'; }
+    else { $free = 0; foreach ($names as $n) { $why = pool_explain($m, $n); if (strpos($why, 'KOSONG') === 0) $free++; $out[] = "  • $n → $why"; } $out[] = "Sisa kolam: $free dari " . count($names); }
+    return $out;
+}
 // Ambil 1 DB kosong dari kolam untuk usaha $alias (atomik lewat GET_LOCK). Return nama DB atau null.
 function pool_claim_db($m, $alias) {
     $names = pool_names(); if (!$names) return null;
