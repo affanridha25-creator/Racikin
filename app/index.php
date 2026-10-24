@@ -1897,29 +1897,65 @@ async function saveBatch(){
 async function delBatch(id){if(confirm("Hapus batch ini? Stok berkurang.")){await api("deleteBatch",{id});await reload();rProduksi();}}
 
 // ================= DISTRIBUSI (per NOTA) =================
-function rDistribusi(){
+// ---- Distribusi: ringkasan, filter status/toko/cari, peringatan nomor kembar, produk terkirim ----
+let DIST_ST="all",DIST_STORE="",DIST_Q="";
+function distList(){
+  const q=DIST_Q.trim().toLowerCase();
+  return S.notas.filter(n=>!n.sessionId&&inMonth(n.date))
+    .filter(n=>!DIST_ST||DIST_ST==="all"||notaStatus(n)===DIST_ST)
+    .filter(n=>!DIST_STORE||n.storeId===DIST_STORE)
+    .filter(n=>!q||(n.notaNo||"").toLowerCase().includes(q)||((store(n.storeId)||{}).name||"").toLowerCase().includes(q))
+    .sort((a,b)=>(b.date||"").localeCompare(a.date||"")||(b.notaNo||"").localeCompare(a.notaNo||""));
+}
+function distBodyHtml(){
+  const list=distList();
+  const dup={};S.notas.forEach(n=>{if(n.notaNo)dup[n.notaNo]=(dup[n.notaNo]||0)+1;});
+  const warn=n=>dup[n.notaNo]>1?` <span title="Nomor nota dipakai ${dup[n.notaNo]} nota — ubah lewat Edit" style="color:var(--amber);cursor:help">⚠</span>`:"";
+  const jualQ=n=>notaItems(n).filter(it=>(it.kind||"jual")==="jual").reduce((a,it)=>a+(+it.qty||0),0);
+  const freeQ=n=>notaItems(n).filter(it=>(it.kind||"jual")!=="jual").reduce((a,it)=>a+(+it.qty||0),0);
+  const tot=list.reduce((a,n)=>a+notaTotal(n),0),lab=list.reduce((a,n)=>a+notaProfit(n),0),due=list.reduce((a,n)=>a+Math.max(0,notaDue(n)),0);
+  const qj=list.reduce((a,n)=>a+jualQ(n),0),qf=list.reduce((a,n)=>a+freeQ(n),0);
+  const cards=`<div class="cards"><div class="card"><div class="lbl">Jumlah Nota</div><div class="val">${list.length}</div></div><div class="card"><div class="lbl">Total Penjualan</div><div class="val">${rp(tot)}</div></div><div class="card green"><div class="lbl">Laba</div><div class="val">${rp(lab)}</div></div><div class="card amber"><div class="lbl">Belum Terbayar</div><div class="val">${rp(due)}</div></div><div class="card"><div class="lbl">Botol Terkirim</div><div class="val">${qj}${qf?` <span class="mini">+${qf} gratis</span>`:""}</div></div></div>`;
+  if(!list.length)return cards+`<div class="empty">Tak ada nota yang cocok pada periode/filter ini.</div>`;
+  // produk terkirim
+  const pm={};list.forEach(n=>notaItems(n).forEach(it=>{const o=pm[it.productId]||(pm[it.productId]={j:0,f:0});if((it.kind||"jual")==="jual")o.j+=+it.qty||0;else o.f+=+it.qty||0;}));
+  const prodRows=Object.entries(pm).sort((a,b)=>(b[1].j+b[1].f)-(a[1].j+a[1].f)).map(([pid,o])=>`<tr><td>${esc((prod(pid)||{}).name||"?")}</td><td class="num">${o.j}</td><td class="num">${o.f||"—"}</td></tr>`).join("");
+  const prodPanel=`<div class="panel"><h3>Produk Terkirim</h3><div style="overflow-x:auto"><table><thead><tr><th>Produk</th><th class="num">Terjual</th><th class="num">Gratis</th></tr></thead><tbody>${prodRows}</tbody></table></div></div>`;
+  let listHtml;
   if(isMobile()){
-    const list=S.notas.filter(n=>!n.sessionId&&inMonth(n.date));
-    const rows=list.map(n=>{const items=notaItems(n);const free=items.filter(it=>(it.kind||"jual")!=="jual");
+    listHtml=`<div class="clist">${list.map(n=>{const items=notaItems(n);const free=items.filter(it=>(it.kind||"jual")!=="jual");
       const badges=free.length?`<div style="margin-top:4px">${free.map(it=>`<span class="pill-mini ${it.kind}">${kindLabel(it.kind)}</span>`).join(" ")}</div>`:"";
-      return crow({icon:"🧾",title:esc(n.notaNo||"-"),sub:`${esc((store(n.storeId)||{}).name||"?")} · ${items.length} item · ${fmtDate(n.date)}`,badges,amt:rp(notaTotal(n)),status:notaStatus(n),acts:`<div class="cacts"><button class="btn sm gray" onclick="event.stopPropagation();strukModal('${n.id}')">🖨</button></div>`,onclick:`editNota('${n.id}')`,del:`delNota('${n.id}')`});}).join("");
-    document.getElementById("v-distribusi").innerHTML=`<div class="desc">Nota kirim/titip ke toko (faktur). Penjualan kasir POS ada di menu <b>Rekap Kasir</b>.</div><div style="display:flex;gap:8px;margin-bottom:14px"><button class="btn" style="flex:1" onclick="editNota()">+ Nota Baru</button><button class="btn gray" onclick="exportPenjualan('distribusi')">⬇️ CSV</button></div>${monthBar()}${list.length===0?'<div class="empty">Tak ada nota distribusi pada periode ini.</div>':`<div class="clist">${rows}</div>`}`;
-    return;
+      const d=notaDue(n);
+      return crow({icon:"🧾",title:esc(n.notaNo||"-")+warn(n),sub:`${esc((store(n.storeId)||{}).name||"?")} · ${items.length} item · ${fmtDate(n.date)}${d>0&&notaPaid(n)>0?` · sisa ${rp(d)}`:""}`,badges,amt:rp(notaTotal(n)),status:notaStatus(n),acts:`<div class="cacts"><button class="btn sm gray" onclick="event.stopPropagation();strukModal('${n.id}')">🖨</button></div>`,onclick:`editNota('${n.id}')`,del:`delNota('${n.id}')`});}).join("")}</div>`;
+  }else{
+    const nm=it=>esc((prod(it.productId)||{}).name||"?");
+    const rows=list.map(n=>{
+      const jualIt=notaItems(n).filter(it=>(it.kind||"jual")==="jual");
+      const freeIt=notaItems(n).filter(it=>(it.kind||"jual")!=="jual");
+      const li=(inner,q)=>`<div class="li"><span>${inner}</span><span class="q">×${q}</span></div>`;
+      const jualTxt=jualIt.map(it=>li(nm(it),it.qty)).join("")||'<div class="li muted">—</div>';
+      const freeTxt=freeIt.length?`<div class="free">${freeIt.map(it=>li(`<span class="pill-mini ${it.kind}">${kindLabel(it.kind)}</span> ${nm(it)}`,it.qty)).join("")}</div>`:"";
+      const d=notaDue(n);
+      return `<tr><td>${fmtDate(n.date)}</td><td><b>${esc(n.notaNo||"-")}</b>${warn(n)}</td><td>${esc((store(n.storeId)||{}).name||"?")}</td><td><div class="itemcell">${jualTxt}${freeTxt}</div></td><td class="num"><b>${rp(notaTotal(n))}</b></td><td class="num" style="color:var(--green)">${rp(notaProfit(n))}</td><td class="num" style="color:${d>0?"var(--amber)":"var(--muted)"}">${d>0?rp(d):"—"}</td><td><span class="pill ${notaStatus(n)}">${notaStatus(n).toUpperCase()}</span></td><td class="num"><div class="acts"><button class="btn sm" onclick="strukModal('${n.id}')">🖨 Struk</button><button class="btn sm gray" onclick="editNota('${n.id}')">Edit</button><button class="btn sm del" onclick="delNota('${n.id}')">✕</button></div></td></tr>`;}).join("");
+    listHtml=`<div style="overflow-x:auto"><table><thead><tr><th>Tgl</th><th>No. Nota</th><th>Toko</th><th>Item</th><th class="num">Total</th><th class="num">Laba</th><th class="num">Sisa</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
   }
-  const nm=it=>esc((prod(it.productId)||{}).name||"?");
-  const list=S.notas.filter(n=>!n.sessionId&&inMonth(n.date));
-  const rows=list.map(n=>{
-    const jualIt=notaItems(n).filter(it=>(it.kind||"jual")==="jual");
-    const freeIt=notaItems(n).filter(it=>(it.kind||"jual")!=="jual");
-    const li=(inner,q)=>`<div class="li"><span>${inner}</span><span class="q">×${q}</span></div>`;
-    const jualTxt=jualIt.map(it=>li(nm(it),it.qty)).join("")||'<div class="li muted">—</div>';
-    const freeTxt=freeIt.length?`<div class="free">${freeIt.map(it=>li(`<span class="pill-mini ${it.kind}">${kindLabel(it.kind)}</span> ${nm(it)}`,it.qty)).join("")}</div>`:"";
-    const itemsCell=`<div class="itemcell">${jualTxt}${freeTxt}</div>`;
-    return `<tr><td>${fmtDate(n.date)}</td><td><b>${esc(n.notaNo||"-")}</b></td><td>${esc((store(n.storeId)||{}).name||"?")}</td><td>${itemsCell}</td><td class="num"><b>${rp(notaTotal(n))}</b></td><td class="num" style="color:var(--green)">${rp(notaProfit(n))}</td><td><span class="pill ${notaStatus(n)}">${notaStatus(n).toUpperCase()}</span></td><td class="num"><div class="acts"><button class="btn sm" onclick="strukModal('${n.id}')">🖨 Struk</button><button class="btn sm gray" onclick="editNota('${n.id}')">Edit</button><button class="btn sm del" onclick="delNota('${n.id}')">✕</button></div></td></tr>`;
-  }).join("");
-  document.getElementById("v-distribusi").innerHTML=`<h2 class="title">Distribusi ke Toko</h2><div class="desc">Nota/faktur kirim &amp; titip ke toko (jadi tagihan di menu Pembayaran). Penjualan kasir POS terpisah di menu <b>Rekap Kasir</b>.</div>
-  <div class="flexbtns"><button class="btn" onclick="editNota()">+ Nota Baru</button><button class="btn gray" onclick="exportPenjualan('distribusi')">⬇️ Export CSV</button>${monthBar()}${S.stores.length===0?'<span class="mini" style="align-self:center">⚠️ Tambah toko dulu.</span>':""}</div>
-  <div class="panel"><h3>Riwayat Nota Distribusi</h3>${list.length===0?'<div class="empty">Tak ada nota distribusi pada periode ini.</div>':`<table><thead><tr><th>Tgl</th><th>No. Nota</th><th>Toko</th><th>Item</th><th class="num">Total</th><th class="num">Laba</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table>`}</div>`;
+  const nDup=[...new Set(list.filter(n=>dup[n.notaNo]>1).map(n=>n.notaNo))].length;
+  const dupNote=nDup?`<div class="mini" style="background:var(--amber-bg);color:var(--amber);padding:7px 10px;border-radius:8px;margin-bottom:10px">⚠ ${nDup} nomor nota dipakai lebih dari satu nota. Buka <b>Edit</b> pada nota yang bersangkutan untuk mengganti nomornya.</div>`:"";
+  return cards+`<div class="panel"><h3>Riwayat Nota Distribusi</h3>${dupNote}${listHtml}</div>`+prodPanel;
+}
+function setDistSt(v){DIST_ST=v;rDistribusi();}
+function setDistStore(v){DIST_STORE=v;const el=document.getElementById("distBody");if(el)el.innerHTML=distBodyHtml();}
+function setDistQ(v){DIST_Q=v;const el=document.getElementById("distBody");if(el)el.innerHTML=distBodyHtml();}
+function rDistribusi(){
+  const mob=isMobile();
+  const chip=(v,l)=>`<button class="btn sm ${DIST_ST===v?"":"gray"}" onclick="setDistSt('${v}')">${l}</button>`;
+  const tools=`<div class="flexbtns" style="margin:0 0 14px;align-items:center;flex-wrap:wrap">${chip("all","Semua")}${chip("belum","Belum")}${chip("sebagian","Sebagian")}${chip("lunas","Lunas")}
+    <select onchange="setDistStore(this.value)" style="max-width:200px"><option value="">Semua toko</option>${S.stores.map(s=>`<option value="${s.id}"${DIST_STORE===s.id?" selected":""}>${esc(s.name)}</option>`).join("")}</select>
+    <input type="search" placeholder="Cari nota / toko…" value="${esc(DIST_Q)}" oninput="setDistQ(this.value)" style="flex:1;min-width:140px"></div>`;
+  const head=mob?`<div class="desc">Nota kirim/titip ke toko (faktur). Penjualan kasir POS ada di menu <b>Rekap Kasir</b>.</div><div style="display:flex;gap:8px;margin-bottom:14px"><button class="btn" style="flex:1" onclick="editNota()">+ Nota Baru</button><button class="btn gray" onclick="exportPenjualan('distribusi')">⬇️ CSV</button></div>${monthBar()}`
+    :`<h2 class="title">Distribusi ke Toko</h2><div class="desc">Nota/faktur kirim &amp; titip ke toko (jadi tagihan di menu Pembayaran). Penjualan kasir POS terpisah di menu <b>Rekap Kasir</b>.</div>
+  <div class="flexbtns"><button class="btn" onclick="editNota()">+ Nota Baru</button><button class="btn gray" onclick="exportPenjualan('distribusi')">⬇️ Export CSV</button>${monthBar()}${S.stores.length===0?'<span class="mini" style="align-self:center">⚠️ Tambah toko dulu.</span>':""}</div>`;
+  document.getElementById("v-distribusi").innerHTML=`${head}${tools}<div id="distBody">${distBodyHtml()}</div>`;
 }
 const NOTA_FREE_KINDS=[["bonus","Bonus"],["endorse","Endorse"],["tester","Tester"]];
 const kindLabel=k=>({jual:"",bonus:"BONUS",endorse:"ENDORSE",tester:"TESTER"}[k]||"");
