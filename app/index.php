@@ -1677,12 +1677,12 @@ function rProduksi(){
     const rows=S.batches.map(b=>{const c=batchCalc(b);
       const prods=(b.outputs||[]).map(o=>esc((prod(o.productId)||{}).name||"?")).join(", ");
       const acts=`<div class="cacts"><button class="btn sm" onclick="event.stopPropagation();printBatch('${b.id}')">🖨 Cetak</button></div>`;
-      return crow({icon:"🏭",title:(b.note?esc(b.note):prods)||"Batch",sub:`${b.batchNo?esc(b.batchNo)+" · ":""}${fmtDate(b.date)} · ${c.bottles} botol · HPP ${rp(c.avg)}`,amt:rp(c.total),acts,onclick:`editBatch('${b.id}')`,del:`delBatch('${b.id}')`});}).join("");
+      return crow({icon:"🏭",title:(b.note?esc(b.note):prods)||"Batch",sub:`${b.batchNo?esc(b.batchNo)+" · ":""}${fmtDate(b.date)} · ${c.bottles} botol · HPP ${rp(c.avg)}`,amt:rp(c.total),acts,onclick:`viewBatch('${b.id}')`,del:`delBatch('${b.id}')`});}).join("");
     document.getElementById("v-produksi").innerHTML=`<div class="desc">Racik bahan + biaya → HPP per batch otomatis.</div><button class="btn" style="width:100%;margin-bottom:8px" onclick="editBatch()">+ Batch Baru</button><button class="btn gray" style="width:100%;margin-bottom:14px" onclick="cmpBatch()">⚖ Bandingkan Batch</button>${S.batches.length===0?'<div class="empty">Belum ada batch.</div>':`<div class="clist">${rows}</div>`}`;
     return;
   }
   const rows=S.batches.map(b=>{const c=batchCalc(b);const o=(b.outputs||[]).map(x=>`<div class="li"><span>${esc((prod(x.productId)||{}).name||"?")}</span><span class="q">×${x.qty}</span></div>`).join("")||'<span class="muted">—</span>';
-    return `<tr><td>${esc(b.batchNo||"-")}</td><td>${fmtDate(b.date)}${b.note?`<div class="mini">${esc(b.note)}</div>`:""}</td><td><div class="itemcell">${o}</div></td><td class="num">${c.bottles}</td><td class="num">${rp(c.mat)}</td><td class="num">${rp(c.ops)}</td><td class="num"><b>${rp(c.total)}</b></td><td class="num">${rp(c.avg)}</td><td class="num"><div class="acts"><button class="btn sm" onclick="printBatch('${b.id}')">🖨 Cetak</button><button class="btn sm gray" onclick="editBatch('${b.id}')">Edit</button><button class="btn sm del" onclick="delBatch('${b.id}')">✕</button></div></td></tr>`;}).join("");
+    return `<tr><td>${esc(b.batchNo||"-")}</td><td>${fmtDate(b.date)}${b.note?`<div class="mini">${esc(b.note)}</div>`:""}</td><td><div class="itemcell">${o}</div></td><td class="num">${c.bottles}</td><td class="num">${rp(c.mat)}</td><td class="num">${rp(c.ops)}</td><td class="num"><b>${rp(c.total)}</b></td><td class="num">${rp(c.avg)}</td><td class="num"><div class="acts"><button class="btn sm ghost" onclick="viewBatch('${b.id}')">👁 Detail</button><button class="btn sm" onclick="printBatch('${b.id}')">🖨 Cetak</button><button class="btn sm gray" onclick="editBatch('${b.id}')">Edit</button><button class="btn sm del" onclick="delBatch('${b.id}')">✕</button></div></td></tr>`;}).join("");
   document.getElementById("v-produksi").innerHTML=`
   <h2 class="title">Produksi &amp; HPP per Batch</h2>
   <div class="desc">Pilih bahan baku (harga otomatis dari master) + biaya → tentukan produk jadi &amp; qty → HPP per batch dihitung otomatis.</div>
@@ -1737,6 +1737,26 @@ function cmpBatch(pid){
   ${sec("Bahan baku (harga satuan · qty per botol)")}${Object.values(rows).map(itemRow).join("")}
   ${Object.keys(ops).length?sec("Biaya operasional (per botol)")+Object.values(ops).map(opRow).join(""):""}
   </tbody></table></div>`);
+}
+// ---- detail batch (preview sebelum cetak/edit) ----
+function viewBatch(id){
+  const b=S.batches.find(x=>x.id===id);if(!b)return;
+  const c=batchCalc(b);
+  const matRows=(b.materials||[]).map(m=>{const sub=(+m.qty||0)*(+m.price||0);
+    const tgt=m.targetProduct?`<div class="mini">→ ${esc((prod(m.targetProduct)||{}).name||"?")}</div>`:"";
+    return `<tr><td>${esc(m.name||"?")}${tgt}</td><td class="num">${+m.qty||0} ${esc(m.unit||"")}</td><td class="num">${rp(m.price)}</td><td class="num">${rp(sub)}</td></tr>`;}).join("");
+  const opsRows=(b.ops||[]).map(o=>`<tr><td>${esc(o.name||"?")}</td><td class="num">${rp(o.amount)}</td></tr>`).join("");
+  const outRows=(b.outputs||[]).filter(o=>o.productId&&+o.qty>0).map(o=>{const p=prod(o.productId)||{};
+    const hpp=Math.round(c.perProduct[o.productId]||0),harga=+p.harga||0,untung=harga-hpp,margin=hpp>0?untung/hpp*100:0;
+    return `<tr><td>${esc(p.name||"?")}</td><td class="num">${o.qty}</td><td class="num">${rp(hpp)}</td><td class="num">${rp(harga)}</td><td class="num" style="color:${untung<0?"var(--red)":"var(--green)"}">${rp(untung)} <span class="mini">${margin.toFixed(0)}%</span></td></tr>`;}).join("");
+  const sec=t=>`<h4 style="margin:16px 0 6px;font-size:14px">${t}</h4>`;
+  openModal(`<button class="close" onclick="closeModal()">×</button><h3>Detail Batch <span class="mini">${esc(b.batchNo||"")}</span></h3>
+  <div class="mini" style="margin-bottom:8px">${fmtDate(b.date)}${b.note?` · ${esc(b.note)}`:""}</div>
+  <div class="grid2" style="margin-bottom:4px"><div class="poskembali" style="justify-content:space-between"><span>Total modal</span><b>${rp(c.total)}</b></div><div class="poskembali" style="justify-content:space-between"><span>HPP rata/botol</span><b>${rp(c.avg)}</b></div></div>
+  ${sec("Produk jadi")}<div style="overflow-x:auto"><table><thead><tr><th>Produk</th><th class="num">Botol</th><th class="num">HPP</th><th class="num">Harga jual</th><th class="num">Untung/botol</th></tr></thead><tbody>${outRows||'<tr><td colspan="5">—</td></tr>'}</tbody></table></div>
+  ${sec("Bahan baku")}<div style="overflow-x:auto"><table><thead><tr><th>Bahan</th><th class="num">Qty</th><th class="num">Harga</th><th class="num">Subtotal</th></tr></thead><tbody>${matRows||'<tr><td colspan="4">—</td></tr>'}<tr><td colspan="3"><b>Total bahan</b></td><td class="num"><b>${rp(c.mat)}</b></td></tr></tbody></table></div>
+  ${sec("Biaya operasional")}<table><tbody>${opsRows||'<tr><td colspan="2">—</td></tr>'}<tr><td><b>Total operasional</b></td><td class="num"><b>${rp(c.ops)}</b></td></tr></tbody></table>
+  <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap"><button class="btn gray" onclick="closeModal()">Tutup</button><button class="btn gray" onclick="closeModal();editBatch('${b.id}')">Edit</button><button class="btn" onclick="printBatch('${b.id}')">🖨 Cetak</button></div>`);
 }
 function printBatch(id){
   const b=S.batches.find(x=>x.id===id);if(!b)return;
