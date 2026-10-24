@@ -44,3 +44,11 @@ async function api(action,payload={},opts={}){
   return j;
 }
 let BIZ={};
+
+// ---- kontak bantuan pelanggan (satu tempat; ganti di sini bila berubah) ----
+const SUPPORT={email:"info@racikin.com",wa:"6281325523999",waLabel:"0813-2552-3999"};
+function supportMail(sub){return "mailto:"+SUPPORT.email+"?subject="+encodeURIComponent(sub||"Bantuan Racikin");}
+function supportWa(txt){return "https://wa.me/"+SUPPORT.wa+"?text="+encodeURIComponent(txt||"Halo Racikin, saya butuh bantuan.");}
+// baris "Butuh bantuan?" untuk layar login/langganan
+function supportLine(ctx){const who=(typeof BIZ!=="undefined"&&BIZ&&BIZ.alias)?` (usaha ${BIZ.alias})`:"";
+  return `<div class="lhelp">Butuh bantuan? <a href="${supportMail("Bantuan Racikin"+who+(ctx?" — "+ctx:""))}">${SUPPORT.email}</a> · <a href="${supportWa("Halo Racikin, saya butuh bantuan"+who+(ctx?" — "+ctx:"")+".")}" target="_blank" rel="noopener">WhatsApp</a></div>`;}

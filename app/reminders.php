@@ -43,7 +43,7 @@ function reminder_email_body($name, $alias, $days, $until, $owner) {
          . "  4. Transfer sesuai nominal itu, lalu unggah foto bukti transfernya di aplikasi.\n\n"
          . "Setelah kami verifikasi, masa aktifmu langsung diperpanjang dan semua datamu tetap utuh.\n"
          . "Kalau kamu sudah memperpanjang, abaikan email ini ya.\n\n"
-         . "Ada pertanyaan? Balas email ini atau hubungi kami lewat WhatsApp: https://wa.me/6281325523999\n\n"
+         . "Ada pertanyaan? Balas email ini (" . support_email() . ") atau hubungi kami lewat WhatsApp: https://wa.me/6281325523999\n\n"
          . "Terima kasih sudah memakai Racikin 🙏\n— Tim Racikin";
 }
 /**

@@ -92,6 +92,11 @@ function app_mail($to, $subject, $body, $headers = '') {
 }
 
 
+// Email bantuan untuk pelanggan (config.php: define('SUPPORT_EMAIL', '...')). Dipakai sebagai Reply-To semua email ke klien.
+function support_email() {
+    $e = defined('SUPPORT_EMAIL') ? trim((string)SUPPORT_EMAIL) : '';
+    return filter_var($e, FILTER_VALIDATE_EMAIL) ? $e : 'info@racikin.com';
+}
 // Alamat pengirim default (SMTP_FROM / SMTP_USER bila SMTP aktif, selain itu RESET_FROM atau noreply@host)
 function mail_from_addr() {
     if (defined('SMTP_HOST') && SMTP_HOST !== '') return (defined('SMTP_FROM') && SMTP_FROM) ? SMTP_FROM : (defined('SMTP_USER') ? SMTP_USER : '');
@@ -117,7 +122,7 @@ function notify_admin($subject, $body) {
 function mail_client($to, $subject, $body) {
     try {
         if (!filter_var($to, FILTER_VALIDATE_EMAIL)) return false;
-        $headers = "From: Racikin <" . mail_from_addr() . ">\r\nContent-Type: text/plain; charset=UTF-8\r\nMIME-Version: 1.0\r\n";
+        $headers = "From: Racikin <" . mail_from_addr() . ">\r\nReply-To: Racikin <" . support_email() . ">\r\nContent-Type: text/plain; charset=UTF-8\r\nMIME-Version: 1.0\r\n";
         return app_mail($to, preg_replace('/[\r\n]+/', ' ', $subject), $body, $headers);
     } catch (Throwable $e) { error_log('mail_client: ' . $e->getMessage()); return false; }
 }

@@ -392,8 +392,8 @@ function send_reset_email($to, $name, $alias, $tokenStr) {
     $body = "Halo" . ($name ? ' ' . $name : '') . ",\n\n"
           . "Ada permintaan reset password untuk usaha \"$alias\" di Racikin.\n"
           . "Klik link ini untuk membuat password baru (berlaku 1 jam):\n\n$link\n\n"
-          . "Kalau kamu tidak meminta ini, abaikan saja email ini.\n\n— Racikin";
-    $headers = "From: Racikin <$from>\r\nReply-To: $from\r\nContent-Type: text/plain; charset=UTF-8\r\nMIME-Version: 1.0\r\n";
+          . "Kalau kamu tidak meminta ini, abaikan saja email ini. Butuh bantuan? Hubungi " . support_email() . ".\n\n— Racikin";
+    $headers = "From: Racikin <$from>\r\nReply-To: Racikin <" . support_email() . ">\r\nContent-Type: text/plain; charset=UTF-8\r\nMIME-Version: 1.0\r\n";
     app_mail($to, $subject, $body, $headers);
 }
 

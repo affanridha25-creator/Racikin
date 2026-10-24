@@ -36,6 +36,7 @@ define('DB_ALLOW_CREATE', false);
 // Password untuk masuk panel aktivasi usaha. WAJIB ganti yang kuat.
 define('ADMIN_PASS', 'GANTI_PASSWORD_ADMIN');
 define('ADMIN_EMAIL', '');          // (opsional) email pemberitahuan pendaftar; bisa juga diisi dari halaman admin.php
+define('SUPPORT_EMAIL', 'info@racikin.com');   // email bantuan untuk pelanggan (jadi Reply-To semua email ke klien)
 // PENGIRIM EMAIL via SMTP (disarankan, tak mudah masuk spam): buat akun email di cPanel → Email Accounts (mis. notif@racikin.com),
 // lalu isi di bawah. Kosongkan SMTP_HOST = pakai mail() bawaan hosting (kurang andal).
 define('SMTP_HOST', '');            // mis. 'mail.racikin.com'

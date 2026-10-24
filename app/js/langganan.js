@@ -21,6 +21,7 @@ function showSubLock(){
   document.getElementById("subLockBox").innerHTML=`<div class="sl-badge"><span>🔒</span></div>
     <div class="lhead sl-head"><h2>Langganan Berakhir</h2><p class="lsub">Perpanjang untuk kembali mengakses <b>${esc(BIZ.name||"usaha")}</b>. Semua datamu aman tersimpan.</p></div>
     <div id="renewArea" class="sl-area">Memuat…</div>
+    ${supportLine("Langganan berakhir")}
     <div class="sl-out"><a class="llink" onclick="doLogout()">Keluar dari akun</a></div>`;
   renderRenewArea("renewArea");
 }

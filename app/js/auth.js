@@ -46,7 +46,7 @@ function renderLogin(mode){
       <div style="text-align:center;margin-top:14px"><a ${llink} onclick="renderLogin('forgot')">Lupa password?</a></div>`;
   }
   const head=mode==='login'?`<div class="lhead"><h2>Selamat datang kembali 👋</h2><p>Yuk lanjut racik usahamu — cek untung, stok, dan tagihan hari ini.</p></div>`:mode==='reg'?`<div class="lhead"><h2>Mulai racik usahamu 🚀</h2><p>Daftar sekarang dan rapikan produksi, HPP, nota, sampai kasir dalam satu aplikasi.</p></div>`:"";
-  box.innerHTML=`<img class="lgo" src="icons/logo-bowl.png" alt=""><img class="lword" src="icons/logo-word.png" alt="Racikin"><div class="lsub ltag">Tahu untung tiap produk. Tagih piutang tanpa ribet.</div>${head}<div class="lform">${form}</div>${mode==='login'||mode==='reg'?'<div class="lfoot">🔒 Data tiap usaha tersimpan terpisah</div>':""}<div class="lcopy">© ${new Date().getFullYear()} Racikin · Developer: Ahmad Affan Ridha</div>`;
+  box.innerHTML=`<img class="lgo" src="icons/logo-bowl.png" alt=""><img class="lword" src="icons/logo-word.png" alt="Racikin"><div class="lsub ltag">Tahu untung tiap produk. Tagih piutang tanpa ribet.</div>${head}<div class="lform">${form}</div>${mode==='login'||mode==='reg'?'<div class="lfoot">🔒 Data tiap usaha tersimpan terpisah</div>':""}${supportLine(mode==='reg'?"Daftar":(mode==='forgot'?"Lupa password":(mode==='reset'?"Reset password":"Masuk")))}<div class="lcopy">© ${new Date().getFullYear()} Racikin · Developer: Ahmad Affan Ridha</div>`;
   box.onkeydown=e=>{if(e.key!=="Enter"||e.target.tagName!=="INPUT"||e.target.type==="checkbox")return;const b=box.querySelector(".lsubmit");if(b&&!b.classList.contains("busy")){e.preventDefault();b.click();}};
 }
 async function doForgot(){

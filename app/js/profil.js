@@ -58,6 +58,11 @@ function rProfile(){
     ${NativePrinter.isNative()?`<div class="pfc" style="--k:4"><h3>🖨 Printer Struk</h3>
       <p class="mini" style="margin-bottom:12px">Cetak langsung ke printer thermal Bluetooth (58mm), lengkap dengan logo — tanpa app RawBT. ${(()=>{const c=NativePrinter.saved();return c?`Printer aktif: <b>${esc(c.name||c.address)}</b>.`:"Belum ada printer dipilih.";})()}</p>
       <button class="btn ghost" onclick="printerSettingsModal()">Atur Printer</button></div>`:""}
+    <div class="pfc" style="--k:4"><h3>💬 Bantuan</h3>
+      <p class="mini" style="margin-bottom:12px">Ada kendala atau pertanyaan? Tim Racikin siap membantu. Kami balas secepatnya di jam kerja.</p>
+      <div class="flexbtns" style="margin:0"><a class="btn wa" style="text-decoration:none" href="${supportWa("Halo Racikin, saya butuh bantuan untuk usaha "+(BIZ.name||"")+" (kode "+(BIZ.alias||"")+").")}" target="_blank" rel="noopener">💬 Chat WhatsApp</a>
+        <a class="btn ghost" style="text-decoration:none" href="${supportMail("Bantuan Racikin — "+(BIZ.name||"")+" ("+(BIZ.alias||"")+")")}">✉️ ${SUPPORT.email}</a></div>
+    </div>
     <div class="pfc" style="--k:5"><h3>🔒 Keamanan</h3>
       <label class="f">Password Lama</label>${pwField("cpOld","password sekarang")}
       <label class="f" style="margin-top:12px">Password Baru <span class="mini">(min 8 karakter)</span></label>${pwField("cpNew","password baru")}

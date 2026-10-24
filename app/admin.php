@@ -90,7 +90,7 @@ if ($isAdmin && in_array($do, ['save_settings','approve','reject','extend','test
                     $bq = $m->prepare("SELECT name, paid_until FROM businesses WHERE alias=?"); $bq->execute([$r['alias']]); $bq = $bq->fetch() ?: [];
                     $sent = mail_client($r['email'], 'Perpanjangan Racikin disetujui ✓',
                         "Halo,\n\nTerima kasih! Pembayaran perpanjangan untuk usaha \"" . ($bq['name'] ?? $r['alias']) . "\" sudah kami verifikasi.\n\n"
-                      . "Masa aktif sekarang sampai: " . ($bq['paid_until'] ?? '-') . "\n\nSemua datamu tetap utuh dan aplikasi siap dipakai: " . app_base_url() . "\n\nTerima kasih sudah memakai Racikin 🙏\n— Tim Racikin");
+                      . "Masa aktif sekarang sampai: " . ($bq['paid_until'] ?? '-') . "\n\nSemua datamu tetap utuh dan aplikasi siap dipakai: " . app_base_url() . "\n\nAda pertanyaan? Balas email ini (" . support_email() . ") atau chat WhatsApp: https://wa.me/6281325523999\n\nTerima kasih sudah memakai Racikin 🙏\n— Tim Racikin");
                     $msg .= $sent ? ' Email konfirmasi terkirim ke klien.' : ' (Email konfirmasi ke klien tidak terkirim.)';
                 } catch (Throwable $e) { }
             }
@@ -106,7 +106,7 @@ if ($isAdmin && in_array($do, ['save_settings','approve','reject','extend','test
             if ($rq) { $why = mb_substr(trim($_POST['admin_note'] ?? ''), 0, 255);
                 if (mail_client($rq['email'], 'Perpanjangan Racikin belum bisa kami proses',
                     "Halo,\n\nMaaf, bukti transfer perpanjanganmu belum bisa kami verifikasi" . ($why !== '' ? ":\n\"$why\"" : '.') . "\n\n"
-                  . "Silakan buka " . app_base_url() . " lalu ajukan perpanjangan dan unggah bukti transfer yang benar, atau hubungi kami lewat WhatsApp: https://wa.me/6281325523999\n\n— Tim Racikin")) $msg .= ' Email pemberitahuan terkirim ke klien.';
+                  . "Silakan buka " . app_base_url() . " lalu ajukan perpanjangan dan unggah bukti transfer yang benar, atau hubungi kami lewat WhatsApp: https://wa.me/6281325523999 / email " . support_email() . "\n\n— Tim Racikin")) $msg .= ' Email pemberitahuan terkirim ke klien.';
             }
         } catch (Throwable $e) { }
     }
