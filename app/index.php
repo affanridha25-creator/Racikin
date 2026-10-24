@@ -2132,7 +2132,7 @@ function editProd(id){const p=id?S.products.find(x=>x.id===id):{id:null,name:"",
   </div>
   <label class="f">Nama produk</label><input id="pn" value="${esc(p.name)}">
   <div class="grid2" style="margin:12px 0"><div><label class="f">Kategori</label><input id="pc" value="${esc(p.cat)}"></div><div><label class="f">Ukuran (gram)</label><input id="pg" type="number" value="${p.gram}"></div></div>
-  <div class="grid2"><div><label class="f">HPP / ${uw}</label><input id="ph" inputmode="numeric" value="${p.hpp?grp(p.hpp):""}" oninput="this.value=grp(this.value)"></div><div><label class="f">Harga jual / ${uw}</label><input id="phj" inputmode="numeric" value="${p.harga?grp(p.harga):""}" oninput="this.value=grp(this.value)"></div></div>
+  <div class="grid2"><div><label class="f">HPP / ${uw}</label><input id="ph" inputmode="numeric" value="${p.hpp?grp(p.hpp):""}" oninput="this.value=grp(this.value)"></div><div><label class="f">Harga jual</label><input id="phj" inputmode="numeric" value="${p.harga?grp(p.harga):""}" oninput="this.value=grp(this.value)"></div></div>
   ${fnb?"":`<p class="mini" style="margin-top:8px">Ukuran (gram) dipakai membagi HPP antar produk dalam 1 batch (per bobot).</p>`}
   ${fnb?"":reqMatsBox(p)}
   <label style="display:flex;align-items:center;gap:8px;margin-top:14px;cursor:pointer"><input type="checkbox" id="pTrack" ${trk?"checked":""}> <span class="f" style="margin:0">Lacak stok ${fnb?"menu":"produk"} ini</span></label>
