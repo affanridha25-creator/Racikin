@@ -359,12 +359,15 @@ main{flex:1;padding:16px 30px 60px}
 @media (prefers-reduced-motion:reduce){.dash-in>*,.view.active:not(#v-dashboard),.dh-bg i,.ln,.ar-fade,.sp-area,.dpop,.sp-dot,.kpi::after,.dh-ring .rg,.barrow2 .brbar>span,.hlcard::after,.hlcard .hli,.actdot,.hero2{animation:none!important}.ln{stroke-dashoffset:0}.kpi::after{transform:none}}
 
 /* ---- login: animasi keluar + layar sambutan ---- */
+.loginbg.lsplit.leaving{background:transparent!important;animation:none}
+.lsplit.leaving::before,.lsplit.leaving::after{display:none}
 .lsplit.leaving .lhero{animation:lgOutHero .7s .08s cubic-bezier(.6,0,.2,1) forwards}
 .lsplit.leaving .lpanel{animation:lgOutPanel .55s .12s ease forwards}
 .lsplit.leaving .loginbox{animation:lgOutCard .5s cubic-bezier(.5,0,.8,.4) forwards}
-.wsplash{position:fixed;inset:0;z-index:300;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#fff;text-align:center;padding:24px;background:linear-gradient(150deg,#F26A2E 0%,#D53E0F 46%,#8F1208 100%);clip-path:circle(75% at 50% 50%)}
+.wsplash{position:fixed;inset:0;z-index:99;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#fff;text-align:center;padding:24px;background:linear-gradient(150deg,#F26A2E 0%,#D53E0F 46%,#8F1208 100%);clip-path:circle(75% at 50% 50%)}
 .wsplash::before{content:"";position:absolute;width:70vmin;height:70vmin;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.22),rgba(255,255,255,0) 70%);animation:lgDrift1 6s ease-in-out infinite alternate}
 .wsplash>*{position:relative}
+.wsplash:not(.go) .wbowl,.wsplash:not(.go) .wh,.wsplash:not(.go) .wsub,.wsplash:not(.go) .wbar{opacity:0;animation:none}
 .wbowl{width:112px;height:112px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 22px 50px rgba(80,10,0,.4),0 0 0 12px rgba(255,255,255,.16);animation:lgPop .7s cubic-bezier(.3,1.5,.5,1) both,lgBob 2.6s .8s ease-in-out infinite}
 .wbowl img{width:74%;height:auto}
 .wh{font-size:clamp(22px,4vw,32px);font-weight:800;letter-spacing:-.01em;margin-top:14px;animation:lgUp .6s .25s both}
@@ -2947,20 +2950,27 @@ async function doResetConfirm(){
   }catch(e){loginErr(e.message||"Link reset tidak valid atau kadaluarsa.");}
 }
 function loginErr(m){const e=document.getElementById("lerr");if(e){e.textContent=m;e.style.display="block";e.style.animation="none";void e.offsetWidth;e.style.animation="";}}
-// animasi keluar login → layar sambutan beriris → dashboard
-function loginOutro(){
-  return new Promise(res=>{const b=document.querySelector("#loginBox .lsubmit");if(b){b.classList.remove("busy");b.innerHTML="✓ Berhasil";}
-    const ls=document.getElementById("loginScreen");ls.classList.add("leaving");setTimeout(res,720);});
-}
-function loginWelcome(){
-  const ls=document.getElementById("loginScreen");ls.classList.remove("leaving");
-  const lock=document.getElementById("subLock");if(lock&&lock.style.display!=="none")return;   // langganan habis → tak perlu sambutan
+// transisi login: panel bergeser keluar → layar loading sudah menunggu di bawahnya (tanpa jeda) → iris menutup → dashboard
+async function loginTransition(){
+  const bt=document.querySelector("#loginBox .lsubmit");if(bt){bt.classList.remove("busy");bt.innerHTML="✓ Berhasil";}
+  const ls=document.getElementById("loginScreen");
   const w=document.createElement("div");w.className="wsplash";w.id="wsplash";
   w.innerHTML=`<div class="wbowl"><img src="icons/logo-bowl.png" alt=""></div><div class="wh">${greetWord()}, ${esc(BIZ.user||"")}!</div><div class="wsub">Menyiapkan ${esc(BIZ.name||"usahamu")}…</div><div class="wbar"><i></i></div>`;
-  document.body.appendChild(w);
-  setTimeout(()=>{w.classList.add("out");if(curView==="dashboard")try{renderCur();}catch(e){}setTimeout(()=>w.remove(),620);},1500);
+  document.body.appendChild(w);   // z-index di bawah layar login → baru terlihat saat panel login bergeser pergi
+  const t0=performance.now(),wait=ms=>new Promise(r=>setTimeout(r,ms));
+  ls.classList.add("leaving");
+  setTimeout(()=>w.classList.add("go"),380);
+  await wait(760);
+  try{await afterAuth();}catch(e){w.remove();ls.classList.remove("leaving");throw e;}
+  ls.classList.remove("leaving");
+  const lock=document.getElementById("subLock");
+  if(lock&&lock.style.display!=="none"){w.remove();return;}   // langganan habis → layar kunci, tanpa sambutan
+  await wait(Math.max(0,1950-(performance.now()-t0)));
+  w.classList.add("out");
+  if(curView==="dashboard")try{renderCur();}catch(e){}
+  setTimeout(()=>w.remove(),640);
 }
-async function doLogin(){const code=document.getElementById("lCode").value.trim().toLowerCase(),email=document.getElementById("lEmail").value.trim().toLowerCase(),password=document.getElementById("lPass").value,remember=document.getElementById("lRemember").checked;if(!code||!email||!password){loginErr("Isi kode usaha, email & password.");return;}lBusy(true,"Masuk…");let ok=false;try{BIZ=await api("authLogin",{code,email,password,remember},{silent:true});ok=true;await loginOutro();await afterAuth();loginWelcome();}catch(e){if(!ok){lBusy(false);loginErr(e.message||"Gagal masuk.");}else throw e;}}
+async function doLogin(){const code=document.getElementById("lCode").value.trim().toLowerCase(),email=document.getElementById("lEmail").value.trim().toLowerCase(),password=document.getElementById("lPass").value,remember=document.getElementById("lRemember").checked;if(!code||!email||!password){loginErr("Isi kode usaha, email & password.");return;}lBusy(true,"Masuk…");let ok=false;try{BIZ=await api("authLogin",{code,email,password,remember},{silent:true});ok=true;await loginTransition();}catch(e){if(!ok){lBusy(false);loginErr(e.message||"Gagal masuk.");}else throw e;}}
 async function doRegister(){const name=document.getElementById("rName").value.trim(),code=document.getElementById("rCode").value.trim().toLowerCase(),user=document.getElementById("rUser").value.trim(),email=document.getElementById("rEmail").value.trim().toLowerCase(),password=document.getElementById("rPass").value;if(!name||!code||!user||!email||!password){loginErr("Lengkapi semua kolom.");return;}
   {const pe=pwProblem(password);if(pe){loginErr(pe);return;}}
   lBusy(true,"Mendaftar…");
