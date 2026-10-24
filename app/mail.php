@@ -31,10 +31,12 @@ function smtp_read($fp) {
 function smtp_cmd($fp, $cmd, $okPrefix) {
     if ($cmd !== null) fwrite($fp, $cmd . "\r\n");
     $r = smtp_read($fp);
+    $GLOBALS['smtp_last_reply'] = trim(preg_replace('/\s+/', ' ', $r));   // jawaban server (untuk diagnosis)
     return strpos($r, (string)$okPrefix) === 0;
 }
 
 function smtp_send($to, $subject, $body, $headers) {
+    $GLOBALS['smtp_last_reply'] = '';
     @set_time_limit(60);   // beri ruang; batas waktu bawaan hosting (30 dtk) bisa terlewati bila server mail lambat
     $host = (string)SMTP_HOST; $port = defined('SMTP_PORT') ? (int)SMTP_PORT : 465;
     $secure = defined('SMTP_SECURE') ? strtolower((string)SMTP_SECURE) : 'ssl';
@@ -85,7 +87,8 @@ function smtp_send($to, $subject, $body, $headers) {
     } catch (Throwable $e) {
         $why = ['greeting' => 'server tidak menjawab dengan benar', 'EHLO' => 'server menolak salam EHLO', 'STARTTLS' => 'STARTTLS ditolak (coba SMTP_SECURE=ssl, port 465)', 'TLS' => 'enkripsi TLS gagal (sertifikat server tak cocok dengan SMTP_HOST? coba host yang sama dengan nama di sertifikat)',
                 'AUTH' => 'LOGIN DITOLAK — alamat/sandi SMTP salah (SMTP_USER / SMTP_PASS)', 'MAIL FROM' => 'pengirim ditolak (SMTP_FROM harus = akun email yang login)', 'RCPT TO' => 'alamat tujuan ditolak', 'DATA' => 'server menolak isi pesan', 'akhir pesan' => 'pesan ditolak di akhir (kemungkinan dianggap spam)'];
-        $GLOBALS['smtp_last_error'] = ($why[$e->getMessage()] ?? ('gagal di tahap ' . $e->getMessage()));
+        $rep = (string)($GLOBALS['smtp_last_reply'] ?? '');
+        $GLOBALS['smtp_last_error'] = ($why[$e->getMessage()] ?? ('gagal di tahap ' . $e->getMessage())) . ($rep !== '' ? ' — jawaban server: "' . mb_substr($rep, 0, 220) . '"' : '');
         error_log('smtp gagal di tahap ' . $e->getMessage()); @fclose($fp); return false;
     }
 }
