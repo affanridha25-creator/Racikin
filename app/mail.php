@@ -35,6 +35,7 @@ function smtp_cmd($fp, $cmd, $okPrefix) {
 }
 
 function smtp_send($to, $subject, $body, $headers) {
+    @set_time_limit(60);   // beri ruang; batas waktu bawaan hosting (30 dtk) bisa terlewati bila server mail lambat
     $host = (string)SMTP_HOST; $port = defined('SMTP_PORT') ? (int)SMTP_PORT : 465;
     $secure = defined('SMTP_SECURE') ? strtolower((string)SMTP_SECURE) : 'ssl';
     $user = defined('SMTP_USER') ? (string)SMTP_USER : ''; $pass = defined('SMTP_PASS') ? (string)SMTP_PASS : '';
@@ -49,10 +50,13 @@ function smtp_send($to, $subject, $body, $headers) {
         if ($lk === 'from') { if (preg_match('/^"?([^"<]+?)"?\s*</', $v, $mm)) $name = trim($mm[1]); }
         elseif (in_array($lk, ['content-type', 'mime-version', 'reply-to'], true)) $extra[] = "$k: $v";
     }
+    foreach (['stream_socket_client', 'stream_context_create', 'stream_set_timeout', 'fgets', 'fwrite'] as $fn) {
+        if (!function_exists($fn)) { $GLOBALS['smtp_last_error'] = "fungsi PHP \"$fn\" dinonaktifkan oleh hosting, jadi SMTP tidak bisa dipakai. Minta Rumahweb mengaktifkannya, atau kosongkan SMTP_HOST untuk memakai mail() bawaan."; return false; }
+    }
     $ctx = stream_context_create(['ssl' => ['verify_peer' => true, 'verify_peer_name' => true]]);
-    $fp = @stream_socket_client(($secure === 'ssl' ? 'ssl://' : 'tcp://') . $host . ':' . $port, $en, $es, 15, STREAM_CLIENT_CONNECT, $ctx);
+    $fp = @stream_socket_client(($secure === 'ssl' ? 'ssl://' : 'tcp://') . $host . ':' . $port, $en, $es, 10, STREAM_CLIENT_CONNECT, $ctx);
     if (!$fp) { $GLOBALS['smtp_last_error'] = "tidak bisa terhubung ke $host:$port ($es). Cek SMTP_HOST/SMTP_PORT/SMTP_SECURE."; error_log("smtp connect gagal: $es"); return false; }
-    stream_set_timeout($fp, 15);
+    stream_set_timeout($fp, 12);
     try {
         if (!smtp_cmd($fp, null, '220')) throw new Exception('greeting');
         $ehlo = preg_replace('/[^A-Za-z0-9.\-]/', '', (string)($_SERVER['SERVER_NAME'] ?? 'localhost')) ?: 'localhost';
@@ -78,7 +82,7 @@ function smtp_send($to, $subject, $body, $headers) {
         smtp_cmd($fp, 'QUIT', '221');
         fclose($fp);
         return true;
-    } catch (Exception $e) {
+    } catch (Throwable $e) {
         $why = ['greeting' => 'server tidak menjawab dengan benar', 'EHLO' => 'server menolak salam EHLO', 'STARTTLS' => 'STARTTLS ditolak (coba SMTP_SECURE=ssl, port 465)', 'TLS' => 'enkripsi TLS gagal (sertifikat server tak cocok dengan SMTP_HOST? coba host yang sama dengan nama di sertifikat)',
                 'AUTH' => 'LOGIN DITOLAK — alamat/sandi SMTP salah (SMTP_USER / SMTP_PASS)', 'MAIL FROM' => 'pengirim ditolak (SMTP_FROM harus = akun email yang login)', 'RCPT TO' => 'alamat tujuan ditolak', 'DATA' => 'server menolak isi pesan', 'akhir pesan' => 'pesan ditolak di akhir (kemungkinan dianggap spam)'];
         $GLOBALS['smtp_last_error'] = ($why[$e->getMessage()] ?? ('gagal di tahap ' . $e->getMessage()));
@@ -87,8 +91,15 @@ function smtp_send($to, $subject, $body, $headers) {
 }
 
 function app_mail($to, $subject, $body, $headers = '') {
-    if (defined('SMTP_HOST') && SMTP_HOST !== '') return smtp_send($to, $subject, $body, $headers);
-    return @mail($to, $subject, $body, $headers);
+    try {
+        if (defined('SMTP_HOST') && SMTP_HOST !== '') return smtp_send($to, $subject, $body, $headers);
+        if (!function_exists('mail')) { $GLOBALS['smtp_last_error'] = 'fungsi mail() dinonaktifkan hosting — isi pengaturan SMTP di config.php'; return false; }
+        return @mail($to, $subject, $body, $headers);
+    } catch (Throwable $e) {
+        $GLOBALS['smtp_last_error'] = 'error PHP: ' . get_class($e) . ': ' . $e->getMessage() . ' (' . basename($e->getFile()) . ':' . $e->getLine() . ')';
+        error_log('app_mail: ' . $GLOBALS['smtp_last_error']);
+        return false;
+    }
 }
 
 
@@ -128,6 +139,10 @@ function mail_client($to, $subject, $body) {
 }
 // Uji kirim dari halaman admin: kirim email percobaan ke penerima pemberitahuan. Return [bool ok, string pesan].
 function run_mail_test() {
+    try { return run_mail_test_inner(); }
+    catch (Throwable $e) { error_log('run_mail_test: ' . $e->getMessage()); return [false, 'Tes gagal karena error PHP: ' . get_class($e) . ': ' . $e->getMessage() . ' (' . basename($e->getFile()) . ':' . $e->getLine() . '). Kirim pesan ini ke pengembang.']; }
+}
+function run_mail_test_inner() {
     $list = defined('ADMIN_EMAIL') ? (string)ADMIN_EMAIL : '';
     try { $st = settings_all(); $list .= ',' . ($st['notify_email'] ?? ''); } catch (Throwable $e) { }
     $to = array_values(array_unique(array_filter(array_map('trim', explode(',', $list)), function ($x) { return filter_var($x, FILTER_VALIDATE_EMAIL); })));
