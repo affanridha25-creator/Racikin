@@ -88,6 +88,21 @@ function email_rejected($why = '') {
     return ['Perpanjangan Racikin belum bisa kami proses', $text, $html];
 }
 
+// Akun sudah siap dipakai (ke klien, dikirim manual dari admin)
+function email_ready($bizName, $alias, $email, $paidUntil = '') {
+    $url = app_base_url();
+    $text = "Halo,\n\nKabar baik! Akun Racikin untuk usaha \"$bizName\" sudah aktif dan siap dipakai. Mohon maaf sudah menunggu 🙏\n\n"
+          . "Cara masuk:\n1. Buka $url\n2. Kode usaha: $alias\n3. Email: $email\n4. Password: yang kamu buat saat mendaftar (lupa? klik \"Lupa password\")\n\n"
+          . ($paidUntil ? "Masa aktif sampai: $paidUntil\n\n" : '')
+          . "Ada pertanyaan? Balas email ini (" . support_email() . ") atau chat WhatsApp: https://wa.me/6281325523999\n\nSelamat meracik!\n— Tim Racikin";
+    $html = etpl_html('Akunmu sudah siap dipakai 🎉', 'Akun Racikin kamu sudah aktif — yuk mulai.',
+        etpl_p('Kabar baik! Akun Racikin untuk usaha <b>' . etpl_h($bizName) . '</b> sudah aktif dan siap dipakai. Mohon maaf sudah menunggu 🙏')
+      . etpl_facts([['Kode usaha', etpl_h($alias)], ['Email', etpl_h($email)], ['Masa aktif sampai', etpl_h($paidUntil)]])
+      . etpl_steps(['Buka <b>' . etpl_h(preg_replace('#^https?://#', '', $url)) . '</b>', 'Isi kode usaha, email, dan password yang kamu buat saat mendaftar', 'Lupa password? Klik <b>Lupa password</b> di halaman masuk'])
+      . etpl_button('Masuk ke Racikin', $url));
+    return ['Akun Racikin kamu sudah siap dipakai 🎉', $text, $html];
+}
+
 // Katalog contoh (data tiruan) untuk tombol "Contoh Email" di admin.php. key => [label, builder()]
 function email_samples() {
     require_once __DIR__ . '/reminders.php';
@@ -95,6 +110,7 @@ function email_samples() {
     return [
         'reminder' => ['⏰ Pengingat langganan (14 hari) — ke pelanggan', function () use ($until14) { $s = 'Roti Ana Kitchen'; return ['Langganan Racikin kamu berakhir 14 hari lagi', reminder_email_body($s, 'rotiana', 14, $until14, 'Ana'), reminder_email_html($s, 'rotiana', 14, $until14, 'Ana')]; }],
         'approved' => ['✅ Perpanjangan disetujui — ke pelanggan', function () { return email_approved('Roti Ana Kitchen', date('Y-m-d', time() + 44 * 86400)); }],
+        'ready'    => ['🎉 Akun sudah siap dipakai — ke pelanggan', function () { return email_ready('Roti Ana Kitchen', 'rotiana', 'ana@contoh.com', date('Y-m-d', time() + 30 * 86400)); }],
         'rejected' => ['❌ Perpanjangan ditolak — ke pelanggan', function () { return email_rejected('Nominal transfer tidak sesuai dengan mutasi rekening.'); }],
         'reset'    => ['🔑 Reset password — ke pelanggan', function () { return email_reset('Ana', 'rotiana', app_base_url() . '/?reset=contoh.tokenreset123'); }],
         'otp'      => ['🔢 OTP pembatalan transaksi kasir — ke pemilik', function () { return email_otp('Budi', 'Roti Ana Kitchen', 'ANNA-20261024-003', 111000, '482913'); }],

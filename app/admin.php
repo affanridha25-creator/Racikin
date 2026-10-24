@@ -35,11 +35,29 @@ if ($do === 'login') {
 
 $isAdmin = !empty($_SESSION['admin']);
 
-if ($isAdmin && in_array($do, ['activate','deactivate','delete','set_wa'], true)) {
+if ($isAdmin && in_array($do, ['activate','deactivate','delete','set_wa','move_pool','mail_ready'], true)) {
     if (!isset($_POST['csrf']) || !hash_equals($csrf, $_POST['csrf'])) { $err = 'Sesi kadaluarsa, ulangi.'; }
     else {
         $alias = preg_replace('/[^a-z0-9]/', '', strtolower($_POST['alias'] ?? ''));
         if ($alias === '') { $err = 'Alias tidak valid.'; }
+        elseif ($do === 'move_pool') {
+            // hanya untuk usaha yang DB-nya belum ada / masih kosong → tak ada data yang tertinggal
+            $bq = $m->prepare("SELECT db_name FROM businesses WHERE alias=?"); $bq->execute([$alias]); $old = $bq->fetchColumn();
+            if ($old === false) { $err = 'Usaha tidak ditemukan.'; }
+            elseif (biz_db_state($old)[0] === 'ok') { $err = "DB $old sudah berisi data — tidak dipindah."; }
+            elseif ($nm = pool_claim_db($m, $alias)) { $msg = "Usaha \"$alias\" sekarang memakai DB $nm (dari kolam). ✓ Sekarang bisa kirim email \"akun siap\"."; }
+            else { $err = 'Kolam DB habis / tak terbaca. Buat DB baru berawalan ' . (defined('TRIAL_POOL_PREFIX') ? TRIAL_POOL_PREFIX : '') . ' di cPanel lalu coba lagi.'; }
+        }
+        elseif ($do === 'mail_ready') {
+            $bq = $m->prepare("SELECT b.name, b.paid_until, b.db_name, (SELECT email FROM users u WHERE u.alias=b.alias AND u.role='owner' LIMIT 1) AS em FROM businesses b WHERE b.alias=?");
+            $bq->execute([$alias]); $b = $bq->fetch();
+            if (!$b || empty($b['em'])) { $err = 'Email pemilik usaha tidak ditemukan.'; }
+            elseif (biz_db_state($b['db_name'])[0] === 'missing') { $err = "DB {$b['db_name']} belum ada — klik \"Pakai DB kolam\" dulu supaya klien bisa masuk."; }
+            else {
+                [$sj, $tx, $ht] = email_ready($b['name'], $alias, $b['em'], (string)$b['paid_until']);
+                $msg = mail_client_later($b['em'], $sj, $tx, $ht) ? "Email \"akun siap\" ke {$b['em']} sedang dikirim di belakang layar. ✓" : 'Alamat email klien tidak valid.';
+            }
+        }
         elseif ($do === 'activate')   { $m->prepare("UPDATE businesses SET active=1, paid_until=IFNULL(paid_until, DATE_ADD(CURDATE(), INTERVAL 30 DAY)) WHERE alias=?")->execute([$alias]); $msg = "Usaha \"$alias\" diaktifkan — trial 30 hari dimulai. ✓"; }
         elseif ($do === 'set_wa') {
             $wa2 = norm_wa($_POST['wa'] ?? '');
@@ -539,7 +557,9 @@ body.lg::after{width:46vmax;height:46vmax;right:-14vmax;bottom:-16vmax;backgroun
               <div class="nm"><?= h($r['name']) ?><?php if ($isNew): ?><span class="pill new">BARU</span><?php endif; ?></div>
               <div class="em2">✉️ <?= h($r['owner_email'] ?: '-') ?></div>
               <?php if (!empty($r['wa'])): ?><div class="em2">💬 <a href="https://wa.me/<?= h($r['wa']) ?>" target="_blank" rel="noopener" style="color:inherit"><?= h('+' . $r['wa']) ?></a></div><?php endif; ?>
-              <div class="cd"><b style="font-size:12.5px"><?= h($r['alias']) ?></b><span class="dbn"><?= h($r['db_name']) ?></span></div>
+              <?php $dbs = biz_db_state($r['db_name']); ?>
+              <div class="cd"><b style="font-size:12.5px"><?= h($r['alias']) ?></b><span class="dbn" title="<?= h($dbs[1]) ?>" style="<?= $dbs[0] === 'missing' ? 'background:#fdeceb;color:var(--red)' : '' ?>"><?= $dbs[0] === 'missing' ? '⚠️ ' : '' ?><?= h($r['db_name']) ?></span></div>
+              <?php if ($dbs[0] === 'missing'): ?><div class="mt" style="color:var(--red)">DB belum ada — klien tak bisa masuk</div><?php endif; ?>
               <div class="mt"><?= (int)$r['user_count'] ?> pengguna · daftar <?= h(substr((string)$r['created'],0,10)) ?></div>
             </div>
           </div>
@@ -580,6 +600,18 @@ body.lg::after{width:46vmax;height:46vmax;right:-14vmax;bottom:-16vmax;backgroun
               <form method="post" onsubmit="return confirm('Nonaktifkan (blokir login) usaha ini?')">
                 <input type="hidden" name="csrf" value="<?= h($csrf) ?>"><input type="hidden" name="do" value="deactivate"><input type="hidden" name="alias" value="<?= h($r['alias']) ?>">
                 <button class="btn sm amber">Nonaktifkan</button>
+              </form>
+            <?php endif; ?>
+            <?php if ($dbs[0] !== 'ok'): ?>
+              <form method="post" onsubmit="return confirm('Pakai 1 DB kosong dari kolam untuk usaha ini? (DB lama <?= h($r['db_name']) ?> belum berisi data)')">
+                <input type="hidden" name="csrf" value="<?= h($csrf) ?>"><input type="hidden" name="do" value="move_pool"><input type="hidden" name="alias" value="<?= h($r['alias']) ?>">
+                <button class="btn sm" title="Ganti ke DB kosong dari kolam trial">🗄 Pakai DB kolam</button>
+              </form>
+            <?php endif; ?>
+            <?php if ($on && $dbs[0] !== 'missing' && !empty($r['owner_email'])): ?>
+              <form method="post" onsubmit="return confirm('Kirim email &quot;akun sudah siap dipakai&quot; ke <?= h($r['owner_email']) ?>?')">
+                <input type="hidden" name="csrf" value="<?= h($csrf) ?>"><input type="hidden" name="do" value="mail_ready"><input type="hidden" name="alias" value="<?= h($r['alias']) ?>">
+                <button class="btn sm" title="Kirim email bermerek: akun aktif + cara masuk">🎉 Email akun siap</button>
               </form>
             <?php endif; ?>
               <form method="post" onsubmit="return confirm('HAPUS usaha \'<?= h($r['alias']) ?>\' dari registry? (data di database tenant TIDAK ikut terhapus)')">

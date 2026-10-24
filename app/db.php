@@ -242,6 +242,16 @@ function pool_diagnose($m) {
     else { $free = 0; foreach ($names as $n) { $why = pool_explain($m, $n); if (strpos($why, 'KOSONG') === 0) $free++; $out[] = "  • $n → $why"; } $out[] = "Sisa kolam: $free dari " . count($names); }
     return $out;
 }
+// Status DB milik sebuah usaha: ['ok'|'empty'|'missing', label] (untuk admin.php).
+function biz_db_state($name) {
+    global $DB_HOST, $DB_USER, $DB_PASS;
+    if (!preg_match('/^[A-Za-z0-9_]{1,64}$/', (string)$name)) return ['missing', 'nama DB tidak valid'];
+    try {
+        $p = new PDO("mysql:host=$DB_HOST;dbname=$name;charset=utf8mb4", $DB_USER, $DB_PASS, _pdo_opt());
+        $n = (int)$p->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()")->fetchColumn();
+        return $n > 0 ? ['ok', "DB siap ($n tabel)"] : ['empty', 'DB siap (belum dipakai)'];
+    } catch (Throwable $e) { return ['missing', 'DB tidak ada / tak bisa diakses']; }
+}
 // Ambil 1 DB kosong dari kolam untuk usaha $alias (atomik lewat GET_LOCK). Return nama DB atau null.
 function pool_claim_db($m, $alias) {
     $names = pool_names(); if (!$names) return null;
