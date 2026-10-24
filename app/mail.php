@@ -106,6 +106,8 @@ function app_mail($to, $subject, $body, $headers = '') {
 }
 
 
+// Kode versi berkas ini (8 karakter pertama md5). Dipakai untuk memastikan versi yang berjalan di server sama dengan yang di-deploy.
+function mail_build() { return substr((string)@md5_file(__FILE__), 0, 8); }
 // Email bantuan untuk pelanggan (config.php: define('SUPPORT_EMAIL', '...')). Dipakai sebagai Reply-To semua email ke klien.
 function support_email() {
     $e = defined('SUPPORT_EMAIL') ? trim((string)SUPPORT_EMAIL) : '';
@@ -159,7 +161,8 @@ function run_mail_test_inner() {
     $okN = 0;
     foreach ($to as $t) if (app_mail($t, 'Tes email Racikin', $body, $headers)) $okN++;
     $via = $smtp ? 'lewat SMTP' : 'lewat mail() bawaan hosting (tanpa SMTP — kemungkinan masuk spam)';
-    if ($okN === count($to)) return [true, "Email tes terkirim $via ke: " . implode(', ', $to) . '. Cek kotak masuk & folder spam. ✓'];
+    $ver = ' [mail.php v' . mail_build() . ']';
+    if ($okN === count($to)) return [true, "Email tes terkirim $via ke: " . implode(', ', $to) . '. Cek kotak masuk & folder spam. ✓' . $ver];
     $why = $smtp ? ($GLOBALS['smtp_last_error'] ?: 'tidak diketahui — cek error log hosting') : 'mail() ditolak hosting';
-    return [false, "Email tes GAGAL $via. Penyebab: $why"];
+    return [false, "Email tes GAGAL $via. Penyebab: $why" . $ver];
 }

@@ -463,7 +463,7 @@ body.lg::after{width:46vmax;height:46vmax;right:-14vmax;bottom:-16vmax;backgroun
       <textarea name="bank_info" rows="3" placeholder="mis. BCA 1234567890 a.n. Nama Pemilik"><?= h($settings['bank_info']??'') ?></textarea>
       <label class="fl" style="margin-top:14px">Email pemberitahuan pendaftar baru <span style="font-weight:400">(boleh beberapa, pisah koma)</span></label>
       <input class="fi" type="text" name="notify_email" value="<?= h($settings['notify_email'] ?? '') ?>" placeholder="mis. kamu@gmail.com, mitra@gmail.com" autocomplete="off" inputmode="email" aria-label="Email pemberitahuan pendaftar baru">
-      <div class="fhint">Pengirim: <b><?= h((defined('SMTP_HOST') && SMTP_HOST !== '') ? ((defined('SMTP_FROM') && SMTP_FROM) ? SMTP_FROM : (defined('SMTP_USER') ? SMTP_USER : '-')) : 'mail() bawaan hosting (belum pakai SMTP)') ?></b> · simpan dulu, lalu klik <b>Kirim email tes</b> di bawah.</div>
+      <div class="fhint">Pengirim: <b><?= h((defined('SMTP_HOST') && SMTP_HOST !== '') ? ((defined('SMTP_FROM') && SMTP_FROM) ? SMTP_FROM : (defined('SMTP_USER') ? SMTP_USER : '-')) : 'mail() bawaan hosting (belum pakai SMTP)') ?></b> · simpan dulu, lalu klik <b>Kirim email tes</b> di bawah. <span style="opacity:.7">(mail.php v<?= h(mail_build()) ?>)</span></div>
       <label class="ck"><input type="checkbox" name="uniq_on" value="1" <?= ($settings['uniq_on']??'1')==='1'?'checked':'' ?>> <span>Aktifkan kode unik nominal (1–50) — memudahkan cek transfer</span></label>
       <button class="btn" style="margin-top:16px">Simpan Pengaturan</button>
     </form>
