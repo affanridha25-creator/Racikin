@@ -92,10 +92,10 @@ if ($isAdmin && in_array($do, ['save_settings','approve','reject','extend','test
                 $msg = "Perpanjangan \"{$r['alias']}\" disetujui (+{$mo} bulan). ✓";
                 try {   // konfirmasi ke klien
                     $bq = $m->prepare("SELECT name, paid_until FROM businesses WHERE alias=?"); $bq->execute([$r['alias']]); $bq = $bq->fetch() ?: [];
-                    $sent = mail_client($r['email'], 'Perpanjangan Racikin disetujui ✓',
+                    $sent = mail_client_later($r['email'], 'Perpanjangan Racikin disetujui ✓',
                         "Halo,\n\nTerima kasih! Pembayaran perpanjangan untuk usaha \"" . ($bq['name'] ?? $r['alias']) . "\" sudah kami verifikasi.\n\n"
                       . "Masa aktif sekarang sampai: " . ($bq['paid_until'] ?? '-') . "\n\nSemua datamu tetap utuh dan aplikasi siap dipakai: " . app_base_url() . "\n\nAda pertanyaan? Balas email ini (" . support_email() . ") atau chat WhatsApp: https://wa.me/6281325523999\n\nTerima kasih sudah memakai Racikin 🙏\n— Tim Racikin");
-                    $msg .= $sent ? ' Email konfirmasi terkirim ke klien.' : ' (Email konfirmasi ke klien tidak terkirim.)';
+                    $msg .= $sent ? ' Email konfirmasi ke klien sedang dikirim di belakang layar.' : ' (Alamat email klien tidak valid, konfirmasi tidak dikirim.)';
                 } catch (Throwable $e) { }
             }
         }
@@ -108,9 +108,9 @@ if ($isAdmin && in_array($do, ['save_settings','approve','reject','extend','test
         try {   // beri tahu klien + alasannya
             $rq = $m->prepare("SELECT email, alias FROM renewal_requests WHERE id=?"); $rq->execute([$rid]); $rq = $rq->fetch();
             if ($rq) { $why = mb_substr(trim($_POST['admin_note'] ?? ''), 0, 255);
-                if (mail_client($rq['email'], 'Perpanjangan Racikin belum bisa kami proses',
+                if (mail_client_later($rq['email'], 'Perpanjangan Racikin belum bisa kami proses',
                     "Halo,\n\nMaaf, bukti transfer perpanjanganmu belum bisa kami verifikasi" . ($why !== '' ? ":\n\"$why\"" : '.') . "\n\n"
-                  . "Silakan buka " . app_base_url() . " lalu ajukan perpanjangan dan unggah bukti transfer yang benar, atau hubungi kami lewat WhatsApp: https://wa.me/6281325523999 / email " . support_email() . "\n\n— Tim Racikin")) $msg .= ' Email pemberitahuan terkirim ke klien.';
+                  . "Silakan buka " . app_base_url() . " lalu ajukan perpanjangan dan unggah bukti transfer yang benar, atau hubungi kami lewat WhatsApp: https://wa.me/6281325523999 / email " . support_email() . "\n\n— Tim Racikin")) $msg .= ' Email pemberitahuan ke klien sedang dikirim di belakang layar.';
             }
         } catch (Throwable $e) { }
     }

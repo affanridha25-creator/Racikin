@@ -22,6 +22,11 @@ function app_base_url() {
 // ---- Pengirim email: SMTP (akun email asli, lebih andal & tak mudah masuk spam) atau mail() bawaan hosting ----
 // Aktifkan SMTP dengan mengisi SMTP_HOST/SMTP_USER/SMTP_PASS di config.php (buat akun email di cPanel → Email Accounts).
 // Tanda tangan kompatibel mail(): app_mail($to, $subject, $body, $headers). Return true bila diterima server.
+// Batas tunggu jawaban server SMTP (detik): $GLOBALS['smtp_io_timeout'] > SMTP_IO_TIMEOUT (config) > 25.
+function smtp_io_timeout() {
+    if (!empty($GLOBALS['smtp_io_timeout'])) return (int)$GLOBALS['smtp_io_timeout'];
+    return (defined('SMTP_IO_TIMEOUT') && (int)SMTP_IO_TIMEOUT > 0) ? (int)SMTP_IO_TIMEOUT : 25;
+}
 function smtp_read($fp) {
     $out = '';
     while (($line = fgets($fp, 515)) !== false) { $out .= $line; if (strlen($line) < 4 || $line[3] === ' ') break; }
@@ -65,7 +70,7 @@ function smtp_send($to, $subject, $body, $headers) {
     $ctx = stream_context_create(['ssl' => ['verify_peer' => true, 'verify_peer_name' => true]]);
     $fp = @stream_socket_client(($secure === 'ssl' ? 'ssl://' : 'tcp://') . $host . ':' . $port, $en, $es, 10, STREAM_CLIENT_CONNECT, $ctx);
     if (!$fp) { $GLOBALS['smtp_last_error'] = "tidak bisa terhubung ke $host:$port ($es). Cek SMTP_HOST/SMTP_PORT/SMTP_SECURE."; error_log("smtp connect gagal: $es"); return false; }
-    stream_set_timeout($fp, (int)($GLOBALS['smtp_io_timeout'] ?? 25));
+    stream_set_timeout($fp, smtp_io_timeout());
     try {
         if (!smtp_cmd($fp, null, '220')) throw new Exception('greeting');
         $ehlo = preg_replace('/[^A-Za-z0-9.\-]/', '', (string)($_SERVER['SERVER_NAME'] ?? 'localhost')) ?: 'localhost';
@@ -128,7 +133,7 @@ function defer_after_response(callable $fn) {
             elseif (function_exists('litespeed_finish_request')) @litespeed_finish_request();
         } catch (Throwable $e) { }
         @ignore_user_abort(true); @set_time_limit(120);
-        $GLOBALS['smtp_io_timeout'] = 10;
+        $GLOBALS['smtp_io_timeout'] = (defined('SMTP_IO_TIMEOUT') && (int)SMTP_IO_TIMEOUT > 0) ? (int)SMTP_IO_TIMEOUT : 45;   // tak ada yang menunggu → boleh sabar
         foreach ($queue as $f) { try { $f(); } catch (Throwable $e) { error_log('defer: ' . $e->getMessage()); } }
     });
 }
@@ -155,12 +160,18 @@ function admin_recipients() {
 function notify_admin($subject, $body, $now = false) {
     if (!$now && PHP_SAPI !== 'cli') { defer_after_response(function () use ($subject, $body) { notify_admin($subject, $body, true); }); return 0; }
     try {
-        $GLOBALS['smtp_io_timeout'] = 10;
         $to = admin_recipients(); if (!$to) return 0;
         $headers = "From: Racikin <" . mail_from_addr() . ">\r\nContent-Type: text/plain; charset=UTF-8\r\nMIME-Version: 1.0\r\n";
         $n = 0; foreach ($to as $t) if (app_mail($t, preg_replace('/[\r\n]+/', ' ', $subject), $body, $headers)) $n++;
         return $n;
     } catch (Throwable $e) { error_log('notify_admin: ' . $e->getMessage()); return 0; }
+}
+// Email ke klien TANPA menunggu (dikirim setelah respons selesai). Return true = dijadwalkan.
+function mail_client_later($to, $subject, $body) {
+    if (!filter_var($to, FILTER_VALIDATE_EMAIL)) return false;
+    if (PHP_SAPI === 'cli') return mail_client($to, $subject, $body);
+    defer_after_response(function () use ($to, $subject, $body) { mail_client($to, $subject, $body); });
+    return true;
 }
 // Email ke klien (satu penerima), teks biasa.
 function mail_client($to, $subject, $body) {
@@ -226,6 +237,16 @@ function run_smtp_diagnose() {
                 $lines[] = "  $hh:$pp/$sc → $r: " . ($ok ? '✓ ' : '✗ ') . $info;
             }
         }
+        // Uji sabar: apakah penerima yang macet akhirnya DITERIMA bila diberi waktu lebih lama? (menentukan apakah cukup melonggarkan timeout)
+        $slow = null; foreach ($rc as $r) if (stripos($r, 'racikin.com') === false) { $slow = $r; break; }
+        if ($slow && $left() > 80) {
+            $lines[] = '';
+            $lines[] = "Uji sabar (batas tunggu 70 detik) → $slow:";
+            $GLOBALS['smtp_io_timeout'] = 70; $a = microtime(true);
+            [$ok2, $info2] = smtp_try($h, 465, 'ssl', $slow, 70);
+            unset($GLOBALS['smtp_io_timeout']);
+            $lines[] = '  ' . ($ok2 ? '✓ ' : '✗ ') . $info2 . ($ok2 ? ' — jadi cukup melonggarkan batas waktu (pengiriman di belakang layar sudah memakai 45 dtk)' : ' — tetap gagal: sebaiknya pakai layanan pengirim lain (Brevo) atau minta Rumahweb memperbaiki DNS');
+        } elseif ($slow) { $lines[] = '(uji sabar dilewati: batas waktu PHP terlalu pendek)'; }
         $lines[] = 'Versi mail.php v' . mail_build();
         return [true, implode("\n", $lines)];
     } catch (Throwable $e) { return [false, 'Diagnosa gagal: ' . get_class($e) . ': ' . $e->getMessage() . ' (' . basename($e->getFile()) . ':' . $e->getLine() . ')']; }
@@ -236,7 +257,8 @@ function run_mail_test() {
     catch (Throwable $e) { error_log('run_mail_test: ' . $e->getMessage()); return [false, 'Tes gagal karena error PHP: ' . get_class($e) . ': ' . $e->getMessage() . ' (' . basename($e->getFile()) . ':' . $e->getLine() . '). Kirim pesan ini ke pengembang.']; }
 }
 function run_mail_test_inner() {
-    $GLOBALS['smtp_io_timeout'] = 8;
+    @set_time_limit(180);
+    $GLOBALS['smtp_io_timeout'] = 40;
     $list = defined('ADMIN_EMAIL') ? (string)ADMIN_EMAIL : '';
     try { $st = settings_all(); $list .= ',' . ($st['notify_email'] ?? ''); } catch (Throwable $e) { }
     $to = array_values(array_unique(array_filter(array_map('trim', explode(',', $list)), function ($x) { return filter_var($x, FILTER_VALIDATE_EMAIL); })));
