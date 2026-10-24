@@ -1,0 +1,9 @@
+---
+deployment:
+  tasks:
+    # app → login.racikin.com (config.php tidak ada di repo, jadi tak tertimpa)
+    - export APP_PATH=/home/racn9542/public_html/racikin/app
+    - /bin/cp -R app/. $APP_PATH/
+    # landing → racikin.com
+    - export WEB_PATH=/home/racn9542/public_html
+    - /bin/cp -R public/. $WEB_PATH/
