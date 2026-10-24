@@ -52,3 +52,13 @@
 /* pemilih bulan: teks di tengah pil (ruang kiri sama dengan ruang panah di kanan) */
 .view select.monthsel{text-align:center;text-align-last:center;padding-left:36px!important;padding-right:36px!important}
 .monthsel option{text-align:left}
+
+/* pemilih bulan di hero desktop: selalu di pojok kanan atas HERO (bukan di ujung kolom kiri).
+   Kolom kiri dibuat static supaya pil menempel ke hero; blob dekoratif dipindah ke lapisan belakang (isolation) agar tampilan sama. */
+@media (min-width:821px){
+  .dhero,.kn-hero,.py-hero,.ds-hero{position:relative;isolation:isolate}
+  .dhero .dh-bg,.kn-hero .dh-bg,.py-hero .dh-bg,.ds-hero .dh-bg{z-index:-1}
+  .dh-main,.py-h-main,.kn-hmain,.ds-h-main{position:static}
+  .dh-month,.kn-month,.py-h-month,.ds-h-month{position:absolute;top:24px;right:28px;z-index:3;margin:0}
+  .dh-side{margin-top:62px}   /* ruang agar panel samping tak tertimpa pil */
+}
