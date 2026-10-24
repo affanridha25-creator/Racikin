@@ -168,6 +168,8 @@ function handle_auth($action, $in) {
         $name = trim($in['name'] ?? ''); $alias = strtolower(trim($in['code'] ?? $in['alias'] ?? ''));
         $user = trim($in['user'] ?? ''); $email = strtolower(trim($in['email'] ?? '')); $pass = (string)($in['password'] ?? '');
         if ($name === '' || $user === '') { http_response_code(400); echo json_encode(['error' => 'Nama usaha & nama user wajib diisi.']); return; }
+        $wa = norm_wa($in['wa'] ?? '');
+        if ($wa === '') { http_response_code(400); echo json_encode(['error' => 'Nomor WhatsApp wajib diisi dengan benar (mis. 0812xxxxxxxx).']); return; }
         if (!valid_alias($alias)) { http_response_code(400); echo json_encode(['error' => 'Kode usaha harus 2–24 huruf kecil/angka tanpa spasi.']); return; }
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) { http_response_code(400); echo json_encode(['error' => 'Email tidak valid.']); return; }
         if (($pe = pw_problem($pass)) !== '') { http_response_code(400); echo json_encode(['error' => $pe]); return; }
@@ -177,8 +179,8 @@ function handle_auth($action, $in) {
             $m->beginTransaction();
             $q = $m->prepare("SELECT COUNT(*) FROM businesses WHERE alias=?"); $q->execute([$alias]);
             if ($q->fetchColumn()) { $m->rollBack(); http_response_code(400); echo json_encode(['error' => 'Kode usaha "'.$alias.'" sudah dipakai, pilih yang lain.']); return; }
-            $m->prepare("INSERT INTO businesses (alias,name,db_name,user_name,active,created) VALUES (?,?,?,?,0,NOW())")
-              ->execute([$alias, $name, DB_PREFIX . $alias, $user]);
+            $m->prepare("INSERT INTO businesses (alias,name,db_name,user_name,active,created,wa) VALUES (?,?,?,?,0,NOW(),?)")
+              ->execute([$alias, $name, DB_PREFIX . $alias, $user, $wa]);
             $m->prepare("INSERT INTO users (alias,email,name,pass_hash,role,perms,created) VALUES (?,?,?,?,'owner','',NOW())")
               ->execute([$alias, $email, $user, password_hash($pass, PASSWORD_DEFAULT)]);
             $m->commit();
@@ -202,14 +204,14 @@ function handle_auth($action, $in) {
             if ($ready) {
                 $m->prepare("UPDATE businesses SET active=1, paid_until=DATE_ADD(CURDATE(), INTERVAL ? DAY) WHERE alias=?")->execute([$days, $alias]);
                 $_SESSION['alias'] = $alias; $_SESSION['user_name'] = $user; $_SESSION['email'] = $email; $_SESSION['role'] = 'owner'; $_SESSION['perms'] = '';
-                notify_admin_signup($name, $alias, $user, $email, "AKTIF — trial gratis $days hari (otomatis)");
+                notify_admin_signup($name, $alias, $user, $email, "AKTIF — trial gratis $days hari (otomatis)", $wa);
                 $b2 = $m->prepare("SELECT * FROM businesses WHERE alias=?"); $b2->execute([$alias]); $b2 = $b2->fetch();
                 echo json_encode(['ok'=>true, 'trial'=>true, 'loggedIn'=>true, 'trialDays'=>$days, 'name'=>$name, 'alias'=>$alias, 'user'=>$user, 'email'=>$email, 'sub'=>sub_status($b2)] + me_payload()); return;
             }
             if ($trialWhy === '') $trialWhy = 'provisioning database otomatis gagal';
         }
         // akun dibuat sebagai PENDING — tidak auto-login; tunggu aktivasi admin (setelah bayar)
-        notify_admin_signup($name, $alias, $user, $email, 'PENDING — menunggu aktivasi di admin.php' . ($trialWhy !== '' ? " ($trialWhy)" : ''));
+        notify_admin_signup($name, $alias, $user, $email, 'PENDING — menunggu aktivasi di admin.php' . ($trialWhy !== '' ? " ($trialWhy)" : ''), $wa);
         echo json_encode(['ok'=>true, 'pending'=>true, 'name'=>$name, 'alias'=>$alias]); return;
     }
     // ---- ganti password (sedang login) ----
@@ -373,20 +375,84 @@ function app_base_url() {
 }
 // Beri tahu admin lewat email saat ada usaha baru mendaftar (ADMIN_EMAIL di config.php; boleh beberapa, pisah koma).
 // Defensif: gagal kirim tak boleh membatalkan pendaftaran.
-function notify_admin_signup($name, $alias, $user, $email, $status) {
-    if (!defined('ADMIN_EMAIL') || trim((string)ADMIN_EMAIL) === '') return;
+// ---- Pengirim email: SMTP (akun email asli, lebih andal & tak mudah masuk spam) atau mail() bawaan hosting ----
+// Aktifkan SMTP dengan mengisi SMTP_HOST/SMTP_USER/SMTP_PASS di config.php (buat akun email di cPanel → Email Accounts).
+// Tanda tangan kompatibel mail(): app_mail($to, $subject, $body, $headers). Return true bila diterima server.
+function smtp_read($fp) {
+    $out = '';
+    while (($line = fgets($fp, 515)) !== false) { $out .= $line; if (strlen($line) < 4 || $line[3] === ' ') break; }
+    return $out;
+}
+function smtp_cmd($fp, $cmd, $okPrefix) {
+    if ($cmd !== null) fwrite($fp, $cmd . "\r\n");
+    $r = smtp_read($fp);
+    return strpos($r, (string)$okPrefix) === 0;
+}
+function smtp_send($to, $subject, $body, $headers) {
+    $host = (string)SMTP_HOST; $port = defined('SMTP_PORT') ? (int)SMTP_PORT : 465;
+    $secure = defined('SMTP_SECURE') ? strtolower((string)SMTP_SECURE) : 'ssl';
+    $user = defined('SMTP_USER') ? (string)SMTP_USER : ''; $pass = defined('SMTP_PASS') ? (string)SMTP_PASS : '';
+    $fromAddr = defined('SMTP_FROM') && SMTP_FROM ? (string)SMTP_FROM : $user;
+    if ($host === '' || !filter_var($fromAddr, FILTER_VALIDATE_EMAIL)) return false;
+    // ambil header turunan dari string $headers; From dipaksa ke akun SMTP (server biasanya menolak From asing)
+    $name = 'Racikin'; $extra = [];
+    foreach (preg_split("/\r?\n/", (string)$headers) as $h) {
+        if ($h === '' || strpos($h, ':') === false) continue;
+        [$k, $v] = array_map('trim', explode(':', $h, 2));
+        $lk = strtolower($k);
+        if ($lk === 'from') { if (preg_match('/^"?([^"<]+?)"?\s*</', $v, $mm)) $name = trim($mm[1]); }
+        elseif (in_array($lk, ['content-type', 'mime-version', 'reply-to'], true)) $extra[] = "$k: $v";
+    }
+    $ctx = stream_context_create(['ssl' => ['verify_peer' => true, 'verify_peer_name' => true]]);
+    $fp = @stream_socket_client(($secure === 'ssl' ? 'ssl://' : 'tcp://') . $host . ':' . $port, $en, $es, 15, STREAM_CLIENT_CONNECT, $ctx);
+    if (!$fp) { error_log("smtp connect gagal: $es"); return false; }
+    stream_set_timeout($fp, 15);
+    try {
+        if (!smtp_cmd($fp, null, '220')) throw new Exception('greeting');
+        $ehlo = preg_replace('/[^A-Za-z0-9.\-]/', '', (string)($_SERVER['SERVER_NAME'] ?? 'localhost')) ?: 'localhost';
+        if (!smtp_cmd($fp, "EHLO $ehlo", '250')) throw new Exception('EHLO');
+        if ($secure === 'tls') {
+            if (!smtp_cmd($fp, 'STARTTLS', '220')) throw new Exception('STARTTLS');
+            if (!@stream_socket_enable_crypto($fp, true, STREAM_CRYPTO_METHOD_TLS_CLIENT)) throw new Exception('TLS');
+            if (!smtp_cmd($fp, "EHLO $ehlo", '250')) throw new Exception('EHLO2');
+        }
+        if ($user !== '') {
+            if (!smtp_cmd($fp, 'AUTH LOGIN', '334') || !smtp_cmd($fp, base64_encode($user), '334') || !smtp_cmd($fp, base64_encode($pass), '235')) throw new Exception('AUTH');
+        }
+        if (!smtp_cmd($fp, "MAIL FROM:<$fromAddr>", '250')) throw new Exception('MAIL FROM');
+        if (!smtp_cmd($fp, "RCPT TO:<$to>", '250')) throw new Exception('RCPT TO');
+        if (!smtp_cmd($fp, 'DATA', '354')) throw new Exception('DATA');
+        $enc = function ($t) { return preg_match('/[^\x20-\x7E]/', $t) ? '=?UTF-8?B?' . base64_encode($t) . '?=' : $t; };
+        $msg = 'From: ' . $enc($name) . " <$fromAddr>\r\nTo: <$to>\r\nSubject: " . $enc(preg_replace('/[\r\n]+/', ' ', $subject)) . "\r\nDate: " . date('r') . "\r\n"
+             . (array_filter($extra) ? implode("\r\n", $extra) . "\r\n" : "Content-Type: text/plain; charset=UTF-8\r\nMIME-Version: 1.0\r\n") . "\r\n"
+             . preg_replace('/^\./m', '..', str_replace(["\r\n", "\r"], "\n", $body));
+        $msg = str_replace("\n", "\r\n", str_replace("\r\n", "\n", $msg));
+        fwrite($fp, $msg . "\r\n.\r\n");
+        if (strpos(smtp_read($fp), '250') !== 0) throw new Exception('akhir pesan');
+        smtp_cmd($fp, 'QUIT', '221');
+        fclose($fp);
+        return true;
+    } catch (Exception $e) { error_log('smtp gagal di tahap ' . $e->getMessage()); @fclose($fp); return false; }
+}
+function app_mail($to, $subject, $body, $headers = '') {
+    if (defined('SMTP_HOST') && SMTP_HOST !== '') return smtp_send($to, $subject, $body, $headers);
+    return @mail($to, $subject, $body, $headers);
+}
+function notify_admin_signup($name, $alias, $user, $email, $status, $wa = '') {
+    $list = (defined('ADMIN_EMAIL') ? (string)ADMIN_EMAIL : '');
+    try { $st = settings_all(); $list .= ',' . ($st['notify_email'] ?? ''); } catch (Exception $e) { }
+    $recipients = array_values(array_unique(array_filter(array_map('trim', explode(',', $list)), function ($x) { return filter_var($x, FILTER_VALIDATE_EMAIL); })));
+    if (!$recipients) return;
     $clean = function ($v) { return trim(preg_replace('/[\r\n]+/', ' ', (string)$v)); };   // cegah header injection
     $host = preg_replace('/:\d+$/', '', app_host());
     $from = defined('RESET_FROM') && RESET_FROM ? RESET_FROM : ('noreply@' . preg_replace('/^www\./', '', $host));
     $subject = 'Pendaftar baru Racikin: ' . $clean($name) . ' (' . $clean($alias) . ')';
     $body = "Ada usaha baru mendaftar di Racikin.\n\n"
-          . "Usaha   : " . $clean($name) . "\nKode    : " . $clean($alias) . "\nPemilik : " . $clean($user) . "\nEmail   : " . $clean($email) . "\n"
-          . "Status  : " . $status . "\nWaktu   : " . date('Y-m-d H:i') . "\nIP      : " . $clean($_SERVER['REMOTE_ADDR'] ?? '?') . "\n\n"
+          . "Usaha   : " . $clean($name) . "\nKode    : " . $clean($alias) . "\nPemilik : " . $clean($user) . "\nEmail   : " . $clean($email) . "\nWhatsApp: " . ($wa !== '' ? '+' . $clean($wa) . '  → https://wa.me/' . $clean($wa) : '-') . "\n"
+          . "Status  : " . $status . "\nWaktu   : " . gmdate('Y-m-d H:i', time() + 7 * 3600) . " WIB\nIP      : " . $clean($_SERVER['REMOTE_ADDR'] ?? '?') . "\n\n"
           . "Kelola di: " . app_base_url() . "/admin.php\n\n— Racikin";
     $headers = "From: Racikin <$from>\r\nContent-Type: text/plain; charset=UTF-8\r\nMIME-Version: 1.0\r\n";
-    foreach (array_filter(array_map('trim', explode(',', (string)ADMIN_EMAIL))) as $to) {
-        if (filter_var($to, FILTER_VALIDATE_EMAIL)) @mail($to, $subject, $body, $headers);
-    }
+    foreach ($recipients as $to) app_mail($to, $subject, $body, $headers);
 }
 function send_reset_email($to, $name, $alias, $tokenStr) {
     $link = app_base_url() . '/?reset=' . $tokenStr;
@@ -398,7 +464,7 @@ function send_reset_email($to, $name, $alias, $tokenStr) {
           . "Klik link ini untuk membuat password baru (berlaku 1 jam):\n\n$link\n\n"
           . "Kalau kamu tidak meminta ini, abaikan saja email ini.\n\n— Racikin";
     $headers = "From: Racikin <$from>\r\nReply-To: $from\r\nContent-Type: text/plain; charset=UTF-8\r\nMIME-Version: 1.0\r\n";
-    @mail($to, $subject, $body, $headers);
+    app_mail($to, $subject, $body, $headers);
 }
 
 require_once __DIR__ . '/push.php';   // helper FCM (fcm_send, push_tokens_for) — dipakai juga oleh cron
@@ -691,7 +757,7 @@ try {
                   . "Kode OTP: $code\n(berlaku 10 menit, sekali pakai)\n\n"
                   . "Berikan kode ini ke kasir HANYA jika kamu menyetujui pembatalan. Abaikan jika tidak.\n\n— $bizName";
             $headers = "From: " . mb_encode_mimeheader($bizName) . " <$from>\r\nReply-To: $from\r\nContent-Type: text/plain; charset=UTF-8\r\nMIME-Version: 1.0\r\n";
-            $sent = 0; foreach ($owners as $o) { if (@mail($o['email'], $subject, $body, $headers)) $sent++; }
+            $sent = 0; foreach ($owners as $o) { if (app_mail($o['email'], $subject, $body, $headers)) $sent++; }
             echo json_encode(['ok' => true, 'sent' => $sent > 0, 'owners' => array_map(fn($o) => mask_email($o['email']), $owners)]);
             break;
         }
@@ -708,7 +774,7 @@ try {
             $from = defined('RESET_FROM') && RESET_FROM ? RESET_FROM : ('noreply@' . preg_replace('/^www\./', '', $host));
             $subject = 'Struk ' . ($n['nota_no'] ?: '') . ' - ' . $bizName;
             $headers = "From: " . mb_encode_mimeheader($bizName) . " <$from>\r\nReply-To: $from\r\nContent-Type: text/html; charset=UTF-8\r\nMIME-Version: 1.0\r\n";
-            $sent = @mail($email, $subject, build_receipt_html($pdo, $n), $headers);
+            $sent = app_mail($email, $subject, build_receipt_html($pdo, $n), $headers);
             echo json_encode(['ok' => true, 'sent' => (bool)$sent]);
             break;
         }

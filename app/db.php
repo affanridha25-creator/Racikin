@@ -49,6 +49,7 @@ function master_pdo() {
     ensure_column($p, 'businesses', 'active', "active TINYINT(1) DEFAULT 1");
     // paid_until: tanggal langganan berakhir. NULL = tanpa batas (usaha lama/legacy tak terkunci).
     ensure_column($p, 'businesses', 'paid_until', "paid_until DATE DEFAULT NULL");
+    ensure_column($p, 'businesses', 'wa', "wa VARCHAR(24) DEFAULT ''");   // nomor WhatsApp pemilik (format internasional tanpa +, mis. 62812…) untuk dihubungi admin
     // user per usaha: login = kode usaha (alias) + email + password
     // role: owner (pemilik, akses penuh) / staff (akses sesuai perms)
     // perms: daftar menu yang boleh diakses staff (CSV), mis. "pos,distribusi,pembayaran"
@@ -134,7 +135,7 @@ function master_pdo() {
 function settings_all() {
     $out = [];
     foreach (master_pdo()->query("SELECT k,v FROM app_settings") as $r) $out[$r['k']] = $r['v'];
-    return $out + ['price_1bln'=>'0','price_3bln'=>'0','price_1thn'=>'0','bank_info'=>'','uniq_on'=>'1','uniq_max'=>'50'];
+    return $out + ['price_1bln'=>'0','price_3bln'=>'0','price_1thn'=>'0','bank_info'=>'','uniq_on'=>'1','uniq_max'=>'50','notify_email'=>''];
 }
 function setting_set($k, $v) {
     master_pdo()->prepare("INSERT INTO app_settings (k,v) VALUES (?,?) ON DUPLICATE KEY UPDATE v=VALUES(v)")->execute([$k, (string)$v]);
@@ -169,6 +170,16 @@ function cpanel_create_db($dbname, $dbuser) {
     $r2 = $call($base . 'Mysql/set_privileges_on_database?user=' . rawurlencode($dbuser) . '&database=' . rawurlencode($dbname) . '&privileges=' . rawurlencode('ALL PRIVILEGES'));
     if (!$r2 || (int)($r2['status'] ?? 0) !== 1) { error_log('cpanel set_privileges gagal: ' . json_encode($r2)); return false; }
     return true;
+}
+
+// Normalisasi nomor WhatsApp Indonesia → format internasional tanpa '+' (62812…). '' bila tak valid.
+function norm_wa($raw) {
+    $d = preg_replace('/\D/', '', (string)$raw);
+    if ($d === '') return '';
+    if (strpos($d, '62') === 0) { /* sudah 62… */ }
+    elseif (strpos($d, '0') === 0) $d = '62' . substr($d, 1);
+    elseif (strpos($d, '8') === 0) $d = '62' . $d;
+    return (strlen($d) >= 10 && strlen($d) <= 15 && strpos($d, '62') === 0) ? $d : '';
 }
 
 // ---- KOLAM DATABASE TRIAL (tanpa cPanel API) ----

@@ -34,6 +34,7 @@ function renderLogin(mode){
       <div class="lfield"><label>Kode Usaha <span style="font-weight:400">(huruf kecil/angka, tanpa spasi)</span></label><input id="rCode" placeholder="mis. anna" autocapitalize="none"></div>
       <div class="lfield"><label>Nama Kamu</label><input id="rUser" placeholder="mis. Anna"></div>
       <div class="lfield"><label>Email</label><input id="rEmail" type="email" placeholder="email@usaha.com" autocapitalize="none"></div>
+      <div class="lfield"><label>Nomor WhatsApp <span style="font-weight:400">(untuk kami hubungi)</span></label><input id="rWa" type="tel" inputmode="tel" placeholder="mis. 0812xxxxxxxx" autocomplete="tel"></div>
       <div class="lfield"><label>Password (min 8 karakter)</label>${pwField("rPass","buat password")}</div>
       <label class="lremember"><input type="checkbox" id="rRemember" checked> Ingat saya (tetap masuk 30 hari)</label>
       <button class="btn lsubmit" style="width:100%;margin-top:6px" onclick="doRegister()">Daftar &amp; Masuk</button>`
@@ -86,10 +87,11 @@ async function loginTransition(){
   setTimeout(()=>w.remove(),640);
 }
 async function doLogin(){const code=document.getElementById("lCode").value.trim().toLowerCase(),email=document.getElementById("lEmail").value.trim().toLowerCase(),password=document.getElementById("lPass").value,remember=document.getElementById("lRemember").checked;if(!code||!email||!password){loginErr("Isi kode usaha, email & password.");return;}lBusy(true,"Masuk…");let ok=false;try{BIZ=await api("authLogin",{code,email,password,remember},{silent:true});ok=true;await loginTransition();}catch(e){if(!ok){lBusy(false);loginErr(e.message||"Gagal masuk.");}else throw e;}}
-async function doRegister(){const name=document.getElementById("rName").value.trim(),code=document.getElementById("rCode").value.trim().toLowerCase(),user=document.getElementById("rUser").value.trim(),email=document.getElementById("rEmail").value.trim().toLowerCase(),password=document.getElementById("rPass").value;if(!name||!code||!user||!email||!password){loginErr("Lengkapi semua kolom.");return;}
+async function doRegister(){const name=document.getElementById("rName").value.trim(),code=document.getElementById("rCode").value.trim().toLowerCase(),user=document.getElementById("rUser").value.trim(),email=document.getElementById("rEmail").value.trim().toLowerCase(),wa=document.getElementById("rWa").value.trim(),password=document.getElementById("rPass").value;if(!name||!code||!user||!email||!wa||!password){loginErr("Lengkapi semua kolom.");return;}
+  if(wa.replace(/\D/g,"").length<9){loginErr("Nomor WhatsApp belum benar (mis. 0812xxxxxxxx).");return;}
   {const pe=pwProblem(password);if(pe){loginErr(pe);return;}}
   lBusy(true,"Mendaftar…");
-  try{const r=await api("authRegister",{name,code,user,email,password},{silent:true});
+  try{const r=await api("authRegister",{name,code,user,email,wa,password},{silent:true});
     if(r.trial){   // free trial aktif → langsung masuk app
       BIZ=r;await afterAuth();toast(`Selamat datang! Trial gratis ${r.trialDays||30} hari aktif 🎉`);return;
     }

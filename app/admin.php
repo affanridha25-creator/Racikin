@@ -34,12 +34,17 @@ if ($do === 'login') {
 
 $isAdmin = !empty($_SESSION['admin']);
 
-if ($isAdmin && in_array($do, ['activate','deactivate','delete'], true)) {
+if ($isAdmin && in_array($do, ['activate','deactivate','delete','set_wa'], true)) {
     if (!isset($_POST['csrf']) || !hash_equals($csrf, $_POST['csrf'])) { $err = 'Sesi kadaluarsa, ulangi.'; }
     else {
         $alias = preg_replace('/[^a-z0-9]/', '', strtolower($_POST['alias'] ?? ''));
         if ($alias === '') { $err = 'Alias tidak valid.'; }
         elseif ($do === 'activate')   { $m->prepare("UPDATE businesses SET active=1, paid_until=IFNULL(paid_until, DATE_ADD(CURDATE(), INTERVAL 30 DAY)) WHERE alias=?")->execute([$alias]); $msg = "Usaha \"$alias\" diaktifkan — trial 30 hari dimulai. ✓"; }
+        elseif ($do === 'set_wa') {
+            $wa2 = norm_wa($_POST['wa'] ?? '');
+            if ($wa2 === '') { $err = 'Nomor WhatsApp tidak valid (mis. 0812xxxxxxxx).'; }
+            else { $m->prepare("UPDATE businesses SET wa=? WHERE alias=?")->execute([$wa2, $alias]); $msg = "Nomor WhatsApp usaha \"$alias\" disimpan. ✓"; }
+        }
         elseif ($do === 'deactivate') { $m->prepare("UPDATE businesses SET active=0 WHERE alias=?")->execute([$alias]); $msg = "Usaha \"$alias\" dinonaktifkan."; }
         elseif ($do === 'delete') {
             $m->prepare("DELETE FROM businesses WHERE alias=?")->execute([$alias]);
@@ -58,6 +63,8 @@ if ($isAdmin && in_array($do, ['save_settings','approve','reject','extend'], tru
         foreach (['price_1bln','price_3bln','price_1thn'] as $k) setting_set($k, max(0, (int)preg_replace('/\D/', '', $_POST[$k] ?? '0')));
         setting_set('bank_info', mb_substr(trim($_POST['bank_info'] ?? ''), 0, 1000));
         setting_set('uniq_on', empty($_POST['uniq_on']) ? '0' : '1');
+        $ne = array_values(array_unique(array_filter(array_map('trim', explode(',', (string)($_POST['notify_email'] ?? ''))), function ($x) { return filter_var($x, FILTER_VALIDATE_EMAIL); })));
+        setting_set('notify_email', implode(',', array_slice($ne, 0, 5)));
         $msg = 'Pengaturan langganan disimpan. ✓';
     }
     elseif ($do === 'approve') {
@@ -97,7 +104,7 @@ $settings = $isAdmin ? settings_all() : [];
 $reqs = $isAdmin ? $m->query("SELECT rr.*, b.name AS biz_name, DATEDIFF(b.paid_until, CURDATE()) AS days_left
     FROM renewal_requests rr LEFT JOIN businesses b ON b.alias=rr.alias
     WHERE rr.status='pending' ORDER BY rr.created ASC")->fetchAll() : [];
-$rows = $isAdmin ? $m->query("SELECT b.alias,b.name,b.db_name,b.active,b.created,b.paid_until,
+$rows = $isAdmin ? $m->query("SELECT b.alias,b.name,b.db_name,b.active,b.created,b.paid_until,b.wa,
     DATEDIFF(b.paid_until, CURDATE()) AS days_left,
     (SELECT email FROM users u WHERE u.alias=b.alias AND u.role='owner' LIMIT 1) AS owner_email,
     (SELECT COUNT(*) FROM users u WHERE u.alias=b.alias) AS user_count
@@ -114,6 +121,30 @@ foreach ($rows as $r) {
     }
 }
 $poolUsed = max(0, $poolTotal - $poolFree);
+
+// Tombol kontak per usaha: WhatsApp (bila nomor tersimpan) atau isian nomor + email (bila belum).
+function wa_actions($r, $on, $csrf) {
+    ob_start(); ?>
+              <?php
+  $dl = $r['paid_until'] !== null ? (int)$r['days_left'] : null;
+  if (!$on) $waMsg = "Halo 🙏 Terima kasih sudah mendaftar di Racikin (usaha \"{$r['name']}\", kode {$r['alias']}).\n\nMohon maaf baru kami hubungi. Akunmu sedang kami siapkan dan segera aktif. Kami kabari lagi begitu siap ya. Terima kasih 🙏";
+  elseif ($dl === null) $waMsg = "Halo 🙏 Ini dari Racikin. Usaha \"{$r['name']}\" sudah aktif dan siap dipakai di https://login.racikin.com . Kalau ada kendala, balas pesan ini ya 🙏";
+  else $waMsg = "Halo 🙏 Pengingat dari Racikin.\n\nLangganan usaha \"{$r['name']}\" "
+    . ($dl<0 ? "sudah habis pada {$r['paid_until']}" : ($dl<=0 ? "habis hari ini" : "akan habis dalam {$dl} hari ({$r['paid_until']})"))
+    . ".\n\nSilakan perpanjang lewat aplikasi (pilih paket → transfer → upload bukti) supaya bisa terus dipakai. Terima kasih 🙏";
+  $waLabel = !$on ? '💬 Hubungi' : '💬 Ingatkan'; ?>
+<?php if (!empty($r['wa'])): ?>
+  <a class="btn sm wa" href="https://wa.me/<?= h($r['wa']) ?>?text=<?= rawurlencode($waMsg) ?>" target="_blank" rel="noopener" title="Kirim via WhatsApp ke +<?= h($r['wa']) ?>"><?= $waLabel ?></a>
+<?php else: ?>
+  <form method="post" class="wa-set" title="Nomor WhatsApp belum tersimpan — isi lalu simpan">
+    <input type="hidden" name="csrf" value="<?= h($csrf) ?>"><input type="hidden" name="do" value="set_wa"><input type="hidden" name="alias" value="<?= h($r['alias']) ?>">
+    <input type="tel" name="wa" inputmode="tel" placeholder="No. WA 0812…" aria-label="Nomor WhatsApp <?= h($r['alias']) ?>" required>
+    <button class="btn sm wa">Simpan</button>
+  </form>
+  <?php if (!empty($r['owner_email'])): ?><a class="btn sm" href="mailto:<?= h($r['owner_email']) ?>?subject=<?= rawurlencode('Racikin — ' . $r['name']) ?>&body=<?= rawurlencode($waMsg) ?>" title="Kirim email (nomor WA belum ada)">✉️ Email</a><?php endif; ?>
+<?php endif; ?>
+    <?php return ob_get_clean();
+}
 ?>
 <!doctype html>
 <html lang="id"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -218,6 +249,10 @@ input:focus,textarea:focus{outline:none;border-color:var(--red);background:#fff;
 .ck input{width:18px;height:18px;accent-color:var(--red);flex-shrink:0}
 /* ---- daftar usaha ---- */
 .tools{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.wa-set{display:inline-flex;align-items:center;gap:6px;margin:0}
+.wa-set input{width:132px;padding:7px 12px;border-radius:999px;border:1.5px solid #eadfd8;font-size:12.5px;font-family:inherit;background:#fffdfb}
+.wa-set input:focus{outline:none;border-color:var(--red);box-shadow:0 0 0 3px rgba(213,62,15,.12)}
+@media (max-width:640px){.wa-set{flex:1 1 100%}.wa-set input{flex:1;width:auto;min-width:0}}
 .search{position:relative;flex:1;min-width:200px}
 .search::before{content:"🔍";position:absolute;left:15px;top:50%;transform:translateY(-50%);font-size:14px;pointer-events:none}
 .search input{padding-left:40px;padding-top:11px;padding-bottom:11px;border-radius:999px;border:1.5px solid #eadfd8;width:100%;font-size:14px;font-family:inherit;background:#fffdfb}
@@ -404,6 +439,8 @@ body.lg::after{width:46vmax;height:46vmax;right:-14vmax;bottom:-16vmax;backgroun
       </div>
       <label class="fl" style="margin-top:14px">Info Rekening / Cara Bayar (tampil ke pelanggan saat perpanjang)</label>
       <textarea name="bank_info" rows="3" placeholder="mis. BCA 1234567890 a.n. Nama Pemilik"><?= h($settings['bank_info']??'') ?></textarea>
+      <label style="display:block;margin-top:14px">Email pemberitahuan pendaftar baru <span style="font-weight:400;color:var(--muted)">(boleh beberapa, pisah koma)</span></label>
+      <input type="text" name="notify_email" value="<?= h($settings['notify_email'] ?? '') ?>" placeholder="mis. kamu@gmail.com" autocomplete="off" inputmode="email">
       <label class="ck"><input type="checkbox" name="uniq_on" value="1" <?= ($settings['uniq_on']??'1')==='1'?'checked':'' ?>> <span>Aktifkan kode unik nominal (1–50) — memudahkan cek transfer</span></label>
       <button class="btn" style="margin-top:16px">Simpan Pengaturan</button>
     </form>
@@ -439,6 +476,7 @@ body.lg::after{width:46vmax;height:46vmax;right:-14vmax;bottom:-16vmax;backgroun
             <div style="min-width:0">
               <div class="nm"><?= h($r['name']) ?><?php if ($isNew): ?><span class="pill new">BARU</span><?php endif; ?></div>
               <div class="em2">✉️ <?= h($r['owner_email'] ?: '-') ?></div>
+              <?php if (!empty($r['wa'])): ?><div class="em2">💬 <a href="https://wa.me/<?= h($r['wa']) ?>" target="_blank" rel="noopener" style="color:inherit"><?= h('+' . $r['wa']) ?></a></div><?php endif; ?>
               <div class="cd"><b style="font-size:12.5px"><?= h($r['alias']) ?></b><span class="dbn"><?= h($r['db_name']) ?></span></div>
               <div class="mt"><?= (int)$r['user_count'] ?> pengguna · daftar <?= h(substr((string)$r['created'],0,10)) ?></div>
             </div>
@@ -466,12 +504,7 @@ body.lg::after{width:46vmax;height:46vmax;right:-14vmax;bottom:-16vmax;backgroun
                 <button class="btn sm plus" name="months" value="3" title="Perpanjang 3 bulan">+3bln</button>
                 <button class="btn sm plus" name="months" value="12" title="Perpanjang 1 tahun">+1thn</button>
               </form>
-              <?php if ($r['paid_until']!==null): $dl=(int)$r['days_left'];
-                $waMsg = "Halo 🙏 Pengingat dari Racikin.\n\nLangganan usaha \"{$r['name']}\" "
-                  . ($dl<0 ? "sudah habis pada {$r['paid_until']}" : ($dl<=0 ? "habis hari ini" : "akan habis dalam {$dl} hari ({$r['paid_until']})"))
-                  . ".\n\nSilakan perpanjang lewat aplikasi (pilih paket → transfer → upload bukti) supaya bisa terus dipakai. Terima kasih 🙏"; ?>
-                <a class="btn sm wa" href="https://wa.me/?text=<?= rawurlencode($waMsg) ?>" target="_blank" rel="noopener" title="Ingatkan pemilik via WhatsApp">💬 Ingatkan</a>
-              <?php endif; ?>
+              <?= wa_actions($r, $on, $csrf) ?>
             </div>
             <?php endif; ?>
             <div class="arow">
@@ -480,6 +513,7 @@ body.lg::after{width:46vmax;height:46vmax;right:-14vmax;bottom:-16vmax;backgroun
                 <input type="hidden" name="csrf" value="<?= h($csrf) ?>"><input type="hidden" name="do" value="activate"><input type="hidden" name="alias" value="<?= h($r['alias']) ?>">
                 <button class="btn sm green" title="Aktifkan + mulai trial 30 hari gratis">✓ Aktifkan (Trial 30hr)</button>
               </form>
+              <?= wa_actions($r, $on, $csrf) ?>
             <?php else: ?>
               <form method="post" onsubmit="return confirm('Nonaktifkan (blokir login) usaha ini?')">
                 <input type="hidden" name="csrf" value="<?= h($csrf) ?>"><input type="hidden" name="do" value="deactivate"><input type="hidden" name="alias" value="<?= h($r['alias']) ?>">
