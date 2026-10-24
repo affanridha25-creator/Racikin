@@ -1001,7 +1001,7 @@ function penunggakList(penunggak){
 // --- pusat aksi: sinyal yang perlu ditindak ---
 function actionCenter(d){
   const items=[];
-  d.low.slice(0,5).forEach(x=>items.push(`<div class="actrow"><span class="actdot" style="background:var(--red)"></span><div><b>Stok menipis:</b> ${esc(x.n)} — ${x.s} unit</div></div>`));
+  d.low.slice(0,5).forEach(x=>items.push(`<div class="actrow"><span class="actdot" style="background:var(--red)"></span><div><b>Stok menipis:</b> ${esc(x.n)} — ${x.s} item</div></div>`));
   if(d.overdue.length)items.push(`<div class="actrow"><span class="actdot" style="background:var(--amber)"></span><div><b>${d.overdue.length} nota</b> lewat 14 hari belum lunas</div></div>`);
   d.priceUp.slice(0,4).forEach(x=>items.push(`<div class="actrow"><span class="actdot" style="background:#b8560f"></span><div><b>Harga bahan naik:</b> ${esc(x.n)} +${(x.chg*100).toFixed(0)}% → ${rp(x.cur)}</div></div>`));
   return items.length?items.join(""):'<div class="empty">Semua aman 👍 tak ada yang perlu ditindak.</div>';
@@ -1724,7 +1724,7 @@ function rProduksi(){
     const rows=S.batches.map(b=>{const c=batchCalc(b);
       const prods=(b.outputs||[]).map(o=>esc((prod(o.productId)||{}).name||"?")).join(", ");
       const acts=`<div class="cacts"><button class="btn sm" onclick="event.stopPropagation();printBatch('${b.id}')">🖨 Cetak</button></div>`;
-      return crow({icon:"🏭",title:(b.note?esc(b.note):prods)||"Batch",sub:`${b.batchNo?esc(b.batchNo)+" · ":""}${fmtDate(b.date)} · ${c.bottles} unit · HPP ${rp(c.avg)}`,amt:rp(c.total),acts,onclick:`viewBatch('${b.id}')`,del:`delBatch('${b.id}')`});}).join("");
+      return crow({icon:"🏭",title:(b.note?esc(b.note):prods)||"Batch",sub:`${b.batchNo?esc(b.batchNo)+" · ":""}${fmtDate(b.date)} · ${c.bottles} item · HPP ${rp(c.avg)}`,amt:rp(c.total),acts,onclick:`viewBatch('${b.id}')`,del:`delBatch('${b.id}')`});}).join("");
     document.getElementById("v-produksi").innerHTML=`<div class="desc">Racik bahan + biaya → HPP per batch otomatis.</div><button class="btn" style="width:100%;margin-bottom:8px" onclick="editBatch()">+ Batch Baru</button><button class="btn gray" style="width:100%;margin-bottom:14px" onclick="cmpBatch()">⚖ Bandingkan Batch</button>${S.batches.length===0?'<div class="empty">Belum ada batch.</div>':`<div class="clist">${rows}</div>`}`;
     return;
   }
@@ -1734,7 +1734,7 @@ function rProduksi(){
   <h2 class="title">Produksi &amp; HPP per Batch</h2>
   <div class="desc">Pilih bahan baku (harga otomatis dari master) + biaya → tentukan produk jadi &amp; qty → HPP per batch dihitung otomatis.</div>
   <div class="flexbtns"><button class="btn" onclick="editBatch()">+ Batch Baru</button><button class="btn gray" onclick="cmpBatch()">⚖ Bandingkan Batch</button></div>
-  <div class="panel"><h3>Riwayat Batch</h3>${S.batches.length===0?'<div class="empty">Belum ada batch.</div>':`<table><thead><tr><th>No. Batch</th><th>Tanggal</th><th>Produk Jadi</th><th class="num">Unit</th><th class="num">Bahan</th><th class="num">Ops</th><th class="num">Total Modal</th><th class="num">HPP rata-rata/unit</th><th></th></tr></thead><tbody>${rows}</tbody></table>`}</div>`;
+  <div class="panel"><h3>Riwayat Batch</h3>${S.batches.length===0?'<div class="empty">Belum ada batch.</div>':`<table><thead><tr><th>No. Batch</th><th>Tanggal</th><th>Produk Jadi</th><th class="num">Item</th><th class="num">Bahan</th><th class="num">Ops</th><th class="num">Total Modal</th><th class="num">HPP rata-rata/item</th><th></th></tr></thead><tbody>${rows}</tbody></table>`}</div>`;
 }
 // ---- bandingkan batch untuk produk yang sama: perubahan harga/qty bahan + item yang hilang/baru ----
 function cmpBatch(pid){
@@ -1767,7 +1767,7 @@ function cmpBatch(pid){
   const miss=`<span style="color:var(--amber);font-size:11px">⚠ tidak ada</span>`;
   const itemRow=r=>{let prevP=null,prevQ=null;
     const tds=bs.map((b,i)=>{const c=r.c[i];if(!c)return `<td class="num">${miss}</td>`;
-      const h=`<td class="num">${rp(c.price)}${dl(c.price,prevP)}<div class="mini">${num(c.qty)} ${esc(r.unit||"")}/unit${dl(c.qty,prevQ)}</div></td>`;prevP=c.price;prevQ=c.qty;return h;}).join("");
+      const h=`<td class="num">${rp(c.price)}${dl(c.price,prevP)}<div class="mini">${num(c.qty)} ${esc(r.unit||"")}/item${dl(c.qty,prevQ)}</div></td>`;prevP=c.price;prevQ=c.qty;return h;}).join("");
     const gone=r.c.filter(Boolean).length<bs.length;
     return `<tr${gone?' class="warn"':""}><td>${esc(r.name||"?")}</td>${tds}</tr>`;};
   const opRow=r=>{let prev=null;
@@ -1778,11 +1778,11 @@ function cmpBatch(pid){
   const hppTds=bs.map((b,i)=>{const h=cs[i].perProduct[pid]||0;const out=`<td class="num"><b>${rp(Math.round(h))}</b>${dl(h,pv)}</td>`;pv=h;return out;}).join("");
   const sel=`<select onchange="cmpBatch(this.value)" style="width:100%;margin-bottom:10px">${cands.map(p=>`<option value="${p.id}"${p.id===pid?" selected":""}>${esc(p.name)}</option>`).join("")}</select>`;
   openModal(`<button class="close" onclick="closeModal()">×</button><h3>Bandingkan Batch</h3>${sel}
-  <p class="mini" style="margin-bottom:8px">Harga bahan &amp; qty per unit tiap batch, urut dari terlama. ▲▼ = perubahan vs batch sebelumnya. Baris kuning ⚠ = item ada di batch lain tapi tidak di batch ini (mungkin lupa diinput).</p>
-  <div style="overflow-x:auto"><table class="cmpt"><thead><tr><th></th>${bs.map((b,i)=>`<th class="num">${esc(b.batchNo||"-")}<div class="mini">${fmtDate(b.date)} · ${pq[i]} unit</div></th>`).join("")}</tr></thead><tbody>
-  <tr class="tot"><td><b>HPP / unit</b></td>${hppTds}</tr>
-  ${sec("Bahan baku (harga satuan · qty per unit)")}${Object.values(rows).map(itemRow).join("")}
-  ${Object.keys(ops).length?sec("Biaya operasional (per unit)")+Object.values(ops).map(opRow).join(""):""}
+  <p class="mini" style="margin-bottom:8px">Harga bahan &amp; qty per item tiap batch, urut dari terlama. ▲▼ = perubahan vs batch sebelumnya. Baris kuning ⚠ = item ada di batch lain tapi tidak di batch ini (mungkin lupa diinput).</p>
+  <div style="overflow-x:auto"><table class="cmpt"><thead><tr><th></th>${bs.map((b,i)=>`<th class="num">${esc(b.batchNo||"-")}<div class="mini">${fmtDate(b.date)} · ${pq[i]} item</div></th>`).join("")}</tr></thead><tbody>
+  <tr class="tot"><td><b>HPP / item</b></td>${hppTds}</tr>
+  ${sec("Bahan baku (harga satuan · qty per item)")}${Object.values(rows).map(itemRow).join("")}
+  ${Object.keys(ops).length?sec("Biaya operasional (per item)")+Object.values(ops).map(opRow).join(""):""}
   </tbody></table></div>`);
 }
 // cetak dengan judul dokumen sementara → jadi nama file default saat "Simpan sebagai PDF"
@@ -1807,8 +1807,8 @@ function viewBatch(id){
   const sec=t=>`<h4 style="margin:16px 0 6px;font-size:14px">${t}</h4>`;
   openModal(`<button class="close" onclick="closeModal()">×</button><h3>Detail Batch <span class="mini">${esc(b.batchNo||"")}</span></h3>
   <div class="mini" style="margin-bottom:8px">${fmtDate(b.date)}${b.note?` · ${esc(b.note)}`:""}</div>
-  <div class="grid2" style="margin-bottom:4px"><div class="poskembali" style="justify-content:space-between"><span>Total modal</span><b>${rp(c.total)}</b></div><div class="poskembali" style="justify-content:space-between"><span>HPP rata-rata/unit</span><b>${rp(c.avg)}</b></div></div>
-  ${sec("Produk jadi")}<div style="overflow-x:auto"><table><thead><tr><th>Produk</th><th class="num">Unit</th><th class="num">HPP</th><th class="num">Harga jual</th><th class="num">Untung/unit</th></tr></thead><tbody>${outRows||'<tr><td colspan="5">—</td></tr>'}</tbody></table></div>
+  <div class="grid2" style="margin-bottom:4px"><div class="poskembali" style="justify-content:space-between"><span>Total modal</span><b>${rp(c.total)}</b></div><div class="poskembali" style="justify-content:space-between"><span>HPP rata-rata/item</span><b>${rp(c.avg)}</b></div></div>
+  ${sec("Produk jadi")}<div style="overflow-x:auto"><table><thead><tr><th>Produk</th><th class="num">Item</th><th class="num">HPP</th><th class="num">Harga jual</th><th class="num">Untung/item</th></tr></thead><tbody>${outRows||'<tr><td colspan="5">—</td></tr>'}</tbody></table></div>
   ${sec("Bahan baku")}<div style="overflow-x:auto"><table><thead><tr><th>Bahan</th><th class="num">Qty</th><th class="num">Harga</th><th class="num">Subtotal</th></tr></thead><tbody>${matRows||'<tr><td colspan="4">—</td></tr>'}<tr><td colspan="3"><b>Total bahan</b></td><td class="num"><b>${rp(c.mat)}</b></td></tr></tbody></table></div>
   ${sec("Biaya operasional")}<table><tbody>${opsRows||'<tr><td colspan="2">—</td></tr>'}<tr><td><b>Total operasional</b></td><td class="num"><b>${rp(c.ops)}</b></td></tr></tbody></table>
   <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap"><button class="btn gray" onclick="closeModal()">Tutup</button><button class="btn gray" onclick="closeModal();editBatch('${b.id}')">Edit</button><button class="btn" onclick="printBatch('${b.id}')">🖨 Cetak</button></div>`);
@@ -1824,21 +1824,21 @@ function printBatch(id){
     const hpp=Math.round(c.perProduct[o.productId]||0),harga=+p.harga||0,untung=harga-hpp,margin=hpp>0?untung/hpp*100:0;
     return `<tr><td>${esc(p.name||"?")}</td><td class="num">${o.qty}</td><td class="num">${rp(harga)}</td><td class="num">${rp(hpp)}</td><td class="num">${rp(untung)}</td><td class="num">${margin.toFixed(0)}%</td></tr>`;}).join("");
   document.getElementById("printArea").innerHTML=`<div class="preport">
-    ${printHead("LAPORAN HPP"+(b.note?" — "+esc(b.note):" — Batch Produksi"),"Produksi • "+(b.batchNo?b.batchNo+" • ":"")+fmtDate(b.date)+" • "+c.bottles+" unit")}
+    ${printHead("LAPORAN HPP"+(b.note?" — "+esc(b.note):" — Batch Produksi"),"Produksi • "+(b.batchNo?b.batchNo+" • ":"")+fmtDate(b.date)+" • "+c.bottles+" item")}
     <div class="psec">1. Biaya Bahan Baku</div>
     <table><thead><tr><th>Bahan</th><th class="num">Qty</th><th class="num">Harga</th><th class="num">Subtotal</th></tr></thead>
       <tbody>${matRows||'<tr><td colspan="4">—</td></tr>'}<tr class="tot"><td colspan="3">TOTAL BAHAN BAKU</td><td class="num">${rp(c.mat)}</td></tr></tbody></table>
     <div class="psec">2. Biaya Operasional</div>
     <table><thead><tr><th>Item</th><th class="num">Subtotal</th></tr></thead>
       <tbody>${opsRows||'<tr><td colspan="2">—</td></tr>'}<tr class="tot"><td>TOTAL OPERASIONAL</td><td class="num">${rp(c.ops)}</td></tr></tbody></table>
-    <div class="psec">3. HPP &amp; Harga Jual per Unit</div>
-    <table><thead><tr><th>Produk</th><th class="num">Unit</th><th class="num">Harga Jual</th><th class="num">HPP</th><th class="num">Untung/unit</th><th class="num">Margin</th></tr></thead>
+    <div class="psec">3. HPP &amp; Harga Jual per Item</div>
+    <table><thead><tr><th>Produk</th><th class="num">Item</th><th class="num">Harga Jual</th><th class="num">HPP</th><th class="num">Untung/item</th><th class="num">Margin</th></tr></thead>
       <tbody>${outRows||'<tr><td colspan="6">—</td></tr>'}</tbody></table>
     <div class="psec">4. Ringkasan Batch</div>
     <table><tbody>
       <tr><td>Total Modal (bahan + operasional)</td><td class="num"><b>${rp(c.total)}</b></td></tr>
-      <tr><td>Total Unit Jadi</td><td class="num">${c.bottles} unit</td></tr>
-      <tr><td>HPP Rata-rata / unit</td><td class="num">${rp(c.avg)}</td></tr>
+      <tr><td>Total Item Jadi</td><td class="num">${c.bottles} item</td></tr>
+      <tr><td>HPP Rata-rata / item</td><td class="num">${rp(c.avg)}</td></tr>
     </tbody></table>
     <div class="psub" style="margin-top:18px;text-align:left">Dicetak ${fmtDate(today())} — Racikin</div>
   </div>`;
@@ -1920,7 +1920,7 @@ function bSum(){const c=batchCalc(window._b),box=document.getElementById("bSum")
   (window._b.materials||[]).forEach((m,i)=>{const el=document.getElementById("matsub"+i);if(el)el.textContent=rp((+m.qty||0)*(+m.price||0));});
   persistDraft();
   if(!box)return;
-  box.innerHTML=`<div><span>Total bahan baku</span><span>${rp(c.mat)}</span></div><div><span>Total operasional</span><span>${rp(c.ops)}</span></div><div class="big"><span>Total modal batch</span><span>${rp(c.total)}</span></div><div style="margin-top:6px"><span>Total unit jadi</span><span>${c.bottles} unit</span></div><div><span>HPP rata-rata / unit</span><span><b>${rp(c.avg)}</b></span></div>${(window._b.outputs||[]).filter(o=>o.productId&&o.qty).map(o=>`<div class="mini" style="display:flex;justify-content:space-between"><span>↳ HPP ${esc((prod(o.productId)||{}).name||"?")}</span><span>${rp(c.perProduct[o.productId])}</span></div>`).join("")}`;
+  box.innerHTML=`<div><span>Total bahan baku</span><span>${rp(c.mat)}</span></div><div><span>Total operasional</span><span>${rp(c.ops)}</span></div><div class="big"><span>Total modal batch</span><span>${rp(c.total)}</span></div><div style="margin-top:6px"><span>Total item jadi</span><span>${c.bottles} item</span></div><div><span>HPP rata-rata / item</span><span><b>${rp(c.avg)}</b></span></div>${(window._b.outputs||[]).filter(o=>o.productId&&o.qty).map(o=>`<div class="mini" style="display:flex;justify-content:space-between"><span>↳ HPP ${esc((prod(o.productId)||{}).name||"?")}</span><span>${rp(c.perProduct[o.productId])}</span></div>`).join("")}`;
 }
 async function saveBatch(){
   const b=window._b;
@@ -1953,7 +1953,7 @@ function distBodyHtml(){
   const freeQ=n=>notaItems(n).filter(it=>(it.kind||"jual")!=="jual").reduce((a,it)=>a+(+it.qty||0),0);
   const tot=list.reduce((a,n)=>a+notaTotal(n),0),lab=list.reduce((a,n)=>a+notaProfit(n),0),due=list.reduce((a,n)=>a+Math.max(0,notaDue(n)),0);
   const qj=list.reduce((a,n)=>a+jualQ(n),0),qf=list.reduce((a,n)=>a+freeQ(n),0);
-  const cards=`<div class="cards"><div class="card"><div class="lbl">Jumlah Nota</div><div class="val">${list.length}</div></div><div class="card"><div class="lbl">Total Penjualan</div><div class="val">${rp(tot)}</div></div><div class="card green"><div class="lbl">Laba</div><div class="val">${rp(lab)}</div></div><div class="card amber"><div class="lbl">Belum Terbayar</div><div class="val">${rp(due)}</div></div><div class="card"><div class="lbl">Unit Terkirim</div><div class="val">${qj}${qf?` <span class="mini">+${qf} gratis</span>`:""}</div></div></div>`;
+  const cards=`<div class="cards"><div class="card"><div class="lbl">Jumlah Nota</div><div class="val">${list.length}</div></div><div class="card"><div class="lbl">Total Penjualan</div><div class="val">${rp(tot)}</div></div><div class="card green"><div class="lbl">Laba</div><div class="val">${rp(lab)}</div></div><div class="card amber"><div class="lbl">Belum Terbayar</div><div class="val">${rp(due)}</div></div><div class="card"><div class="lbl">Item Terkirim</div><div class="val">${qj}${qf?` <span class="mini">+${qf} gratis</span>`:""}</div></div></div>`;
   if(!list.length)return cards+`<div class="empty">Tak ada nota yang cocok pada periode/filter ini.</div>`;
   // produk terkirim
   const pm={};list.forEach(n=>notaItems(n).forEach(it=>{const o=pm[it.productId]||(pm[it.productId]={j:0,f:0});if((it.kind||"jual")==="jual")o.j+=+it.qty||0;else o.f+=+it.qty||0;}));
@@ -2040,7 +2040,7 @@ function nSum(){const n=window._n;
   const box=document.getElementById("nSum");if(!box)return;
   const valid=n.items.filter(it=>it.productId&&+it.qty>0);
   const freeQty=valid.filter(it=>(it.kind||"jual")!=="jual").reduce((a,it)=>a+(+it.qty||0),0);
-  box.innerHTML=`<div><span>Jumlah item</span><span>${valid.length} baris · ${notaQty(n)} unit${freeQty?` (${freeQty} gratis)`:""}</span></div><div class="big"><span>Total tagihan</span><span>${rp(notaTotal(n))}</span></div><div><span>Estimasi laba</span><span style="color:var(--green)"><b>${rp(notaProfit(n))}</b></span></div>`;
+  box.innerHTML=`<div><span>Jumlah item</span><span>${valid.length} baris · ${notaQty(n)} item${freeQty?` (${freeQty} gratis)`:""}</span></div><div class="big"><span>Total tagihan</span><span>${rp(notaTotal(n))}</span></div><div><span>Estimasi laba</span><span style="color:var(--green)"><b>${rp(notaProfit(n))}</b></span></div>`;
 }
 // nomor otomatis ikut tanggal selama belum diubah manual (hanya nota baru)
 function autoNotaNo(){const n=window._n;if(!n||n.id||n.notaNo!==n._auto||!n.date)return;n.notaNo=n._auto=nextNotaNo(n.date);const el=document.getElementById("nNo");if(el)el.value=n.notaNo;}
@@ -2268,7 +2268,7 @@ function rProduk(){
 let _prodPhoto=null;   // null = tak diubah; "" = hapus; data URI = foto baru
 function editProd(id){const p=id?S.products.find(x=>x.id===id):{id:null,name:"",cat:"",gram:"",hpp:"",harga:"",photo:""};
   _prodPhoto=null;
-  const fnb=bizType()==="fnb",uw=fnb?"porsi":"unit";
+  const fnb=bizType()==="fnb",uw=fnb?"porsi":"item";
   // produk baru: F&B default TIDAK lacak stok (made-to-order); produksi default lacak
   const trk=id?tracksStock(p):!fnb;
   openModal(`<button class="close" onclick="closeModal()">×</button><h3>${id?"Edit":"Tambah"} ${fnb?"Menu":"Produk"}</h3>
@@ -2611,7 +2611,7 @@ function rBackup(){
 }
 function csvCell(v){v=v==null?"":String(v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}
 function exportCSV(type){let rows=[];
-  if(type==="batches"){rows.push(["Tanggal","Catatan","Produk Jadi","Unit","Bahan","Ops","Total Modal","HPP rata-rata/unit"]);S.batches.forEach(b=>{const c=batchCalc(b);rows.push([b.date,b.note,(b.outputs||[]).map(o=>`${(prod(o.productId)||{}).name} x${o.qty}`).join("; "),c.bottles,c.mat,c.ops,c.total,Math.round(c.avg)]);});}
+  if(type==="batches"){rows.push(["Tanggal","Catatan","Produk Jadi","Item","Bahan","Ops","Total Modal","HPP rata-rata/item"]);S.batches.forEach(b=>{const c=batchCalc(b);rows.push([b.date,b.note,(b.outputs||[]).map(o=>`${(prod(o.productId)||{}).name} x${o.qty}`).join("; "),c.bottles,c.mat,c.ops,c.total,Math.round(c.avg)]);});}
   else if(type==="distributions"){rows.push(["Tanggal","No. Nota","Toko","Produk","Jenis","Qty","Harga","Total","HPP","Laba","Status Nota"]);S.notas.forEach(n=>notaItems(n).forEach(it=>rows.push([n.date,n.notaNo,(store(n.storeId)||{}).name,(prod(it.productId)||{}).name,(it.kind||"jual"),it.qty,it.harga,(+it.qty||0)*(+it.harga||0),it.hpp,(+it.qty||0)*((+it.harga||0)-(+it.hpp||0)),notaStatus(n)])));}
   else if(type==="materials"){rows.push(["Bahan","Satuan","Tanggal","Harga","Sumber"]);S.materials.forEach(m=>(m.history||[]).forEach(h=>rows.push([m.name,m.unit,h.date,h.price,h.source])));}
   else{rows.push(["Tanggal Bayar","No. Nota","Toko","Jumlah","Catatan"]);S.notas.forEach(n=>(n.payments||[]).forEach(p=>rows.push([p.date,n.notaNo,(store(n.storeId)||{}).name,p.amount,p.note])));}
