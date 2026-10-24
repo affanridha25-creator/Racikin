@@ -222,6 +222,71 @@ main{flex:1;padding:16px 30px 60px}
 @keyframes lgSlideL{from{transform:translateX(100%)}to{transform:translateX(0)}}
 @keyframes lgSpin{to{transform:rotate(360deg)}}
 @keyframes lgShake{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(3px)}}
+/* ---- login: layout terbelah (hero + form) ---- */
+.loginbg.lsplit{align-items:stretch;justify-content:stretch;padding:0;background:#FFF8F3;animation:none}
+.lsplit::before,.lsplit::after{opacity:.3}
+.lhero{position:relative;flex:0 0 52%;overflow:hidden;color:#fff;z-index:1;display:flex;background:linear-gradient(150deg,#F26A2E 0%,#D53E0F 46%,#8F1208 100%)}
+.lhero::before{content:"";position:absolute;width:60vmin;height:60vmin;border-radius:50%;left:-16vmin;top:-18vmin;background:radial-gradient(circle,rgba(255,255,255,.22),rgba(255,255,255,0) 70%);animation:lgDrift1 20s ease-in-out infinite alternate}
+.lhero::after{content:"";position:absolute;width:70vmin;height:70vmin;border-radius:50%;right:-10vmin;bottom:-26vmin;background:radial-gradient(circle,rgba(255,196,120,.30),rgba(255,196,120,0) 70%);animation:lgDrift2 24s ease-in-out infinite alternate}
+.lhero .lfx span{opacity:0;filter:none}
+.lhero-in{position:relative;z-index:1;display:flex;flex-direction:column;justify-content:center;gap:22px;padding:clamp(28px,5vw,64px) clamp(28px,5vw,72px) clamp(28px,5vw,64px) clamp(28px,5vw,64px);width:100%}
+.lh-word{height:38px;width:auto;align-self:flex-start;filter:drop-shadow(0 4px 10px rgba(0,0,0,.18));animation:lgUp .7s .05s both}
+.lh-copy h1{font-size:clamp(30px,3.6vw,48px);line-height:1.08;font-weight:800;letter-spacing:-.02em;margin:0 0 10px;animation:lgUp .7s .15s both}
+.lh-copy h1 span{background:linear-gradient(90deg,#FFE3B0,#FFC470);-webkit-background-clip:text;background-clip:text;color:transparent}
+.lh-copy p{font-size:clamp(13px,1.15vw,16px);line-height:1.55;max-width:420px;opacity:.9;animation:lgUp .7s .25s both}
+.lh-tag{display:none}
+.lstage{position:relative;height:clamp(240px,34vh,330px);margin-top:6px}
+.lplate{position:absolute;right:2%;top:50%;width:clamp(170px,17vw,230px);aspect-ratio:1;transform:translateY(-50%);animation:lgPop .9s .4s cubic-bezier(.3,1.4,.5,1) both}
+.ldisc{position:absolute;inset:12%;border-radius:50%;background:#fff;box-shadow:0 22px 50px rgba(80,10,0,.35),0 0 0 10px rgba(255,255,255,.16);display:flex;align-items:center;justify-content:center;animation:lgBob 5s ease-in-out infinite}
+.ldisc img{width:74%;height:auto;object-fit:contain}
+.lorbit{position:absolute;inset:0;animation:lgSpin 26s linear infinite}
+.lorbit i{position:absolute;font-style:normal;font-size:clamp(20px,2vw,28px);left:50%;top:50%;margin:-.6em 0 0 -.6em;filter:drop-shadow(0 4px 6px rgba(0,0,0,.25))}
+.lorbit i:nth-child(1){transform:rotate(0deg) translateY(calc(-1 * clamp(85px,8.6vw,116px)))}
+.lorbit i:nth-child(2){transform:rotate(90deg) translateY(calc(-1 * clamp(85px,8.6vw,116px)))}
+.lorbit i:nth-child(3){transform:rotate(180deg) translateY(calc(-1 * clamp(85px,8.6vw,116px)))}
+.lorbit i:nth-child(4){transform:rotate(270deg) translateY(calc(-1 * clamp(85px,8.6vw,116px)))}
+.lfc{position:absolute;display:flex;align-items:center;gap:11px;background:rgba(255,255,255,.96);color:var(--ink);border-radius:18px;padding:11px 16px 11px 12px;box-shadow:0 16px 34px rgba(80,10,0,.28);animation:lgUp .7s both,lgFloatY 6s ease-in-out infinite}
+.lfc b{width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,#FFE9D8,#FFD0B0);display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0}
+.lfc strong{display:block;font-size:13px;font-weight:800}
+.lfc span{display:block;font-size:11px;color:var(--muted);margin-top:1px}
+.lfc1{left:0;top:2%;transform:rotate(-5deg);animation-delay:.55s,0s}
+.lfc2{left:12%;top:38%;transform:rotate(4deg);animation-delay:.7s,-2s}
+.lfc3{left:2%;top:73%;transform:rotate(-3deg);animation-delay:.85s,-4s}
+.lwave{position:absolute;right:-20px;top:0;height:100%;width:calc(clamp(70px,8vw,120px) + 20px);z-index:2;animation:lgSway 7s ease-in-out infinite alternate}
+.lwave-b{display:none}
+.lpanel{flex:1;display:flex;align-items:center;justify-content:center;padding:28px;overflow-y:auto;position:relative;z-index:1}
+.lsplit .loginbox{margin:auto;max-width:408px;border-radius:30px;padding:30px 28px 24px;background:#fff;box-shadow:0 26px 64px rgba(126,3,6,.16),0 0 0 1px rgba(213,62,15,.05)}
+.lsplit .loginbox .lgo,.lsplit .loginbox .lword,.lsplit .loginbox .ltag{display:none}
+.lhead{margin-bottom:18px;animation:lgUp .5s both}
+.lhead h2{font-size:23px;font-weight:800;letter-spacing:-.01em;text-align:left;margin:0 0 4px}
+.lhead p{font-size:13px;color:var(--muted);line-height:1.5}
+/* input pil + ikon */
+.lsplit .loginbox .lfield input:not([type=checkbox]){border-radius:999px;padding:13px 16px 13px 46px;background-repeat:no-repeat;background-position:16px center;background-size:18px 18px;border:1.5px solid #ece5e0;background-color:#fdfaf8}
+.lsplit .loginbox .lfield input:focus{background-color:#fff}
+.lsplit .loginbox .pwwrap input{padding-right:46px}
+.lsplit .ltabs{border-radius:999px;padding:5px}
+.lsplit .ltabs::before{border-radius:999px;top:5px;bottom:5px;left:5px;width:calc(50% - 5px)}
+.lsplit .ltabs button{border-radius:999px}
+.lsplit .lsubmit{border-radius:999px;padding:14px}
+#lCode,#rCode,#fCode,#rName{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23c9a999' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 9l1.5-5h15L21 9'/%3E%3Cpath d='M4 9v11h16V9'/%3E%3Cpath d='M9 20v-6h6v6'/%3E%3C/svg%3E")}
+#lEmail,#rEmail,#fEmail{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23c9a999' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='14' rx='3'/%3E%3Cpath d='M3 7l9 6 9-6'/%3E%3C/svg%3E")}
+#rUser{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23c9a999' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='8' r='4'/%3E%3Cpath d='M4 21c1-4 4-6 8-6s7 2 8 6'/%3E%3C/svg%3E")}
+#lPass,#rPass,#rpNew,#rpNew2{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23c9a999' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='4' y='10' width='16' height='11' rx='3'/%3E%3Cpath d='M8 10V7a4 4 0 018 0v3'/%3E%3C/svg%3E")}
+@keyframes lgFloatY{0%,100%{translate:0 0}50%{translate:0 -9px}}
+@keyframes lgSway{from{transform:translateX(0)}to{transform:translateX(-12px)}}
+@media (max-width:899px){
+  .loginbg.lsplit{flex-direction:column;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .lhero{flex:none;height:clamp(190px,30vh,250px);align-items:center;justify-content:center;padding-top:var(--sat)}
+  .lhero-in{align-items:center;justify-content:center;gap:8px;padding:16px}
+  .lh-copy,.lstage{display:none}
+  .lh-word{height:44px;align-self:center}
+  .lh-tag{display:block;font-size:12.5px;opacity:.92;text-align:center;animation:lgUp .7s .2s both}
+  .lwave{display:none}
+  .lwave-b{display:block;position:absolute;left:0;right:0;bottom:-1px;width:100%;height:46px;z-index:2;animation:lgSway 7s ease-in-out infinite alternate}
+  .lpanel{flex:none;margin-top:-6px;padding:0 16px calc(28px + var(--sab));align-items:flex-start;overflow:visible}
+  .lsplit .loginbox{padding:24px 20px 20px;border-radius:26px}
+}
+@media (prefers-reduced-motion:reduce){.lhero::before,.lhero::after,.lh-word,.lh-copy *,.lplate,.ldisc,.lorbit,.lfc,.lwave,.lwave-b,.lhead,.lh-tag{animation:none!important}}
 @media (prefers-reduced-motion:reduce){.loginbg,.loginbg::before,.loginbg::after,.loginbox,.loginbox *,.lfx span{animation:none!important;transition:none!important}.lfx{display:none}}
 
 @media(max-width:820px){
@@ -504,7 +569,25 @@ label.f{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;font-w
 <div class="modal-bg" id="modalBg"><div class="modal" id="modal"></div></div>
 <div id="toast"></div>
 <div id="printArea"></div>
-<div class="loginbg" id="loginScreen" style="display:flex"><div class="lfx" aria-hidden="true"><span style="--x:6%;--s:30px;--d:19s;--w:0s">🌶️</span><span style="--x:19%;--s:24px;--d:23s;--w:-7s">🧅</span><span style="--x:33%;--s:28px;--d:21s;--w:-12s">🍤</span><span style="--x:52%;--s:26px;--d:25s;--w:-4s">🧄</span><span style="--x:67%;--s:32px;--d:20s;--w:-15s">🍅</span><span style="--x:81%;--s:24px;--d:24s;--w:-9s">🥘</span><span style="--x:92%;--s:28px;--d:22s;--w:-18s">🍋</span></div><div class="loginbox intro" id="loginBox"></div></div>
+<div class="loginbg lsplit" id="loginScreen" style="display:flex">
+  <div class="lhero">
+    <div class="lfx" aria-hidden="true"><span style="--x:8%;--s:30px;--d:19s;--w:0s">🌶️</span><span style="--x:24%;--s:24px;--d:23s;--w:-7s">🧅</span><span style="--x:41%;--s:28px;--d:21s;--w:-12s">🍤</span><span style="--x:58%;--s:26px;--d:25s;--w:-4s">🧄</span><span style="--x:73%;--s:32px;--d:20s;--w:-15s">🍅</span><span style="--x:88%;--s:24px;--d:24s;--w:-9s">🍋</span></div>
+    <div class="lhero-in">
+      <img class="lh-word" src="icons/logo-word-white.png" alt="Racikin">
+      <div class="lh-copy"><h1>Racik. Hitung. <span>Jual.</span></h1><p>Kelola produksi, HPP, distribusi &amp; kasir usaha kamu dalam satu aplikasi.</p></div>
+      <div class="lh-tag">Kelola produksi, HPP &amp; penjualan UMKM</div>
+      <div class="lstage" aria-hidden="true">
+        <div class="lplate"><div class="lorbit"><i>🌶️</i><i>🧅</i><i>🍤</i><i>🧄</i></div><div class="ldisc"><img src="icons/logo-bowl.png" alt=""></div></div>
+        <div class="lfc lfc1"><b>📦</b><div><strong>HPP otomatis</strong><span>dari bahan &amp; biaya produksi</span></div></div>
+        <div class="lfc lfc2"><b>🧾</b><div><strong>Nota &amp; piutang</strong><span>tagih lewat WhatsApp</span></div></div>
+        <div class="lfc lfc3"><b>📱</b><div><strong>Kasir + QRIS</strong><span>cetak struk Bluetooth</span></div></div>
+      </div>
+    </div>
+    <svg class="lwave" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path d="M100 0 V100 H34 C12 86 58 74 38 56 C18 38 62 26 40 10 C33 4 26 2 22 0 Z" fill="#FFF8F3"/></svg>
+    <svg class="lwave-b" viewBox="0 0 400 60" preserveAspectRatio="none" aria-hidden="true"><path d="M0 34 C70 0 130 58 210 30 C290 2 340 40 400 18 V60 H0 Z" fill="#FFF8F3"/></svg>
+  </div>
+  <div class="lpanel"><div class="loginbox intro" id="loginBox"></div></div>
+</div>
 <div class="loginbg" id="subLock" style="display:none"><div class="loginbox" id="subLockBox" style="max-width:440px"></div></div>
 <nav class="botnav" id="botnav">
   <button data-v="dashboard" onclick="go('dashboard')"><span class="bic">📊</span>Beranda</button>
@@ -2713,7 +2796,8 @@ function renderLogin(mode){
       <button class="btn lsubmit" style="width:100%;margin-top:6px" onclick="doLogin()">Masuk</button>
       <div style="text-align:center;margin-top:14px"><a ${llink} onclick="renderLogin('forgot')">Lupa password?</a></div>`;
   }
-  box.innerHTML=`<img class="lgo" src="icons/logo-bowl.png" alt=""><img class="lword" src="icons/logo-word.png" alt="Racikin"><div class="lsub">Kelola produksi, HPP &amp; penjualan UMKM</div><div class="lform">${form}</div>${mode==='login'||mode==='reg'?'<div class="lfoot">🔒 Data tiap usaha tersimpan terpisah</div>':""}<div class="lcopy">© ${new Date().getFullYear()} Racikin · Developer: Ahmad Affan Ridha</div>`;
+  const head=mode==='login'?`<div class="lhead"><h2>Selamat datang kembali 👋</h2><p>Masuk untuk mengelola produksi, HPP &amp; penjualan usahamu.</p></div>`:mode==='reg'?`<div class="lhead"><h2>Daftarkan usahamu 🚀</h2><p>Buat akun usaha baru — isi data di bawah ini.</p></div>`:"";
+  box.innerHTML=`<img class="lgo" src="icons/logo-bowl.png" alt=""><img class="lword" src="icons/logo-word.png" alt="Racikin"><div class="lsub ltag">Kelola produksi, HPP &amp; penjualan UMKM</div>${head}<div class="lform">${form}</div>${mode==='login'||mode==='reg'?'<div class="lfoot">🔒 Data tiap usaha tersimpan terpisah</div>':""}<div class="lcopy">© ${new Date().getFullYear()} Racikin · Developer: Ahmad Affan Ridha</div>`;
   box.onkeydown=e=>{if(e.key!=="Enter"||e.target.tagName!=="INPUT"||e.target.type==="checkbox")return;const b=box.querySelector(".lsubmit");if(b&&!b.classList.contains("busy")){e.preventDefault();b.click();}};
 }
 async function doForgot(){
