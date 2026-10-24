@@ -94,7 +94,11 @@ if ($isAdmin && in_array($do, ['save_settings','approve','reject','extend','test
                     $bq = $m->prepare("SELECT name, paid_until FROM businesses WHERE alias=?"); $bq->execute([$r['alias']]); $bq = $bq->fetch() ?: [];
                     $sent = mail_client_later($r['email'], 'Perpanjangan Racikin disetujui ✓',
                         "Halo,\n\nTerima kasih! Pembayaran perpanjangan untuk usaha \"" . ($bq['name'] ?? $r['alias']) . "\" sudah kami verifikasi.\n\n"
-                      . "Masa aktif sekarang sampai: " . ($bq['paid_until'] ?? '-') . "\n\nSemua datamu tetap utuh dan aplikasi siap dipakai: " . app_base_url() . "\n\nAda pertanyaan? Balas email ini (" . support_email() . ") atau chat WhatsApp: https://wa.me/6281325523999\n\nTerima kasih sudah memakai Racikin 🙏\n— Tim Racikin");
+                      . "Masa aktif sekarang sampai: " . ($bq['paid_until'] ?? '-') . "\n\nSemua datamu tetap utuh dan aplikasi siap dipakai: " . app_base_url() . "\n\nAda pertanyaan? Balas email ini (" . support_email() . ") atau chat WhatsApp: https://wa.me/6281325523999\n\nTerima kasih sudah memakai Racikin 🙏\n— Tim Racikin",
+                        etpl_html('Perpanjangan disetujui ✓', 'Terima kasih! Langgananmu sudah diperpanjang.',
+                            etpl_p('Terima kasih! Pembayaran perpanjangan untuk usaha <b>' . etpl_h($bq['name'] ?? $r['alias']) . '</b> sudah kami verifikasi.')
+                          . etpl_facts([['Usaha', etpl_h($bq['name'] ?? $r['alias'])], ['Masa aktif sampai', etpl_h($bq['paid_until'] ?? '-')]])
+                          . etpl_p('Semua datamu tetap utuh dan aplikasi siap dipakai.') . etpl_button('Buka Racikin', app_base_url())));
                     $msg .= $sent ? ' Email konfirmasi ke klien sedang dikirim di belakang layar.' : ' (Alamat email klien tidak valid, konfirmasi tidak dikirim.)';
                 } catch (Throwable $e) { }
             }
@@ -110,7 +114,11 @@ if ($isAdmin && in_array($do, ['save_settings','approve','reject','extend','test
             if ($rq) { $why = mb_substr(trim($_POST['admin_note'] ?? ''), 0, 255);
                 if (mail_client_later($rq['email'], 'Perpanjangan Racikin belum bisa kami proses',
                     "Halo,\n\nMaaf, bukti transfer perpanjanganmu belum bisa kami verifikasi" . ($why !== '' ? ":\n\"$why\"" : '.') . "\n\n"
-                  . "Silakan buka " . app_base_url() . " lalu ajukan perpanjangan dan unggah bukti transfer yang benar, atau hubungi kami lewat WhatsApp: https://wa.me/6281325523999 / email " . support_email() . "\n\n— Tim Racikin")) $msg .= ' Email pemberitahuan ke klien sedang dikirim di belakang layar.';
+                  . "Silakan buka " . app_base_url() . " lalu ajukan perpanjangan dan unggah bukti transfer yang benar, atau hubungi kami lewat WhatsApp: https://wa.me/6281325523999 / email " . support_email() . "\n\n— Tim Racikin",
+                    etpl_html('Perpanjangan belum bisa kami proses', 'Bukti transfer belum bisa diverifikasi.',
+                        etpl_p('Maaf, bukti transfer perpanjanganmu <b>belum bisa kami verifikasi</b>.')
+                      . ($why !== '' ? '<div style="margin:12px 0;padding:14px 16px;border-radius:12px;background:#fdeceb;border-left:4px solid #D53E0F;font-size:14px;line-height:1.6;color:#7a2a1c"><b>Alasan:</b> ' . etpl_h($why) . '</div>' : '')
+                      . etpl_p('Silakan ajukan perpanjangan lagi dan unggah bukti transfer yang benar. Kalau perlu bantuan, hubungi kami kapan saja.') . etpl_button('Ajukan ulang', app_base_url())))) $msg .= ' Email pemberitahuan ke klien sedang dikirim di belakang layar.';
             }
         } catch (Throwable $e) { }
     }

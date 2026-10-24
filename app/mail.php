@@ -157,12 +157,14 @@ function admin_recipients() {
     return array_values(array_unique(array_filter(array_map('trim', explode(',', $list)), function ($x) { return filter_var($x, FILTER_VALIDATE_EMAIL); })));
 }
 // Kirim email teks biasa ke semua penerima admin. Aman dipanggil kapan saja (tak pernah melempar).
-function notify_admin($subject, $body, $now = false) {
-    if (!$now && PHP_SAPI !== 'cli') { defer_after_response(function () use ($subject, $body) { notify_admin($subject, $body, true); }); return 0; }
+function notify_admin($subject, $body, $now = false, $html = null) {
+    if (!$now && PHP_SAPI !== 'cli') { defer_after_response(function () use ($subject, $body, $html) { notify_admin($subject, $body, true, $html); }); return 0; }
     try {
         $to = admin_recipients(); if (!$to) return 0;
-        $headers = "From: Racikin <" . mail_from_addr() . ">\r\nContent-Type: text/plain; charset=UTF-8\r\nMIME-Version: 1.0\r\n";
-        $n = 0; foreach ($to as $t) if (app_mail($t, preg_replace('/[\r\n]+/', ' ', $subject), $body, $headers)) $n++;
+        $hdr = "From: Racikin <" . mail_from_addr() . ">\r\n";
+        if ($html !== null && $html !== '') { [$mh, $body] = etpl_multipart($body, $html); $hdr .= $mh; }
+        else $hdr .= "Content-Type: text/plain; charset=UTF-8\r\nMIME-Version: 1.0\r\n";
+        $n = 0; foreach ($to as $t) if (app_mail($t, preg_replace('/[\r\n]+/', ' ', $subject), $body, $hdr)) $n++;
         return $n;
     } catch (Throwable $e) { error_log('notify_admin: ' . $e->getMessage()); return 0; }
 }
@@ -173,19 +175,21 @@ function app_mail_later($to, $subject, $body, $headers = '') {
     defer_after_response(function () use ($to, $subject, $body, $headers) { app_mail($to, $subject, $body, $headers); });
     return true;
 }
-// Email ke klien TANPA menunggu (dikirim setelah respons selesai). Return true = dijadwalkan.
-function mail_client_later($to, $subject, $body) {
+// Email ke klien TANPA menunggu (dikirim setelah respons selesai). Return true = dijadwalkan. $html opsional → multipart bermerek.
+function mail_client_later($to, $subject, $body, $html = null) {
     if (!filter_var($to, FILTER_VALIDATE_EMAIL)) return false;
-    if (PHP_SAPI === 'cli') return mail_client($to, $subject, $body);
-    defer_after_response(function () use ($to, $subject, $body) { mail_client($to, $subject, $body); });
+    if (PHP_SAPI === 'cli') return mail_client($to, $subject, $body, $html);
+    defer_after_response(function () use ($to, $subject, $body, $html) { mail_client($to, $subject, $body, $html); });
     return true;
 }
-// Email ke klien (satu penerima), teks biasa.
-function mail_client($to, $subject, $body) {
+// Email ke klien (satu penerima). $html opsional: kalau ada → multipart (teks polos + HTML bermerek).
+function mail_client($to, $subject, $body, $html = null) {
     try {
         if (!filter_var($to, FILTER_VALIDATE_EMAIL)) return false;
-        $headers = "From: Racikin <" . mail_from_addr() . ">\r\nReply-To: Racikin <" . support_email() . ">\r\nContent-Type: text/plain; charset=UTF-8\r\nMIME-Version: 1.0\r\n";
-        return app_mail($to, preg_replace('/[\r\n]+/', ' ', $subject), $body, $headers);
+        $hdr = "From: Racikin <" . mail_from_addr() . ">\r\nReply-To: Racikin <" . support_email() . ">\r\n";
+        if ($html !== null && $html !== '') { [$mh, $body] = etpl_multipart($body, $html); $hdr .= $mh; }
+        else $hdr .= "Content-Type: text/plain; charset=UTF-8\r\nMIME-Version: 1.0\r\n";
+        return app_mail($to, preg_replace('/[\r\n]+/', ' ', $subject), $body, $hdr);
     } catch (Throwable $e) { error_log('mail_client: ' . $e->getMessage()); return false; }
 }
 // Diagnosa SMTP: coba beberapa jalur sampai tahap penerima, TANPA mengirim email. Satu koneksi BARU per penerima
@@ -281,10 +285,16 @@ function run_mail_test_inner() {
     $okN = 0; $rows = [];
     foreach ($to as $t) {   // hasil PER PENERIMA, supaya jelas siapa yang berhasil
         $GLOBALS['smtp_last_error'] = '';
-        if (app_mail($t, 'Tes email Racikin', $body, $headers)) { $okN++; $rows[] = "✓ $t — terkirim"; }
+        [$mh, $mbody] = etpl_multipart($body, etpl_html('Tes email berhasil ✓', 'Pengiriman email Racikin berjalan.',
+            etpl_p('Ini email percobaan dari panel admin Racikin. Kalau kamu membaca ini, pengiriman email sudah berjalan.')
+          . etpl_facts([['Pengirim', etpl_h($from)], ['Metode', $smtp ? 'SMTP (' . etpl_h(SMTP_HOST) . ':' . (defined('SMTP_PORT') ? (int)SMTP_PORT : 465) . ')' : 'mail() bawaan hosting'], ['Penerima', etpl_h($t)], ['Waktu', gmdate('Y-m-d H:i', time() + 7 * 3600) . ' WIB']])
+          . etpl_p('Pemberitahuan pendaftar baru dan bukti transfer akan tampil seperti email ini.') . etpl_button('Buka Racikin', app_base_url())));
+        $hdrT = "From: Racikin <$from>\r\nReply-To: Racikin <" . support_email() . ">\r\n" . $mh;
+        if (app_mail($t, 'Tes email Racikin', $mbody, $hdrT)) { $okN++; $rows[] = "✓ $t — terkirim"; }
         else $rows[] = "✗ $t — GAGAL: " . ($smtp ? ($GLOBALS['smtp_last_error'] ?: 'tidak diketahui — cek error log hosting') : 'mail() ditolak hosting');
     }
     $head = $okN === count($to) ? "Email tes terkirim $via. Cek kotak masuk & folder spam. ✓"
           : ($okN > 0 ? "Email tes TERKIRIM SEBAGIAN $via ($okN dari " . count($to) . ' penerima).' : "Email tes GAGAL $via.");
     return [$okN === count($to), $head . "\n" . implode("\n", $rows) . "\n" . $ver];
 }
+require_once __DIR__ . '/emailtpl.php';   // template HTML (sesudah semua fungsi di atas terdefinisi)
