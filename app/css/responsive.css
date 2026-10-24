@@ -48,3 +48,7 @@
 
 /* --- grafik tren mengisi lebar panel (skala proporsional) --- */
 .pchart svg,.kn-trend svg{width:100%;height:auto;max-height:340px}
+
+/* pemilih bulan: teks di tengah pil (ruang kiri sama dengan ruang panah di kanan) */
+.view select.monthsel{text-align:center;text-align-last:center;padding-left:36px!important;padding-right:36px!important}
+.monthsel option{text-align:left}
