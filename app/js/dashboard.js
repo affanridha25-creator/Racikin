@@ -127,27 +127,31 @@ function rDashM(){
   const uname=BIZ.user||"Racikin";
   const el=document.getElementById("v-dashboard");
   el.innerHTML=`
-  <div class="dgreet"><div><h2>${greetWord()}, ${esc(uname)} 👋</h2><p>Ringkasan ${esc(BIZ.name||"usaha")}</p></div></div>
-  ${monthBar()}
-  <div class="hero2">
-    <div class="hl">💰 Omzet · ${monthLabelFull(FILTER_MONTH)}</div>
-    <div class="hv">${cnt(d.omzet)}</div>
-    <div class="hpills">${heroPill(d.dOmz)}<span class="hpill">Laba ${rp(d.laba)} · ${d.margin.toFixed(0)}%</span></div>
-    <div class="hact">
-      <button onclick="go('pos')"><span class="hai">🛒</span>Kasir</button>
-      <button onclick="editNota()"><span class="hai">🧾</span>Nota</button>
-      <button onclick="go('pembayaran')"><span class="hai">💰</span>Bayar</button>
+  <div class="dm-hero">
+    <div class="dm-bg" aria-hidden="true"><i></i><i></i></div>
+    <div class="dm-top"><div class="dm-hi"><h2>${greetWord()}, ${esc(uname)} 👋</h2><p>${esc(BIZ.name||"usaha")}</p></div><div class="dm-month">${monthBar()}</div></div>
+    <div class="dm-lbl">💰 Omzet · ${monthLabelFull(FILTER_MONTH)}</div>
+    <div class="dm-val">${cnt(d.omzet)}</div>
+    <div class="dm-pills">${heroPill(d.dOmz)}<span class="hpill">Laba ${rp(d.laba)}</span></div>
+    <div class="dm-viz">
+      <div class="dm-ring"><svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="32" fill="none" stroke="rgba(255,255,255,.22)" stroke-width="8"/><circle class="rg" cx="40" cy="40" r="32" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" pathLength="1" style="--off:${(1-Math.max(0,Math.min(1,d.margin/100))).toFixed(3)}" transform="rotate(-90 40 40)"/></svg><b>${cnt(Math.max(0,d.margin),"pct")}</b><em>margin</em></div>
+      <div class="dm-spark">${sparkline(d.trend)}<div class="dh-lab">${d.trend.map(t=>`<span>${monthLabel(t.m)}</span>`).join("")}</div></div>
+    </div>
+    <div class="dm-act">
+      <button onclick="go('pos')"><span>🛒</span>Kasir</button>
+      <button onclick="editNota()"><span>🧾</span>Nota</button>
+      <button onclick="go('pembayaran')"><span>💰</span>Bayar</button>
     </div>
   </div>
   ${dashHighlight(d)}
-  <div class="tiles">
-    <div class="mcard"><div class="mi" style="background:var(--green-bg);color:var(--green)">🏦</div><div class="ml">Saldo Kas</div><div class="mv" style="color:${d.saldoKas>=0?"var(--green)":"var(--red)"}">${cnt(d.saldoKas)}</div><div class="ms muted">posisi sekarang</div></div>
-    <div class="mcard"><div class="mi" style="background:var(--amber-bg);color:var(--amber)">⏳</div><div class="ml">Piutang</div><div class="mv" style="color:var(--amber)">${cnt(d.piutang)}</div><div class="ms muted">belum tertagih</div></div>
-    <div class="mcard"><div class="mi" style="background:var(--green-bg);color:var(--green)">💵</div><div class="ml">Laba Kotor</div><div class="mv">${cnt(d.laba)}</div><div class="ms">${deltaTag(d.dLab)}</div></div>
-    <div class="mcard"><div class="mi" style="background:var(--blue-bg);color:var(--blue)">📦</div><div class="ml">Nilai Stok</div><div class="mv">${cnt(d.nilaiStok)}</div><div class="ms muted">HPP di gudang</div></div>
+  <div class="dm-kpis">
+    <div class="dm-kpi" onclick="go('keuangan')"><div class="mi" style="background:var(--blue-bg);color:var(--blue)">🏦</div><div class="ml">Saldo Kas</div><div class="mv" style="color:${d.saldoKas>=0?"var(--green)":"var(--red)"}">${cnt(d.saldoKas)}</div><div class="ms muted">posisi sekarang</div></div>
+    <div class="dm-kpi" onclick="go('pembayaran')"><div class="mi" style="background:var(--amber-bg);color:var(--amber)">⏳</div><div class="ml">Piutang</div><div class="mv" style="color:var(--amber)">${cnt(d.piutang)}</div><div class="ms muted">${d.penunggak.length} toko belum lunas</div></div>
+    <div class="dm-kpi"><div class="mi" style="background:var(--green-bg);color:var(--green)">💵</div><div class="ml">Laba Kotor</div><div class="mv">${cnt(d.laba)}</div><div class="ms">${deltaTag(d.dLab)}</div></div>
+    <div class="dm-kpi" onclick="go('produk')"><div class="mi" style="background:#efe9ff;color:#6b4bd1">📦</div><div class="ml">Nilai Stok</div><div class="mv">${cnt(d.nilaiStok)}</div><div class="ms muted">HPP di gudang</div></div>
   </div>
   <div class="dsec"><h3>Tren 6 Bulan</h3></div>
-  <div class="card2">${trendChart(d.trend)}</div>
+  <div class="card2 dm-chart">${trendChart(d.trend)}</div>
   <div class="dsec"><h3>Produk Terlaris</h3><a onclick="go('produk')">Semua</a></div>
   <div class="card2">${prodProfitBars(d.prodRank)}</div>
   <div class="dsec"><h3>💸 Top Penunggak</h3><a onclick="go('pembayaran')">Tagih</a></div>

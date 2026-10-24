@@ -1,8 +1,12 @@
 "use strict";
-// rekap.js — rekap kasir & sesi
+// rekap.js — rekap kasir & sesi (v2: hero, kartu per kasir, kartu sesi, modal detail)
 // ================= REKAP KASIR =================
 let _userNames={};   // email -> nama (dari daftar pengguna)
 function kasirName(email){return _userNames[email]||email||"(tak tercatat)";}
+// avatar inisial berwarna (pakai avHue dari toko.js)
+function rkAv(name,cls){const h=avHue(name);return `<div class="rk-av ${cls||""}" style="background:hsl(${h},75%,92%);color:hsl(${h},55%,32%)">${esc((String(name||"?").trim()[0]||"?").toUpperCase())}</div>`;}
+// selisih kas -> kelas + label
+function rkDiff(d){d=+d||0;return d===0?{c:"ok",l:"Pas",t:"Rp 0"}:d<0?{c:"neg",l:"Kurang",t:"−"+rp(Math.abs(d))}:{c:"pos",l:"Lebih",t:"+"+rp(d)};}
 async function rRekap(){
   // ambil nama pengguna sekali (biar tampil nama, bukan email) — owner-only, sudah dijaga server
   if(Object.keys(_userNames).length===0){try{const r=await api("usersList");(r.users||[]).forEach(u=>_userNames[u.email]=u.name);}catch(e){}}
@@ -13,53 +17,63 @@ async function rRekap(){
   const tot=rows.reduce((a,r)=>({omzet:a.omzet+r.omzet,tunai:a.tunai+r.tunai,nontunai:a.nontunai+r.nontunai,n:a.n+r.n}),{omzet:0,tunai:0,nontunai:0,n:0});
   const el=document.getElementById("v-rekap");
   const sesi=regLogHtml();
-  const head=`<h2 class="title">Penjualan Kasir (POS)</h2><div class="desc">Rekap transaksi kasir per pengguna &amp; per sesi. Ketuk sesi untuk lihat detail + cetak ulang struk/settlement.</div>`;
-  const expBtn=fnotas.length?`<button class="btn sm gray" onclick="exportPenjualan('pos')">⬇️ CSV</button>`:"";
-  if(rows.length===0){el.innerHTML=`${head}${monthBar()}${sesi||'<div class="empty">Belum ada penjualan kasir pada periode ini.</div>'}`;return;}
-  if(isMobile()){
-    const cards=rows.map(r=>crow({icon:"🧑‍💼",title:esc(kasirName(r.k)),sub:`${r.n} transaksi · tunai ${rp(r.tunai)}`,amt:rp(r.omzet),badges:(r.nontunai>0?`<div class="csub">Non-tunai ${rp(r.nontunai)}</div>`:"")})).join("");
-    el.innerHTML=`${head}${monthBar()}
-      <div class="card accent" style="margin-bottom:14px"><div class="lbl">Total Penjualan Kasir · ${monthLabelFull(FILTER_MONTH)}</div><div class="val">${rp(tot.omzet)}</div></div>
-      <div style="margin-bottom:10px">${expBtn}</div>
-      <div class="clist">${cards}</div>${sesi}`;
-    return;
-  }
-  const trs=rows.map(r=>`<tr><td>${esc(kasirName(r.k))}</td><td class="num">${r.n}</td><td class="num">${rp(r.omzet)}</td><td class="num" style="color:var(--green)">${rp(r.tunai)}</td><td class="num" style="color:var(--amber)">${rp(r.nontunai)}</td></tr>`).join("");
-  el.innerHTML=`${head}<div class="flexbtns">${expBtn}${monthBar()}</div>
-    <div class="panel"><table><thead><tr><th>Kasir</th><th class="num">Transaksi</th><th class="num">Penjualan</th><th class="num">Tunai</th><th class="num">Non-tunai</th></tr></thead>
-    <tbody>${trs}<tr class="tot" style="font-weight:700;border-top:2px solid var(--line)"><td>TOTAL</td><td class="num">${tot.n}</td><td class="num">${rp(tot.omzet)}</td><td class="num">${rp(tot.tunai)}</td><td class="num">${rp(tot.nontunai)}</td></tr></tbody></table></div>${sesi}`;
+  const mob=isMobile();
+  const pT=tot.omzet>0?tot.tunai/tot.omzet*100:0,pN=tot.omzet>0?100-pT:0;
+  const avg=tot.n?tot.omzet/tot.n:0;
+  const expBtn=fnotas.length?`<button class="rk-exp" onclick="exportPenjualan('pos')">⬇️ CSV</button>`:"";
+  const hero=`<div class="rk-hero">
+    <div class="rk-hbg" aria-hidden="true"><i></i><i></i></div>
+    <div class="rk-htop"><div><div class="rk-ht">${mob?"Kasir (POS)":"Penjualan Kasir (POS)"}</div><div class="rk-hs">Rekap per kasir &amp; per sesi laci</div></div><div class="rk-hm">${monthBar()}${expBtn}</div></div>
+    <div class="rk-hl">🛒 Omzet kasir · ${monthLabelFull(FILTER_MONTH)}</div>
+    <div class="rk-hv">${cnt(tot.omzet)}</div>
+    <div class="rk-hp"><span class="hpill">🧾 ${tot.n} transaksi</span><span class="hpill">Rata-rata ${rp(avg)}</span></div>
+    <div class="rk-split"><div class="rk-seg" title="Tunai vs non-tunai">${tot.omzet>0?`<i class="t" style="width:${pT.toFixed(1)}%"></i><i class="n" style="width:${pN.toFixed(1)}%"></i>`:""}</div>
+      <div class="rk-leg"><span><b class="dt"></b>Tunai ${rp(tot.tunai)} <em>${pT.toFixed(0)}%</em></span><span><b class="dn"></b>Non-tunai ${rp(tot.nontunai)} <em>${pN.toFixed(0)}%</em></span></div></div>
+  </div>`;
+  let kas;
+  if(rows.length===0)kas=`<div class="empty">Belum ada penjualan kasir pada periode ini. 🛒</div>`;
+  else kas=`<div class="rk-sec"><h3>👥 Per Kasir</h3><span>${rows.length} kasir</span></div>
+    <div class="rk-grid">${rows.map((r,k)=>{const nm=kasirName(r.k),share=tot.omzet>0?r.omzet/tot.omzet*100:0,tp=r.omzet>0?r.tunai/r.omzet*100:0;
+      return `<div class="rk-card" style="--k:${k}">
+        <div class="rk-ctop">${rkAv(nm)}<div class="rk-cid"><div class="rk-cn">${esc(nm)}${k===0&&rows.length>1?' <span class="rk-crown" title="Penjualan tertinggi">🏆</span>':""}</div><div class="rk-cs">${r.n} transaksi · rata-rata ${rp(r.n?r.omzet/r.n:0)}</div></div><div class="rk-cv">${rp(r.omzet)}</div></div>
+        <div class="rk-bar" title="Kontribusi ${share.toFixed(0)}% dari total"><i style="width:${share.toFixed(1)}%"></i></div>
+        <div class="rk-cmeta"><span>Kontribusi <b>${share.toFixed(0)}%</b></span><span class="g">Tunai <b>${rp(r.tunai)}</b></span><span class="a">Non-tunai <b>${rp(r.nontunai)}</b></span></div>
+        <div class="rk-mix" title="Porsi tunai"><i style="width:${tp.toFixed(1)}%"></i></div>
+      </div>`;}).join("")}</div>`;
+  el.innerHTML=`${hero}${kas}${sesi}`;
+  dashAnimate(el);
 }
 // Riwayat sesi kasir (buka/tutup laci) untuk bulan terpilih
 function regLogHtml(){
   const log=(S.registerLog||[]).filter(s=>inMonth(String(s.closedAt||s.openedAt||"").slice(0,10)));
   if(!log.length)return "";
-  if(isMobile()){
-    const cards=log.map(s=>{const d=s.diff;return crow({icon:"🧾",title:esc(kasirName(s.openedBy)),sub:`${fmtClock(s.openedAt)} → ${fmtClock(s.closedAt)} · ${s.txnCount} nota`,amt:rp(s.cashSales),badges:`<div class="csub">Modal ${rp(s.openingFloat)} · Selisih <b style="color:${d===0?"var(--green)":"var(--red)"}">${(d>0?"+":"")+rp(d)}</b></div>`,onclick:`sessionDetail('${s.id}')`});}).join("");
-    return `<div class="dsec" style="margin-top:22px"><h2 class="title" style="font-size:17px">Riwayat Sesi Kasir</h2></div><div class="clist">${cards}</div>`;
-  }
-  const trs=log.map(s=>{const d=s.diff;return `<tr style="cursor:pointer" onclick="sessionDetail('${s.id}')"><td>${esc(kasirName(s.openedBy))}<br><span class="mini">${fmtClock(s.openedAt)} → ${fmtClock(s.closedAt)}</span></td><td class="num">${s.txnCount}</td><td class="num">${rp(s.openingFloat)}</td><td class="num">${rp(s.cashSales)}</td><td class="num">${rp(s.expected)}</td><td class="num">${rp(s.closing)}</td><td class="num" style="color:${d===0?"var(--green)":"var(--red)"};font-weight:700">${(d>0?"+":"")+rp(d)}</td></tr>`;}).join("");
-  return `<h2 class="title" style="font-size:18px;margin-top:26px">Riwayat Sesi Kasir</h2><div class="desc">Buka/tutup laci pada periode terpilih. <b>Ketuk sesi</b> untuk detail transaksi + cetak ulang. Selisih = uang fisik − kas seharusnya.</div>
-    <div class="panel"><table><thead><tr><th>Kasir / Waktu</th><th class="num">Nota</th><th class="num">Modal</th><th class="num">Tunai</th><th class="num">Seharusnya</th><th class="num">Dihitung</th><th class="num">Selisih</th></tr></thead><tbody>${trs}</tbody></table></div>`;
+  const bad=log.filter(s=>(+s.diff||0)!==0).length;
+  const cards=log.map((s,k)=>{const df=rkDiff(s.diff),nm=kasirName(s.openedBy);
+    return `<div class="rk-sess ${df.c}" style="--k:${k}" onclick="sessionDetail('${esc(s.id)}')">
+      <div class="rk-stop">${rkAv(nm,"sm")}<div class="rk-cid"><div class="rk-cn">${esc(nm)}</div><div class="rk-cs">${fmtClock(s.openedAt)} → ${fmtClock(s.closedAt)} · ${s.txnCount} nota</div></div><div class="rk-df ${df.c}"><small>${df.l}</small>${df.t}</div></div>
+      <div class="rk-sgrid"><div><span>Modal</span><b>${rp(s.openingFloat)}</b></div><div><span>Tunai</span><b>${rp(s.cashSales)}</b></div><div><span>Seharusnya</span><b>${rp(s.expected)}</b></div><div><span>Dihitung</span><b>${rp(s.closing)}</b></div></div>
+    </div>`;}).join("");
+  return `<div class="rk-sec"><h3>🧾 Riwayat Sesi Kasir</h3><span>${bad?`<b class="rk-warn">${bad} sesi selisih</b>`:"semua kas pas ✓"}</span></div>
+    <div class="rk-note">Ketuk sesi untuk detail transaksi &amp; cetak ulang. Selisih = uang fisik − kas seharusnya.</div>
+    <div class="rk-grid">${cards}</div>`;
 }
 // ---- Detail sesi kasir: settlement + daftar transaksi + cetak ulang ----
 function sessionDetail(sid){
   const s=(S.registerLog||[]).find(x=>x.id===sid);if(!s){toast("Sesi tak ditemukan.");return;}
   const txns=S.notas.filter(n=>n.sessionId===sid).sort((a,b)=>(b.notaNo||"").localeCompare(a.notaNo||""));
-  const d=s.diff;
-  const rows=txns.map(n=>`<div class="crow"><div class="ci">🧾</div><div class="cmain"><div class="ctitle">${esc(n.notaNo||"-")}</div><div class="csub">${fmtDate(n.date)} · ${notaItems(n).length} item · ${esc(n.payMethod||"Tunai")}</div></div><div class="cright"><div class="camt">${rp(notaTotal(n))}</div></div><button class="crow-del" style="color:var(--red);font-size:16px" title="Cetak ulang struk" onclick="strukModal('${n.id}')">🖨</button></div>`).join("");
-  openModal(`<button class="close" onclick="closeModal()">×</button><h3>Sesi Kasir — ${esc(kasirName(s.openedBy))}</h3>
-    <div class="mini" style="margin:-6px 0 12px">${fmtClock(s.openedAt)} → ${fmtClock(s.closedAt)}</div>
-    <div class="regsum" style="background:var(--bg);border-radius:12px;padding:6px 14px;margin-bottom:14px">
-      <div class="rs" style="display:flex;justify-content:space-between;padding:7px 0"><span>Modal awal</span><b>${rp(s.openingFloat)}</b></div>
-      <div class="rs" style="display:flex;justify-content:space-between;padding:7px 0;border-top:1px solid var(--line)"><span>Penjualan tunai</span><b>${rp(s.cashSales)}</b></div>
-      <div class="rs" style="display:flex;justify-content:space-between;padding:7px 0;border-top:1px solid var(--line)"><span>Non-tunai</span><b>${rp(s.noncashSales)}</b></div>
-      <div class="rs" style="display:flex;justify-content:space-between;padding:7px 0;border-top:1px solid var(--line);font-weight:800"><span>Kas seharusnya</span><b>${rp(s.expected)}</b></div>
-      <div class="rs" style="display:flex;justify-content:space-between;padding:7px 0;border-top:1px solid var(--line)"><span>Uang dihitung</span><b>${rp(s.closing)}</b></div>
-      <div class="rs" style="display:flex;justify-content:space-between;padding:7px 0;border-top:1px solid var(--line);font-weight:800"><span>Selisih</span><b style="color:${d===0?'var(--green)':'var(--red)'}">${(d>0?'+':'')+rp(d)}</b></div>
-    </div>
-    <button class="btn" style="width:100%;margin-bottom:14px" onclick="printRawBT(settlementText('${sid}'))">🖨 Cetak Ulang Laporan Settlement</button>
-    <div class="mini" style="font-weight:700;color:var(--ink);margin-bottom:6px">Transaksi (${txns.length})</div>
-    ${txns.length===0?'<div class="empty">Tak ada transaksi.</div>':`<div class="clist">${rows}</div>`}`);
+  const df=rkDiff(s.diff),nm=kasirName(s.openedBy);
+  const rows=txns.map(n=>`<div class="rk-trx"><div class="rk-ti">🧾</div><div class="rk-tm"><b>${esc(n.notaNo||"-")}</b><span>${fmtDate(n.date)} · ${notaItems(n).length} item · ${esc(n.payMethod||"Tunai")}</span></div><div class="rk-ta">${rp(notaTotal(n))}</div><button class="rk-tp" title="Cetak ulang struk" onclick="strukModal('${n.id}')">🖨</button></div>`).join("");
+  const rs=(l,v,cl)=>`<div class="rk-rs ${cl||""}"><span>${l}</span><b>${v}</b></div>`;
+  openModal(`<div class="rk-md">
+    <div class="rk-mh"><button class="close" onclick="closeModal()">×</button>
+      <div class="rk-mhrow">${rkAv(nm,"sm")}<div><div class="rk-mt">Sesi Kasir — ${esc(nm)}</div><div class="rk-ms">${fmtClock(s.openedAt)} → ${fmtClock(s.closedAt)} · ${s.txnCount} nota</div></div></div>
+      <div class="rk-mdiff ${df.c}"><span>Selisih kas · ${df.l}</span><b>${df.t}</b></div></div>
+    <div class="rk-mb">
+      <div class="rk-rsum">${rs("Modal awal",rp(s.openingFloat))}${rs("Penjualan tunai",rp(s.cashSales))}${rs("Non-tunai",rp(s.noncashSales))}${rs("Kas seharusnya",rp(s.expected),"b")}${rs("Uang dihitung",rp(s.closing))}${rs("Selisih",df.t,"b "+df.c)}</div>
+      <button class="btn rk-pbtn" onclick="printRawBT(settlementText('${sid}'))">🖨 Cetak Ulang Laporan Settlement</button>
+      <div class="rk-tt">Transaksi (${txns.length})</div>
+      ${txns.length===0?'<div class="empty">Tak ada transaksi.</div>':`<div class="rk-tl">${rows}</div>`}
+    </div></div>`);
 }
 function settlementText(sid){
   const s=(S.registerLog||[]).find(x=>x.id===sid);if(!s)return "";
