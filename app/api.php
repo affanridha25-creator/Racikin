@@ -440,7 +440,7 @@ function app_mail($to, $subject, $body, $headers = '') {
 }
 function notify_admin_signup($name, $alias, $user, $email, $status, $wa = '') {
     $list = (defined('ADMIN_EMAIL') ? (string)ADMIN_EMAIL : '');
-    try { $st = settings_all(); $list .= ',' . ($st['notify_email'] ?? ''); } catch (Exception $e) { }
+    try { $st = settings_all(); $list .= ',' . ($st['notify_email'] ?? ''); } catch (Throwable $e) { }
     $recipients = array_values(array_unique(array_filter(array_map('trim', explode(',', $list)), function ($x) { return filter_var($x, FILTER_VALIDATE_EMAIL); })));
     if (!$recipients) return;
     $clean = function ($v) { return trim(preg_replace('/[\r\n]+/', ' ', (string)$v)); };   // cegah header injection

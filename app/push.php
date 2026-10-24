@@ -26,7 +26,7 @@ function fcm_access_token() {
     $ch = curl_init($sa['token_uri'] ?? 'https://oauth2.googleapis.com/token');
     curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER=>true, CURLOPT_POST=>true, CURLOPT_TIMEOUT=>15,
         CURLOPT_POSTFIELDS=>http_build_query(['grant_type'=>'urn:ietf:params:oauth:grant-type:jwt-bearer','assertion'=>$jwt])]);
-    $res = curl_exec($ch); curl_close($ch);
+    $res = curl_exec($ch);
     $j = json_decode($res, true);
     if (empty($j['access_token'])) { error_log('fcm token: '.$res); return null; }
     $cache = ['tok'=>$j['access_token'], 'exp'=>$now + (int)($j['expires_in'] ?? 3600)];
@@ -49,7 +49,7 @@ function fcm_send(array $tokens, $title, $body, array $data = []) {
         curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER=>true, CURLOPT_POST=>true, CURLOPT_TIMEOUT=>15,
             CURLOPT_HTTPHEADER=>['Authorization: Bearer '.$access, 'Content-Type: application/json'],
             CURLOPT_POSTFIELDS=>json_encode($msg)]);
-        $res = curl_exec($ch); $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
+        $res = curl_exec($ch); $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
         if ($code === 200) $sent++;
         elseif ($code === 404 || $code === 400) $dead[] = $t;   // token kadaluarsa/tak valid → buang
     }

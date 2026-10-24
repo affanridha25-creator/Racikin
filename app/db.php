@@ -156,7 +156,7 @@ function cpanel_create_db($dbname, $dbuser) {
     $call = function ($url) use ($auth) {
         $ch = curl_init($url);
         curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER=>true, CURLOPT_HTTPHEADER=>[$auth], CURLOPT_TIMEOUT=>20, CURLOPT_CONNECTTIMEOUT=>10, CURLOPT_SSL_VERIFYPEER=>true, CURLOPT_SSL_VERIFYHOST=>2]);
-        $res = curl_exec($ch); $err = curl_error($ch); curl_close($ch);
+        $res = curl_exec($ch); $err = curl_error($ch);
         if ($res === false) { error_log('cpanel curl: ' . $err); return null; }
         $j = json_decode($res, true); return is_array($j) ? $j : null;
     };
@@ -198,7 +198,7 @@ function pool_names() {
             $q = server_pdo()->prepare("SHOW DATABASES LIKE ?");
             $q->execute([str_replace(['\\', '_', '%'], ['\\\\', '\\_', '\\%'], $prefix) . '%']);
             foreach ($q->fetchAll(PDO::FETCH_COLUMN) as $d) $n[] = (string)$d;
-        } catch (Exception $e) { error_log('pool detect: ' . $e->getMessage()); }
+        } catch (Throwable $e) { error_log('pool detect: ' . $e->getMessage()); }
     }
     $skip = defined('DB_MASTER') ? [DB_MASTER] : [];
     $cache = array_values(array_unique(array_filter($n, function ($d) use ($skip) { return $d !== '' && !in_array($d, $skip, true); })));
