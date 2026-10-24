@@ -133,7 +133,7 @@ function defer_after_response(callable $fn) {
             elseif (function_exists('litespeed_finish_request')) @litespeed_finish_request();
         } catch (Throwable $e) { }
         @ignore_user_abort(true); @set_time_limit(120);
-        $GLOBALS['smtp_io_timeout'] = (defined('SMTP_IO_TIMEOUT') && (int)SMTP_IO_TIMEOUT > 0) ? (int)SMTP_IO_TIMEOUT : 45;   // tak ada yang menunggu → boleh sabar
+        $GLOBALS['smtp_io_timeout'] = (defined('SMTP_IO_TIMEOUT') && (int)SMTP_IO_TIMEOUT > 0) ? (int)SMTP_IO_TIMEOUT : 60;   // tak ada yang menunggu → boleh sabar (DNS server lambat: Gmail butuh ±35 dtk)
         foreach ($queue as $f) { try { $f(); } catch (Throwable $e) { error_log('defer: ' . $e->getMessage()); } }
     });
 }
@@ -165,6 +165,13 @@ function notify_admin($subject, $body, $now = false) {
         $n = 0; foreach ($to as $t) if (app_mail($t, preg_replace('/[\r\n]+/', ' ', $subject), $body, $headers)) $n++;
         return $n;
     } catch (Throwable $e) { error_log('notify_admin: ' . $e->getMessage()); return 0; }
+}
+// Kirim email apa adanya (header lengkap) TANPA menunggu — setelah respons selesai. Return true = dijadwalkan.
+function app_mail_later($to, $subject, $body, $headers = '') {
+    if (!filter_var($to, FILTER_VALIDATE_EMAIL)) return false;
+    if (PHP_SAPI === 'cli') return app_mail($to, $subject, $body, $headers);
+    defer_after_response(function () use ($to, $subject, $body, $headers) { app_mail($to, $subject, $body, $headers); });
+    return true;
 }
 // Email ke klien TANPA menunggu (dikirim setelah respons selesai). Return true = dijadwalkan.
 function mail_client_later($to, $subject, $body) {
@@ -245,7 +252,7 @@ function run_smtp_diagnose() {
             $GLOBALS['smtp_io_timeout'] = 70; $a = microtime(true);
             [$ok2, $info2] = smtp_try($h, 465, 'ssl', $slow, 70);
             unset($GLOBALS['smtp_io_timeout']);
-            $lines[] = '  ' . ($ok2 ? '✓ ' : '✗ ') . $info2 . ($ok2 ? ' — jadi cukup melonggarkan batas waktu (pengiriman di belakang layar sudah memakai 45 dtk)' : ' — tetap gagal: sebaiknya pakai layanan pengirim lain (Brevo) atau minta Rumahweb memperbaiki DNS');
+            $lines[] = '  ' . ($ok2 ? '✓ ' : '✗ ') . $info2 . ($ok2 ? ' — jadi cukup melonggarkan batas waktu (pengiriman di belakang layar sudah memakai 60 dtk)' : ' — tetap gagal: sebaiknya pakai layanan pengirim lain (Brevo) atau minta Rumahweb memperbaiki DNS');
         } elseif ($slow) { $lines[] = '(uji sabar dilewati: batas waktu PHP terlalu pendek)'; }
         $lines[] = 'Versi mail.php v' . mail_build();
         return [true, implode("\n", $lines)];
@@ -258,7 +265,7 @@ function run_mail_test() {
 }
 function run_mail_test_inner() {
     @set_time_limit(180);
-    $GLOBALS['smtp_io_timeout'] = 40;
+    $GLOBALS['smtp_io_timeout'] = 60;
     $list = defined('ADMIN_EMAIL') ? (string)ADMIN_EMAIL : '';
     try { $st = settings_all(); $list .= ',' . ($st['notify_email'] ?? ''); } catch (Throwable $e) { }
     $to = array_values(array_unique(array_filter(array_map('trim', explode(',', $list)), function ($x) { return filter_var($x, FILTER_VALIDATE_EMAIL); })));

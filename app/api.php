@@ -394,7 +394,7 @@ function send_reset_email($to, $name, $alias, $tokenStr) {
           . "Klik link ini untuk membuat password baru (berlaku 1 jam):\n\n$link\n\n"
           . "Kalau kamu tidak meminta ini, abaikan saja email ini. Butuh bantuan? Hubungi " . support_email() . ".\n\n— Racikin";
     $headers = "From: Racikin <$from>\r\nReply-To: Racikin <" . support_email() . ">\r\nContent-Type: text/plain; charset=UTF-8\r\nMIME-Version: 1.0\r\n";
-    app_mail($to, $subject, $body, $headers);
+    app_mail_later($to, $subject, $body, $headers);   // tanpa menunggu server mail (DNS lambat → Gmail ±35 dtk)
 }
 
 require_once __DIR__ . '/push.php';   // helper FCM (fcm_send, push_tokens_for) — dipakai juga oleh cron
@@ -687,7 +687,7 @@ try {
                   . "Kode OTP: $code\n(berlaku 10 menit, sekali pakai)\n\n"
                   . "Berikan kode ini ke kasir HANYA jika kamu menyetujui pembatalan. Abaikan jika tidak.\n\n— $bizName";
             $headers = "From: " . mb_encode_mimeheader($bizName) . " <$from>\r\nReply-To: $from\r\nContent-Type: text/plain; charset=UTF-8\r\nMIME-Version: 1.0\r\n";
-            $sent = 0; foreach ($owners as $o) { if (app_mail($o['email'], $subject, $body, $headers)) $sent++; }
+            $sent = 0; foreach ($owners as $o) { if (app_mail_later($o['email'], $subject, $body, $headers)) $sent++; }   // dikirim di belakang layar; kasir tak perlu menunggu
             echo json_encode(['ok' => true, 'sent' => $sent > 0, 'owners' => array_map(fn($o) => mask_email($o['email']), $owners)]);
             break;
         }
@@ -704,7 +704,7 @@ try {
             $from = defined('RESET_FROM') && RESET_FROM ? RESET_FROM : ('noreply@' . preg_replace('/^www\./', '', $host));
             $subject = 'Struk ' . ($n['nota_no'] ?: '') . ' - ' . $bizName;
             $headers = "From: " . mb_encode_mimeheader($bizName) . " <$from>\r\nReply-To: $from\r\nContent-Type: text/html; charset=UTF-8\r\nMIME-Version: 1.0\r\n";
-            $sent = app_mail($email, $subject, build_receipt_html($pdo, $n), $headers);
+            $sent = app_mail_later($email, $subject, build_receipt_html($pdo, $n), $headers);   // HTML dibangun sekarang, dikirim setelah respons
             echo json_encode(['ok' => true, 'sent' => (bool)$sent]);
             break;
         }
