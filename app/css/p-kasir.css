@@ -132,3 +132,5 @@
 }
 @media(pointer:coarse){.pk-co .crt .stp button{width:44px;height:44px}}
 @media (prefers-reduced-motion:reduce){.pk-lock,.pk-lockic,.pk-hero,.pk-hero i,.pk-card,.pcard.pk-card.pk-pop,.pcard.pk-card .qbadge,.posbar,.posbar.bump,.pk-kembdone,.pk-done .ok,.pk-qbox{animation:none!important}.pcard.pk-card,.pcard.pk-card .pcimg img{transition:none}}
+
+#v-pos .cnt{letter-spacing:-.02em}

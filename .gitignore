@@ -15,3 +15,6 @@ _sql/
 *.code-workspace
 .vscode/
 .idea/
+
+# worktree & data sesi agent
+.claude/

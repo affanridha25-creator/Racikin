@@ -264,3 +264,26 @@ td.empty,.cmpt .empty{padding:30px}
   .nav-ind,.bn-ind,.sheet,.sheet-bg,#nav button,#nav button .ic,.btn,.card,.crow,#toast,.sidebar .logout,.sidebar .brand .logo,.modal .close,.x,.combo-opt,.botnav,.botnav button .bic{transition:none!important}
   #nav button:hover,.btn:hover,.card:hover{transform:none!important}
 }
+
+/* sidebar ringkas di layar pendek supaya seluruh menu terlihat tanpa digulir */
+@media (min-width:821px) and (max-height:980px){
+  .sidebar{padding-top:16px;padding-bottom:12px}
+  .sidebar .brand{padding-bottom:8px}
+  .sidebar .brand .logo{width:46px;height:46px}
+  .nav-grp{padding:9px 16px 3px}
+  #nav button{padding:4px 14px 4px 7px;font-size:13.5px;min-height:36px}
+  #nav button .ic{width:26px;height:26px;font-size:13px}
+  #nav{padding-bottom:6px}
+}
+@media (min-width:821px) and (max-height:820px){
+  .sidebar .brand{display:none}
+  .nav-grp{padding:7px 16px 2px}
+  #nav button{padding:3px 14px 3px 6px;font-size:13px;min-height:32px}
+  #nav button .ic{width:24px;height:24px;font-size:12px}
+}
+
+/* mobile: konten tak boleh melebar melewati layar (blob dekoratif / baris geser); clip tidak membuat scroll container → sticky tetap jalan */
+@media (max-width:820px){main,.content{overflow-x:clip}}
+
+/* angka hitung-naik selalu ikut ukuran/gaya induknya (selektor "... span{}" di CSS halaman tak boleh mengecilkannya) */
+.cnt{display:inline!important;font:inherit!important;letter-spacing:inherit;text-transform:none!important}

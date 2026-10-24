@@ -69,7 +69,7 @@ function asset($p){return $p.'?v='.(@filemtime(__DIR__.'/'.$p)?:1);} ?>
 </aside>
 <div class="content">
   <div id="subBanner" style="display:none"></div>
-  <div class="topbar"><div class="t-left"><div class="t-hi" id="topHi">Selamat datang kembali</div><div class="t-title" id="topTitle">Dashboard</div></div><img class="t-word-img" src="icons/logo-word.png" alt="Racikin"><div class="t-right">👋 Halo, <b>ANNA</b></div></div></div>
+  <div class="topbar"><div class="t-left"><div class="t-hi" id="topHi">Selamat datang kembali</div><div class="t-title" id="topTitle">Dashboard</div></div><img class="t-word-img" src="icons/logo-word.png" alt="Racikin"><div class="t-right">👋 Halo, <b>ANNA</b></div></div>
   <main>
     <section id="v-dashboard" class="view active"><div class="empty">Memuat data…</div></section>
     <section id="v-pos" class="view"></section>

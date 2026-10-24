@@ -194,3 +194,20 @@
   .ds-wrap.ds-in>*,.ds-tbl tbody tr,.ds-nc,.ds-pbar i,.ds-pr-bar i,.ds-empty-i,.ds-mh-i,.ds-ic,.pill.ds-st.belum::before{animation:none!important}
   .ds-chip,.ds-kpi,.ds-ab,.ds-nc{transition:none!important}
 }
+
+/* tabel nota: nomor tak patah baris, kolom lebih rapat supaya aksi tak terpotong */
+.ds-tbl td,.ds-tbl th{padding-left:4px;padding-right:4px}
+.ds-tbl .ds-sto{min-width:0}
+.ds-tbl .ds-sto .ds-av{display:none}
+.ds-tbl td:nth-child(2) b{font-size:12.5px}
+.ds-tbl{font-size:12.5px}
+.ds-tbl td:nth-child(2){white-space:nowrap}
+.ds-tbl td.ds-td-d{white-space:nowrap}
+.ds-tbl td:last-child{white-space:nowrap;width:1%}
+.ds-tbl .pill{padding:4px 8px}
+.ds-acts{gap:4px}
+.ds-ab{padding:6px 8px;min-width:0}
+@media (max-width:820px){
+  .ds-tools,.ds-tools>*{min-width:0;max-width:100%}
+  .ds-tools-r select,.ds-tools-r input{max-width:none;width:100%;min-width:0}
+}

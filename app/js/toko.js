@@ -43,8 +43,10 @@ function rToko(){
   const top=mob?`<div class="tk-hero"><div class="pf-hbg" aria-hidden="true"><i></i><i></i></div>
       <div class="tk-hl">🏪 ${d.length} toko mitra</div><div class="tk-hv">${cnt(totO)}</div><div class="tk-hs">total omzet dari semua toko</div>
       <div class="tk-hrow"><div><span>Piutang</span><b>${cnt(totD)}</b></div><div><span>Berpiutang</span><b>${cnt(nD,"num")} toko</b></div></div></div>`
-    :`<h2 class="title">Master Toko</h2><div class="desc">Daftar toko/warung tempat titip atau jual produk — lengkap dengan omzet &amp; piutang tiap toko.</div>
-  <div class="cards">${card("Jumlah Toko",cnt(d.length,"num"))}${card("Total Omzet",cnt(totO))}${card("Total Piutang",cnt(totD),"amber")}${card("Toko Berpiutang",cnt(nD,"num"))}</div>`;
+    :`<div class="tk-hero tk-hd"><div class="pf-hbg" aria-hidden="true"><i></i><i></i></div>
+      <div class="tk-hdtop"><div><div class="tk-hl">🏪 Master Toko</div><div class="tk-hv">${cnt(totO)}</div><div class="tk-hs">total omzet dari ${d.length} toko mitra · daftar tempat titip atau jual produk</div></div>
+        <button class="btn tk-hadd" onclick="editStore()">+ Toko Baru</button></div>
+      <div class="tk-hrow tk-h4"><div><span>Jumlah Toko</span><b>${cnt(d.length,"num")}</b></div><div><span>Total Omzet</span><b>${cnt(totO)}</b></div><div><span>Total Piutang</span><b>${cnt(totD)}</b></div><div><span>Toko Berpiutang</span><b>${cnt(nD,"num")}</b></div></div></div>`;
   el.innerHTML=`${top}
   <div class="tk-tools"><input type="search" placeholder="Cari toko / kontak / alamat…" value="${esc(TOKO_Q)}" oninput="setTokoQ(this.value)">
     <div class="tk-sort">${chip("omzet","Omzet")}${chip("piutang","Piutang")}${chip("terbaru","Terbaru")}${chip("nama","A–Z")}</div>

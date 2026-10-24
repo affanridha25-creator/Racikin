@@ -27,6 +27,10 @@ function navSync(anim){
     // grup menu disembunyikan bila semua itemnya tak boleh diakses (mis. staf / F&B)
     if(nav){let g=null,any=false;const done=()=>{if(g){const d=any?"":"none";if(g.style.display!==d)g.style.display=d;}};
       [...nav.children].forEach(el=>{if(el.classList.contains("nav-grp")){done();g=el;any=false;}else if(el.tagName==="BUTTON"&&el.style.display!=="none")any=true;});done();}
+    if(nav&&act&&nav.scrollHeight>nav.clientHeight+2){   // menu aktif harus terlihat walau daftar menu harus digulir
+      if(act.offsetTop<nav.scrollTop+4)nav.scrollTop=Math.max(0,act.offsetTop-10);
+      else if(act.offsetTop+act.offsetHeight>nav.scrollTop+nav.clientHeight-4)nav.scrollTop=act.offsetTop+act.offsetHeight-nav.clientHeight+12;
+    }
     if(ind&&act&&act.offsetHeight){
       if(!ind.dataset.on){ind.style.transition="none";}
       ind.style.transform="translateY("+act.offsetTop+"px)";ind.style.height=act.offsetHeight+"px";ind.style.opacity=1;

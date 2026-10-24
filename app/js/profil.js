@@ -13,7 +13,7 @@ function rProfile(){
   const rate=(id,v)=>`<div class="pf-rate"><input id="${id}" inputmode="decimal" value="${v&&+v?(+v):""}" placeholder="0"><b>%</b></div>`;
   const qv=_prof.qris?(qrisValid(_prof.qris)?'<span style="color:var(--green)">✓ QRIS valid — nanti muncul di Kasir saat pilih QRIS.</span>':'<span style="color:var(--red)">⚠ Kode QRIS belum valid.</span>'):'Scan sticker QRIS-mu pakai app pembaca QR, salin teksnya ke sini. Kosongkan kalau belum ada.';
   const el=document.getElementById("v-profile");
-  el.innerHTML=`<div class="pf-head"><h2 class="title">Profil Usaha</h2><div class="desc">Logo &amp; kontak muncul di aplikasi, <b>struk PDF</b>, &amp; kop laporan cetak. <span class="mini">(Struk thermal 58mm hanya teks — tak memuat gambar logo.)</span></div></div>
+  el.innerHTML=`<div class="pf-head"><div class="desc">Logo &amp; kontak muncul di aplikasi, <b>struk PDF</b>, &amp; kop laporan cetak. <span class="mini">(Struk thermal 58mm hanya teks — tak memuat gambar logo.)</span></div></div>
   <div class="pf-grid">
    <div class="pf-col">
     <div class="pfc pf-hero" style="--k:0">

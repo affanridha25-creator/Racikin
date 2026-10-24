@@ -67,3 +67,17 @@
   .tk-mact .btn{flex:1}
 }
 @media (prefers-reduced-motion:reduce){.tk-hero{animation:none!important}}
+
+
+/* hero desktop */
+.tk-hd{padding:26px 28px 22px;border-radius:28px;margin-bottom:18px}
+.tk-hd .tk-hv{font-size:clamp(32px,4vw,46px)}
+.tk-hdtop{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+.tk-hadd{background:#fff;color:var(--red);border-radius:999px;padding:11px 20px;font-weight:700;border:none;box-shadow:0 8px 20px rgba(0,0,0,.18)}
+.tk-hadd:hover{background:var(--cream);color:var(--red)}
+.tk-h4{grid-template-columns:repeat(4,1fr);gap:12px;margin-top:20px}
+.tk-h4>div{padding:13px 16px;border-radius:20px}
+.tk-h4 b{font-size:20px}
+@media (max-width:820px){.tk-hd{padding:18px 18px 16px;border-radius:26px}.tk-hadd{display:none}.tk-h4{grid-template-columns:1fr 1fr}}
+@media (min-width:821px){.tk-add{display:none}}
+.tk-hrow b .cnt{display:inline;font-size:inherit;font-weight:inherit;opacity:1}
