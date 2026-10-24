@@ -78,21 +78,26 @@ async function submitVoidOtp(id){
 
 function rPOS(){
   const reg=regOpen(),el=document.getElementById("v-pos");
+  const popId=window._posPop||null;window._posPop=null;   // produk yg baru diketuk (animasi pop; hanya tampilan)
   if(!reg){
-    el.innerHTML=`<div class="pos-head"><div class="pt">🛒 Kasir</div></div>
-      <div class="regopen"><div class="regicon">🔒</div><h3>Kasir belum dibuka</h3>
+    el.innerHTML=`<div class="pk-lock"><div class="pk-lockic">🔒</div><h3>Kasir belum dibuka</h3>
       <p class="mini">Buka kasir dulu &amp; catat modal awal (uang tunai/kembalian di laci) sebelum mulai berjualan. Semua transaksi akan tercatat dalam sesi ini.</p>
-      <button class="btn" onclick="openRegisterModal()">🔓 Buka Kasir</button></div>`;
+      <button class="btn pk-pill" onclick="openRegisterModal()">🔓 Buka Kasir</button></div>`;
     return;
   }
   const st=sessTotals(),laci=reg.openingFloat+st.cash;
-  const grid=S.products.map(p=>{const tr=tracksStock(p);const s=stock(p.id);const q=POS.cart[p.id]||0;
-    return `<button class="pcard ${tr&&s<=0?(canOversell()?"low":"out"):""} ${p.photo?"haspic":""}" data-n="${esc(p.name.toLowerCase())}" onclick="posAdd('${p.id}')">${q>0?`<span class="qbadge">${q}</span>`:""}${p.photo?`<div class="pcimg"><img src="${p.photo}" alt=""></div>`:""}<div class="pn">${esc(p.name)}</div><div class="pp">${rp(p.harga)}</div><div class="ps">${tr?(s<=0?"stok habis":"stok "+s):"&nbsp;"}</div></button>`;}).join("");
-  const cnt=posCount(),tot=posTotal();
-  el.innerHTML=`
-    <div class="pos-head"><div class="pt">🛒 Kasir</div><button class="btn sm del" onclick="closeRegisterModal()">🔓 Tutup Kasir</button></div>
-    <div class="regbar">
-      <div class="rgi">Dibuka oleh <b>${esc(kasirName(reg.openedBy))}</b><i>${fmtClock(reg.openedAt)}</i></div>
+  const td=today(),omzetHariIni=S.notas.filter(n=>n.sessionId&&String(n.date||"").slice(0,10)===td).reduce((a,n)=>a+notaOmzet(n),0);
+  const grid=S.products.map((p,i)=>{const tr=tracksStock(p);const s=stock(p.id);const q=POS.cart[p.id]||0;
+    const hue=typeof avHue==="function"?avHue(p.name):20;
+    const stl=!tr?"":(s<=0?"stok habis":(s<=5?"menipis · "+s:"stok "+s));
+    const stc=!tr?"":(s<=0?"out":(s<=5?"low":"ok"));
+    return `<button class="pcard pk-card ${tr&&s<=0?(canOversell()?"low":"out"):""} ${p.photo?"haspic":""} ${p.id===popId?"pk-pop":""}" style="--i:${Math.min(i,14)}" data-n="${esc(p.name.toLowerCase())}" onclick="posAdd('${p.id}')">${q>0?`<span class="qbadge">${q}</span>`:""}<div class="pcimg">${p.photo?`<img src="${p.photo}" alt="">`:`<span class="pk-ph" style="--h:${hue}">${esc((p.name||"?").trim().charAt(0).toUpperCase())}</span>`}${stc?`<span class="pk-stk ${stc}">${stl}</span>`:""}</div><div class="pcb"><div class="pn">${esc(p.name)}</div><div class="pp">${rp(p.harga)}</div></div></button>`;}).join("");
+  const cnt_=posCount(),tot=posTotal();
+  el.innerHTML=`<div class="pk-wrap${popId?" pk-still":""}">
+    <div class="pk-hero">
+      <i class="pk-b1"></i><i class="pk-b2"></i>
+      <div class="pk-htop"><div><div class="pk-ht">🛒 Kasir</div><div class="pk-hs">Dibuka oleh <b>${esc(kasirName(reg.openedBy))}</b> · ${fmtClock(reg.openedAt)}</div></div><button class="pk-close" onclick="closeRegisterModal()">🔓 Tutup Kasir</button></div>
+      <div class="pk-hnum"><span>Omzet hari ini</span><b>${popId?rp(omzetHariIni):cnt(omzetHariIni,"rp")}</b></div>
       <div class="rgchips">
         <div class="rgc"><span>Modal awal</span><b>${rp(reg.openingFloat)}</b></div>
         <div class="rgc"><span>Penjualan tunai</span><b>${rp(st.cash)}</b></div>
@@ -101,10 +106,11 @@ function rPOS(){
         <div class="rgc hl"><span>Kas di laci</span><b>${rp(laci)}</b></div>
       </div>
     </div>
-    <button class="btn ghost" style="width:100%;justify-content:center;margin-bottom:12px" onclick="sessionTxnsModal()">🧾 Transaksi Sesi Ini${st.cnt?` (${st.cnt})`:""} — lihat / batalkan</button>
-    <input class="possearch" id="posSearch" placeholder="🔎 Cari produk…" oninput="posFilterGrid(this.value)" value="${esc(POS.q)}">
+    <div class="pk-tools"><input class="possearch" id="posSearch" placeholder="🔎 Cari produk…" oninput="posFilterGrid(this.value)" value="${esc(POS.q)}">
+    <button class="pk-sess" onclick="sessionTxnsModal()">🧾 Transaksi Sesi${st.cnt?` (${st.cnt})`:""}</button></div>
     ${S.products.length===0?'<div class="empty">Belum ada produk. Tambah dulu di menu Produk.</div>':`<div class="posgrid" id="posGrid">${grid}</div>`}
-    ${cnt>0?`<div class="posbar"><button class="posclr" onclick="event.stopPropagation();posClear()" title="Kosongkan">🗑</button><div class="posbarmain" onclick="posCheckoutModal()"><div><div class="pc">${cnt} item</div><div class="pv">${rp(tot)}</div></div><div class="go">Bayar →</div></div></div>`:""}`;
+    ${cnt_>0?`<div class="posbar${popId?" bump":""}"><button class="posclr" onclick="event.stopPropagation();posClear()" title="Kosongkan">🗑</button><div class="posbarmain" onclick="posCheckoutModal()"><div><div class="pc">🛍 ${cnt_} item</div><div class="pv">${rp(tot)}</div></div><div class="go">Bayar →</div></div></div>`:""}</div>`;
+  if(!popId)runCounts(el);
   if(POS.q)posFilterGrid(POS.q);
 }
 function openRegisterModal(){
@@ -193,33 +199,40 @@ function regReceiptText(s){
   return t;
 }
 function posFilterGrid(q){POS.q=q;q=(q||"").toLowerCase();document.querySelectorAll("#posGrid .pcard").forEach(c=>{c.style.display=c.dataset.n.includes(q)?"":"none";});}
-function posAdd(pid){const p=prod(pid);if(!p)return;const st=stock(pid);const q=POS.cart[pid]||0;if(tracksStock(p)&&!canOversell()&&q>=st){toast("Stok "+p.name+" tinggal "+st);return;}POS.cart[pid]=q+1;rPOS();}
+function posAdd(pid){const p=prod(pid);if(!p)return;const st=stock(pid);const q=POS.cart[pid]||0;if(tracksStock(p)&&!canOversell()&&q>=st){toast("Stok "+p.name+" tinggal "+st);return;}POS.cart[pid]=q+1;window._posPop=pid;rPOS();}
 function posInc(pid){const p=prod(pid);const st=stock(pid);const q=POS.cart[pid]||0;if(tracksStock(p)&&!canOversell()&&q>=st){toast("Stok tinggal "+st);return;}POS.cart[pid]=q+1;posCheckoutModal();}
 function posDec(pid){const q=POS.cart[pid]||0;if(q<=1)delete POS.cart[pid];else POS.cart[pid]=q-1;if(posCount()===0){closeModal();rPOS();}else posCheckoutModal();}
 function posCheckoutModal(){
   if(posCount()===0){toast("Keranjang kosong.");return;}
   const sub=posSubtotal(),tot=posTotal();
   const lines=Object.entries(POS.cart).map(([pid,q])=>{const p=prod(pid)||{};const lt=q*(+p.harga||0);
-    return `<div class="crt"><div class="cn"><b>${esc(p.name||"?")}</b><span>${rp(p.harga)}</span></div><div class="stp"><button onclick="posDec('${pid}')">−</button><span>${q}</span><button onclick="posInc('${pid}')">+</button></div><div class="lt">${rp(lt)}</div></div>`;}).join("");
+    return `<div class="crt"><div class="pk-ci">${p.photo?`<img src="${p.photo}" alt="">`:"🍽"}</div><div class="cn"><b>${esc(p.name||"?")}</b><span>${rp(p.harga)}</span></div><div class="stp"><button onclick="posDec('${pid}')">−</button><span>${q}</span><button onclick="posInc('${pid}')">+</button></div><div class="lt">${rp(lt)}</div></div>`;}).join("");
   const isCash=POS.method==="Tunai";
   const bayar=isCash?(+digits(POS.bayar)||0):tot;
   const kembali=Math.max(0,bayar-tot);
   comboReset();
   const custCombo=combo(S.stores.filter(s=>s.name!==POS_NAME).map(s=>({id:s.id,label:s.name})),POS.customer,(id)=>{POS.customer=id;},"Umum / pelanggan langsung");
+  const MI={Tunai:["💵","Uang pas / kembalian"],Transfer:["🏦","Transfer bank"],QRIS:["📲","Scan QR"]};
   openModal(`<button class="close" onclick="closeModal()">×</button><h3>Pembayaran</h3>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><span class="mini">${posCount()} item</span><button class="btn sm del" onclick="posClear()">🗑 Kosongkan</button></div>
-    <div style="max-height:28vh;overflow:auto;margin-bottom:8px">${lines}</div>
-    <div class="crt" style="border:none;padding:4px 0"><div class="cn">Subtotal</div><div>${rp(sub)}</div></div>
-    <div class="crt" style="border:none;padding:4px 0;align-items:center"><div class="cn">Diskon (Rp)</div><input id="posDisc" inputmode="numeric" style="width:130px;text-align:right;padding:8px 10px" placeholder="0" value="${POS.disc?grp(POS.disc):""}" oninput="posDiscInput(this)"></div>
-    ${posSvcRate()>0?`<div class="crt" style="border:none;padding:4px 0"><div class="cn">Service (${posSvcRate()}%)</div><div id="posSvcL">${rp(posService())}</div></div>`:""}
-    ${posTaxRate()>0?`<div class="crt" style="border:none;padding:4px 0"><div class="cn">Pajak (${posTaxRate()}%)</div><div id="posTaxL">${rp(posTax())}</div></div>`:""}
-    <div class="crt" style="border-top:1px solid var(--line);border-bottom:none;font-weight:800;font-size:16px;padding-top:8px"><div class="cn">Total</div><div id="posTotL">${rp(tot)}</div></div>
-    <label class="f" style="margin-top:10px">Pelanggan <span class="mini">(opsional)</span></label>${custCombo}
-    <label class="f" style="margin-top:12px">Metode Bayar</label>
-    <div class="posseg">${["Tunai","Transfer","QRIS"].map(x=>`<button class="${POS.method===x?"on":""}" onclick="posSetMethod('${x}')">${x}</button>`).join("")}</div>
-    ${isCash?`<label class="f">Uang Diterima</label><input id="posBayar" inputmode="numeric" placeholder="${grp(tot)}" value="${POS.bayar?grp(POS.bayar):""}" oninput="posBayarInput(this)">
-    <div class="poskembali"><span>Kembalian</span><b id="posKembali">${rp(kembali)}</b></div>`:`<p class="mini" style="margin-top:6px">Pembayaran ${esc(POS.method)} dianggap pas — <b id="posTotL2">${rp(tot)}</b>.</p>`}
-    <div style="margin-top:16px;display:flex;gap:8px"><button class="btn gray" onclick="closeModal()">Batal</button><button class="btn" style="flex:1" id="posSelesai" onclick="posCheckout()">✓ Selesaikan · ${rp(tot)}</button></div>`);
+    <div class="pk-co">
+    <div class="pk-cart">
+      <div class="pk-carth"><span class="mini">🛍 ${posCount()} item di keranjang</span><button class="btn sm del" onclick="posClear()">🗑 Kosongkan</button></div>
+      <div class="pk-lines">${lines}</div>
+    </div>
+    <div class="pk-sum">
+      <div class="crt" style="border:none;padding:4px 0"><div class="cn">Subtotal</div><div>${rp(sub)}</div></div>
+      <div class="crt" style="border:none;padding:4px 0;align-items:center"><div class="cn">Diskon (Rp)</div><input id="posDisc" inputmode="numeric" style="width:130px;text-align:right;padding:8px 10px" placeholder="0" value="${POS.disc?grp(POS.disc):""}" oninput="posDiscInput(this)"></div>
+      ${posSvcRate()>0?`<div class="crt" style="border:none;padding:4px 0"><div class="cn">Service (${posSvcRate()}%)</div><div id="posSvcL">${rp(posService())}</div></div>`:""}
+      ${posTaxRate()>0?`<div class="crt" style="border:none;padding:4px 0"><div class="cn">Pajak (${posTaxRate()}%)</div><div id="posTaxL">${rp(posTax())}</div></div>`:""}
+      <div class="pk-tot"><span>Total bayar</span><b id="posTotL">${rp(tot)}</b></div>
+    </div>
+    <label class="f" style="margin-top:12px">Pelanggan <span class="mini">(opsional)</span></label>${custCombo}
+    <label class="f" style="margin-top:14px">Metode Bayar</label>
+    <div class="posseg pk-meths">${["Tunai","Transfer","QRIS"].map(x=>`<button class="${POS.method===x?"on":""}" onclick="posSetMethod('${x}')"><i>${MI[x][0]}</i><b>${x}</b><small>${MI[x][1]}</small></button>`).join("")}</div>
+    ${isCash?`<label class="f">Uang Diterima</label><input id="posBayar" class="pk-bayar" inputmode="numeric" placeholder="${grp(tot)}" value="${POS.bayar?grp(POS.bayar):""}" oninput="posBayarInput(this)">
+    <div class="poskembali pk-kemb"><span>Kembalian</span><b id="posKembali">${rp(kembali)}</b></div>`:`<p class="mini pk-pas" style="margin-top:6px">Pembayaran ${esc(POS.method)} dianggap pas — <b id="posTotL2">${rp(tot)}</b>.</p>`}
+    <div class="pk-act"><button class="btn gray pk-pill" onclick="closeModal()">Batal</button> <button class="btn pk-pill pk-go" style="flex:1" id="posSelesai" onclick="posCheckout()">✓ Selesaikan · ${rp(tot)}</button></div>
+    </div>`);
 }
 function posDiscInput(el){el.value=grp(el.value);POS.disc=+digits(el.value)||0;const t=posTotal();
   const set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
@@ -249,8 +262,8 @@ function posShowQris(total){
   openModal(`<button class="close" onclick="posCheckoutModal()">×</button><h3>Scan untuk Bayar</h3>
     <div style="text-align:center">
       <div class="mini" style="margin-bottom:2px">${esc(BIZ.name||"")}</div>
-      <div style="font-size:27px;font-weight:800;color:var(--red);margin-bottom:12px">${rp(total)}</div>
-      <div style="display:inline-block;background:#fff;padding:12px;border-radius:16px;box-shadow:0 8px 22px rgba(0,0,0,.12)"><canvas id="qrCanvas" style="display:block;width:260px;height:260px;image-rendering:pixelated"></canvas></div>
+      <div class="pk-qamt" style="font-size:27px;font-weight:800;color:var(--red);margin-bottom:12px">${rp(total)}</div>
+      <div class="pk-qbox" style="display:inline-block;background:#fff;padding:12px;border-radius:16px;box-shadow:0 8px 22px rgba(0,0,0,.12)"><canvas id="qrCanvas" style="display:block;width:260px;height:260px;image-rendering:pixelated"></canvas></div>
       <div class="mini" style="margin:12px auto 2px;max-width:280px">Pelanggan scan pakai <b>GoPay / OVO / Dana / ShopeePay / m-banking</b> — nominal sudah otomatis terisi.</div>
     </div>
     <div style="margin-top:16px;display:flex;gap:8px"><button class="btn gray" onclick="posCheckoutModal()">Kembali</button><button class="btn" style="flex:1" onclick="posFinalize(${total},0,'QRIS')">✓ Sudah Dibayar</button></div>`);
@@ -293,13 +306,13 @@ async function posEnqueue(nota,tot,bayar,kembali,method){
   posSuccess(nota.id,tot,sBayar,sKembali,method,true);
 }
 function posSuccess(id,total,bayar,kembali,method,pending){
-  openModal(`<div class="pos-done"><div class="ok"${pending?' style="background:#fff3e0;color:var(--amber)"':''}>${pending?"⏳":"✓"}</div><h3 style="margin-bottom:6px">${pending?"Tersimpan (Offline)":"Transaksi Berhasil"}</h3>
+  openModal(`<div class="pos-done pk-done"><div class="ok"${pending?' style="background:#fff3e0;color:var(--amber)"':''}>${pending?"⏳":"✓"}</div><h3 style="margin-bottom:6px">${pending?"Tersimpan (Offline)":"Transaksi Berhasil"}</h3>
     <div class="mini" style="margin-bottom:14px">Total ${rp(total)} · ${esc(method)}${pending?" · akan tersinkron saat online":""}</div>
-    ${method==="Tunai"?`<div class="poskembali" style="justify-content:center;gap:14px;margin-bottom:16px">Kembalian <b>${rp(kembali)}</b></div>`:""}
+    ${method==="Tunai"?`<div class="poskembali pk-kemb pk-kembdone" style="justify-content:center;gap:14px;margin-bottom:16px">Kembalian <b>${rp(kembali)}</b></div>`:""}
     <div style="display:flex;flex-direction:column;gap:8px">
       <button class="btn" onclick="printRawBT(posReceiptText('${id}',${bayar},${kembali},'${esc(method)}'))">🖨 Cetak Struk (Printer Bluetooth)</button>
       <div style="display:flex;gap:8px"><button class="btn ghost" style="flex:1" onclick="printReceipt('${id}',${bayar},${kembali},'${esc(method)}')">Struk PDF</button><button class="btn ghost" style="flex:1" onclick="waReceipt('${id}',${bayar},${kembali},'${esc(method)}')">💬 WA</button><button class="btn ghost" style="flex:1" onclick="emailReceiptModal('${id}')">✉️ Email</button></div>
-      <button class="btn" style="background:var(--green)" onclick="closeModal();rPOS()">+ Transaksi Baru</button>
+      <button class="btn pk-pill" style="background:var(--green)" onclick="closeModal();rPOS()">+ Transaksi Baru</button>
       ${NativePrinter.isNative()?"":'<div class="mini" style="text-align:center;margin-top:2px">Printer Bluetooth perlu app <b>RawBT</b> (Android).</div>'}
     </div></div>`);
 }
