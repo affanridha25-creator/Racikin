@@ -195,11 +195,13 @@ function handle_auth($action, $in) {
             if (cpanel_create_db(DB_PREFIX . $alias, $dbUser)) {
                 $m->prepare("UPDATE businesses SET active=1, paid_until=DATE_ADD(CURDATE(), INTERVAL ? DAY) WHERE alias=?")->execute([$days, $alias]);
                 $_SESSION['alias'] = $alias; $_SESSION['user_name'] = $user; $_SESSION['email'] = $email; $_SESSION['role'] = 'owner'; $_SESSION['perms'] = '';
+                notify_admin_signup($name, $alias, $user, $email, "AKTIF — trial gratis $days hari (otomatis)");
                 $b2 = $m->prepare("SELECT * FROM businesses WHERE alias=?"); $b2->execute([$alias]); $b2 = $b2->fetch();
                 echo json_encode(['ok'=>true, 'trial'=>true, 'loggedIn'=>true, 'trialDays'=>$days, 'name'=>$name, 'alias'=>$alias, 'user'=>$user, 'email'=>$email, 'sub'=>sub_status($b2)] + me_payload()); return;
             }
         }
         // akun dibuat sebagai PENDING — tidak auto-login; tunggu aktivasi admin (setelah bayar)
+        notify_admin_signup($name, $alias, $user, $email, 'PENDING — menunggu aktivasi di admin.php');
         echo json_encode(['ok'=>true, 'pending'=>true, 'name'=>$name, 'alias'=>$alias]); return;
     }
     // ---- ganti password (sedang login) ----
@@ -360,6 +362,23 @@ function app_base_url() {
     if (defined('APP_URL') && APP_URL) return rtrim(APP_URL, '/');   // paling utama: host eksplisit dari config
     $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
     return ($https ? 'https' : 'http') . '://' . app_host();          // jaring pengaman: hanya host di allowlist
+}
+// Beri tahu admin lewat email saat ada usaha baru mendaftar (ADMIN_EMAIL di config.php; boleh beberapa, pisah koma).
+// Defensif: gagal kirim tak boleh membatalkan pendaftaran.
+function notify_admin_signup($name, $alias, $user, $email, $status) {
+    if (!defined('ADMIN_EMAIL') || trim((string)ADMIN_EMAIL) === '') return;
+    $clean = function ($v) { return trim(preg_replace('/[\r\n]+/', ' ', (string)$v)); };   // cegah header injection
+    $host = preg_replace('/:\d+$/', '', app_host());
+    $from = defined('RESET_FROM') && RESET_FROM ? RESET_FROM : ('noreply@' . preg_replace('/^www\./', '', $host));
+    $subject = 'Pendaftar baru Racikin: ' . $clean($name) . ' (' . $clean($alias) . ')';
+    $body = "Ada usaha baru mendaftar di Racikin.\n\n"
+          . "Usaha   : " . $clean($name) . "\nKode    : " . $clean($alias) . "\nPemilik : " . $clean($user) . "\nEmail   : " . $clean($email) . "\n"
+          . "Status  : " . $status . "\nWaktu   : " . date('Y-m-d H:i') . "\n\n"
+          . "Kelola di: " . app_base_url() . "/admin.php\n\n— Racikin";
+    $headers = "From: Racikin <$from>\r\nContent-Type: text/plain; charset=UTF-8\r\nMIME-Version: 1.0\r\n";
+    foreach (array_filter(array_map('trim', explode(',', (string)ADMIN_EMAIL))) as $to) {
+        if (filter_var($to, FILTER_VALIDATE_EMAIL)) @mail($to, $subject, $body, $headers);
+    }
 }
 function send_reset_email($to, $name, $alias, $tokenStr) {
     $link = app_base_url() . '/?reset=' . $tokenStr;

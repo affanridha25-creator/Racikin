@@ -102,7 +102,8 @@ $rows = $isAdmin ? $m->query("SELECT b.alias,b.name,b.db_name,b.active,b.created
     (SELECT email FROM users u WHERE u.alias=b.alias AND u.role='owner' LIMIT 1) AS owner_email,
     (SELECT COUNT(*) FROM users u WHERE u.alias=b.alias) AS user_count
     FROM businesses b ORDER BY b.active ASC, b.created DESC")->fetchAll() : [];
-$pending = 0; foreach ($rows as $r) if ((int)$r['active'] === 0) $pending++;
+$pending = 0; $recent = 0;
+foreach ($rows as $r) { if ((int)$r['active'] === 0) $pending++; if (strtotime((string)$r['created']) >= strtotime('-7 days')) $recent++; }
 ?>
 <!doctype html>
 <html lang="id"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -221,7 +222,7 @@ details summary{list-style:none}details summary::-webkit-details-marker{display:
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
       <h2 style="font-size:17px">Daftar Usaha</h2>
-      <span class="count"><?= count($rows) ?> usaha · <b style="color:var(--amber)"><?= $pending ?></b> menunggu aktivasi</span>
+      <span class="count"><?= count($rows) ?> usaha · <b style="color:var(--amber)"><?= $pending ?></b> menunggu aktivasi · <b style="color:var(--red)"><?= $recent ?></b> baru (7 hari)</span>
     </div>
     <table>
       <thead><tr><th>Usaha</th><th>Kode / DB</th><th>Pemilik</th><th>Status</th><th>Aksi</th></tr></thead>
@@ -229,7 +230,7 @@ details summary{list-style:none}details summary::-webkit-details-marker{display:
       <?php if (!$rows): ?><tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px">Belum ada usaha.</td></tr><?php endif; ?>
       <?php foreach ($rows as $r): $on = (int)$r['active'] === 1; ?>
         <tr>
-          <td><b><?= h($r['name']) ?></b><br><span class="count"><?= (int)$r['user_count'] ?> pengguna · daftar <?= h(substr((string)$r['created'],0,10)) ?></span></td>
+          <td><b><?= h($r['name']) ?></b><?php if (strtotime((string)$r['created']) >= strtotime('-7 days')): ?> <span class="pill" style="background:#fde7e4;color:var(--red)">BARU</span><?php endif; ?><br><span class="count"><?= (int)$r['user_count'] ?> pengguna · daftar <?= h(substr((string)$r['created'],0,10)) ?></span></td>
           <td><b><?= h($r['alias']) ?></b><br><span class="dbn"><?= h($r['db_name']) ?></span></td>
           <td><?= h($r['owner_email'] ?: '-') ?></td>
           <td><span class="pill <?= $on?'on':'off' ?>"><?= $on?'AKTIF':'PENDING' ?></span>

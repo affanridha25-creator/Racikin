@@ -35,6 +35,7 @@ define('DB_ALLOW_CREATE', false);
 // ---- Panel Admin (admin.php) ----
 // Password untuk masuk panel aktivasi usaha. WAJIB ganti yang kuat.
 define('ADMIN_PASS', 'GANTI_PASSWORD_ADMIN');
+define('ADMIN_EMAIL', '');          // email pemberitahuan saat ada pendaftar baru (boleh beberapa, pisah koma). Kosong = tak ada email.
 
 // ---- Email reset password ----
 // PENTING (keamanan): APP_URL WAJIB diisi host aslimu. Kalau kosong, link reset
