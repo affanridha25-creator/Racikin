@@ -175,7 +175,25 @@ function cpanel_create_db($dbname, $dbuser) {
 // Admin menyiapkan beberapa database KOSONG di cPanel sekali (mis. racn9542_t01 … t20), semuanya diberi hak ke user MySQL utama,
 // lalu mendaftarkannya di config.php: define('TRIAL_POOL', ['racn9542_t01','racn9542_t02', ...]).
 // Tiap pendaftar trial mengambil satu yang masih kosong & belum dipakai usaha lain.
-function pool_names() { return (defined('TRIAL_POOL') && is_array(TRIAL_POOL)) ? array_values(array_filter(array_map('strval', TRIAL_POOL))) : []; }
+// Daftar kandidat DB kolam: TRIAL_POOL (daftar eksplisit) + hasil deteksi otomatis lewat TRIAL_POOL_PREFIX
+// (semua database yang BISA diakses user MySQL & namanya berawalan itu, mis. 'racn9542_t' → racn9542_t01, racn9542_t02, …).
+// Hanya yang masih kosong & belum dipakai usaha yang benar-benar diambil (lihat pool_db_free).
+function pool_names() {
+    static $cache = null; if ($cache !== null) return $cache;
+    $n = (defined('TRIAL_POOL') && is_array(TRIAL_POOL)) ? array_map('strval', TRIAL_POOL) : [];
+    $prefix = defined('TRIAL_POOL_PREFIX') ? (string)TRIAL_POOL_PREFIX : '';
+    if ($prefix !== '' && preg_match('/^[A-Za-z0-9_]+$/', $prefix)) {
+        try {
+            $q = server_pdo()->prepare("SHOW DATABASES LIKE ?");
+            $q->execute([str_replace(['\\', '_', '%'], ['\\\\', '\\_', '\\%'], $prefix) . '%']);
+            foreach ($q->fetchAll(PDO::FETCH_COLUMN) as $d) $n[] = (string)$d;
+        } catch (Exception $e) { error_log('pool detect: ' . $e->getMessage()); }
+    }
+    $skip = defined('DB_MASTER') ? [DB_MASTER] : [];
+    $cache = array_values(array_unique(array_filter($n, function ($d) use ($skip) { return $d !== '' && !in_array($d, $skip, true); })));
+    sort($cache);
+    return $cache;
+}
 function pool_db_free($m, $name) {   // true bila DB ada, bisa diakses, kosong (0 tabel) & belum dipakai usaha manapun
     global $DB_HOST, $DB_USER, $DB_PASS;
     if (!preg_match('/^[A-Za-z0-9_]{1,64}$/', $name)) return false;

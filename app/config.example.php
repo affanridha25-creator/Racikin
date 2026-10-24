@@ -57,7 +57,8 @@ define('TRIAL_DAYS', 30);           // lama trial gratis (hari)
 // TRIAL OTOMATIS TANPA cPanel API (kolam database): buat beberapa database KOSONG di cPanel (mis. NAMACPANEL_t01 … t20),
 // beri user MySQL utama hak ALL PRIVILEGES ke tiap DB, lalu daftarkan di sini. Pendaftar baru otomatis dapat 1 DB & trial TRIAL_DAYS hari.
 // Kolam habis → pendaftar jadi PENDING (kamu dikabari lewat ADMIN_EMAIL). Pantau sisa kolam di admin.php.
-define('TRIAL_POOL', []);           // mis. ['NAMACPANEL_t01','NAMACPANEL_t02','NAMACPANEL_t03']
+define('TRIAL_POOL', []);           // (opsional) daftar manual, mis. ['NAMACPANEL_t01','NAMACPANEL_t02']
+define('TRIAL_POOL_PREFIX', '');    // DETEKSI OTOMATIS: awalan nama DB kolam, mis. 'NAMACPANEL_t' → semua DB NAMACPANEL_t01, t02, … yg kosong dipakai otomatis
 
 // cPanel API token: cPanel > "Manage API Tokens" > Create. RAHASIA — jangan dibagikan.
 // CPANEL_HOST = host cPanel (mis. 'srv123.rumahweb.com' atau domainmu). CPANEL_USER = username cPanel.
