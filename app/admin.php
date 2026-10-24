@@ -486,10 +486,11 @@ body.lg::after{width:46vmax;height:46vmax;right:-14vmax;bottom:-16vmax;backgroun
       <input type="hidden" name="csrf" value="<?= h($csrf) ?>"><input type="hidden" name="do" value="diag_mail">
       <button class="btn sm" style="background:#fff;color:var(--ink);border:1.5px solid #e6d9d1" title="Memeriksa kolam database trial dan mencoba beberapa jalur SMTP, tanpa mengirim email">🔍 Diagnosa SMTP &amp; kolam</button>
     </form>
+    <a href="#contoh" onclick="var d=document.getElementById('contoh');if(d)d.open=true;" class="btn sm" style="display:inline-block;margin-top:8px;background:#fff;color:var(--red);border:1.5px solid #f0c9bb;text-decoration:none">📨 Kirim contoh tiap jenis email ↓</a>
   </details>
 
   <!-- Contoh email: kirim tiap jenis email ke emailmu untuk dilihat -->
-  <details class="card">
+  <details class="card" id="contoh">
     <summary><span class="ico">📨</span>Contoh Email</summary>
     <div class="sbody">
       <p class="fhint" style="margin:14px 0 12px">Kirim contoh tiap jenis email ke <b>emailmu</b> (penerima pemberitahuan) untuk melihat tampilannya persis seperti yang diterima pelanggan. Datanya tiruan, subjeknya diawali <b>[CONTOH]</b>, dan tidak ada email yang dikirim ke pelanggan.</p>
