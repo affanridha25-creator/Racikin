@@ -149,43 +149,62 @@ function mail_client($to, $subject, $body) {
         return app_mail($to, preg_replace('/[\r\n]+/', ' ', $subject), $body, $headers);
     } catch (Throwable $e) { error_log('mail_client: ' . $e->getMessage()); return false; }
 }
-// Diagnosa SMTP: coba beberapa jalur (host/port/enkripsi) sampai tahap penerima, TANPA mengirim email.
-// Return teks multi-baris berisi hasil + waktu tiap langkah. Dipakai tombol "Diagnosa SMTP" di admin.php.
-function smtp_probe($host, $port, $secure, array $rcpts, $timeout = 8) {
+// Diagnosa SMTP: coba beberapa jalur sampai tahap penerima, TANPA mengirim email. Satu koneksi BARU per penerima
+// (server yang macet di satu penerima tidak boleh membuat penerima lain ikut gagal). Return [ok, ringkasan].
+function smtp_try($host, $port, $secure, $rcpt, $timeout = 6) {
     $user = defined('SMTP_USER') ? (string)SMTP_USER : ''; $pass = defined('SMTP_PASS') ? (string)SMTP_PASS : '';
     $from = (defined('SMTP_FROM') && SMTP_FROM) ? (string)SMTP_FROM : $user;
-    $lab = "$host:$port/" . ($secure === '' ? 'polos' : $secure);
-    $steps = []; $t = function () { return microtime(true); };
-    $t0 = $t();
-    $ctx = stream_context_create(['ssl' => ['verify_peer' => false, 'verify_peer_name' => false]]);   // diagnosa saja: abaikan sertifikat agar masalah lain terlihat
+    $t0 = microtime(true); $el = function () use ($t0) { return round(microtime(true) - $t0, 1); };
+    $ctx = stream_context_create(['ssl' => ['verify_peer' => false, 'verify_peer_name' => false]]);   // diagnosa: abaikan sertifikat agar masalah lain terlihat
     $fp = @stream_socket_client(($secure === 'ssl' ? 'ssl://' : 'tcp://') . $host . ':' . $port, $en, $es, $timeout, STREAM_CLIENT_CONNECT, $ctx);
-    if (!$fp) return "$lab → TIDAK BISA TERHUBUNG (" . round($t() - $t0, 1) . "s: " . trim($es) . ")";
+    if (!$fp) return [false, 'tidak bisa terhubung (' . trim($es) . ')'];
     stream_set_timeout($fp, $timeout);
-    $step = function ($name, $cmd, $ok) use ($fp, &$steps, $t) {
-        $a = $t(); $good = smtp_cmd($fp, $cmd, $ok); $d = round($t() - $a, 1);
-        $rep = (string)($GLOBALS['smtp_last_reply'] ?? ''); $steps[] = ($good ? '✓' : '✗') . " $name " . $d . 's' . ($good ? '' : ' → ' . mb_substr($rep, 0, 140));
-        return $good;
-    };
     $ehlo = preg_replace('/[^A-Za-z0-9.\-]/', '', (string)($_SERVER['SERVER_NAME'] ?? 'localhost')) ?: 'localhost';
-    $okAll = $step('sambutan', null, '220') && $step('EHLO', "EHLO $ehlo", '250');
-    if ($okAll && $secure === 'tls') { $okAll = $step('STARTTLS', 'STARTTLS', '220'); if ($okAll) { $okAll = @stream_socket_enable_crypto($fp, true, STREAM_CRYPTO_METHOD_TLS_CLIENT); $steps[] = ($okAll ? '✓' : '✗') . ' TLS'; if ($okAll) $okAll = $step('EHLO2', "EHLO $ehlo", '250'); } }
-    if ($okAll && $user !== '') $okAll = $step('login', 'AUTH LOGIN', '334') && $step('user', base64_encode($user), '334') && $step('sandi', base64_encode($pass), '235');
-    if ($okAll) $okAll = $step('MAIL FROM', "MAIL FROM:<$from>", '250');
-    if ($okAll) { foreach ($rcpts as $r) { $step("RCPT $r", "RCPT TO:<$r>", '250'); if (empty($GLOBALS['smtp_last_reply']) || strpos((string)$GLOBALS['smtp_last_reply'], '(server') === 0) break; } @fwrite($fp, "RSET\r\nQUIT\r\n"); }
+    $stage = 'sambutan';
+    $chk = function ($cmd, $ok, $st) use ($fp, &$stage) { $stage = $st; return smtp_cmd($fp, $cmd, $ok); };
+    $good = $chk(null, '220', 'sambutan') && $chk("EHLO $ehlo", '250', 'EHLO');
+    if ($good && $secure === 'tls') { $good = $chk('STARTTLS', '220', 'STARTTLS') && @stream_socket_enable_crypto($fp, true, STREAM_CRYPTO_METHOD_TLS_CLIENT) && $chk("EHLO $ehlo", '250', 'EHLO2'); }
+    if ($good && $user !== '') $good = $chk('AUTH LOGIN', '334', 'login') && $chk(base64_encode($user), '334', 'login') && $chk(base64_encode($pass), '235', 'login (sandi)');
+    $good = $good && $chk("MAIL FROM:<$from>", '250', 'MAIL FROM') && $chk("RCPT TO:<$rcpt>", '250', 'RCPT TO');
+    $rep = (string)($GLOBALS['smtp_last_reply'] ?? '');
+    if ($good) @fwrite($fp, "RSET\r\nQUIT\r\n");
     @fclose($fp);
-    return "$lab → " . implode(' · ', $steps);
+    return $good ? [true, 'DITERIMA (' . $el() . 's)'] : [false, "gagal di tahap $stage (" . $el() . 's): ' . mb_substr($rep, 0, 160)];
+}
+// Pemeriksaan jaringan dari sisi server: DNS (tanpa ini server mail tak bisa mencari tujuan) & koneksi keluar.
+function net_diagnose($timeout = 5) {
+    $o = [];
+    $t = microtime(true);
+    $mx = []; $okMx = @getmxrr('gmail.com', $mx); $d = round(microtime(true) - $t, 1);
+    $o[] = 'DNS dari server: MX gmail.com → ' . ($okMx && $mx ? count($mx) . " rekaman ($d" . 's)' : "GAGAL / kosong ($d" . 's) — resolver DNS server bermasalah atau sangat lambat');
+    foreach ([['gmail-smtp-in.l.google.com', 25, 'Gmail (langsung, port 25)'], ['smtp.gmail.com', 587, 'Gmail SMTP (587)'], ['smtp-relay.brevo.com', 587, 'Brevo SMTP relay (587)']] as [$h, $p, $lab]) {
+        $a = microtime(true); $fp = @stream_socket_client("tcp://$h:$p", $en, $es, $timeout); $dd = round(microtime(true) - $a, 1);
+        $o[] = "Koneksi keluar ke $lab → " . ($fp ? "TERBUKA ($dd" . 's)' : "TERTUTUP/lambat ($dd" . 's: ' . trim((string)$es) . ')'); if ($fp) @fclose($fp);
+    }
+    return $o;
 }
 function run_smtp_diagnose() {
     try {
         $lines = [];
+        $t0 = microtime(true);
         if (function_exists('pool_diagnose')) { try { $lines = pool_diagnose(master_pdo()); $lines[] = ''; } catch (Throwable $e) { $lines[] = 'Diagnosa kolam gagal: ' . $e->getMessage(); $lines[] = ''; } }
-        if (!(defined('SMTP_HOST') && SMTP_HOST !== '')) { $lines[] = 'SMTP belum aktif: SMTP_HOST kosong di config.php. Versi mail.php v' . mail_build(); return [true, implode("\n", $lines)]; }
         @set_time_limit(180);
+        $maxx = (int)ini_get('max_execution_time'); $budget = $maxx > 0 ? max(10, $maxx - 6) : 150;   // jangan melewati batas waktu PHP hosting
+        $left = function () use ($t0, $budget) { return $budget - (microtime(true) - $t0); };
+        $lines[] = 'Jaringan server:';
+        if ($left() > 25) { foreach (net_diagnose(4) as $x) $lines[] = '  ' . $x; } else $lines[] = '  (dilewati: batas waktu PHP ' . $maxx . ' dtk)';
+        $lines[] = '';
+        if (!(defined('SMTP_HOST') && SMTP_HOST !== '')) { $lines[] = 'SMTP belum aktif: SMTP_HOST kosong di config.php. Versi mail.php v' . mail_build(); return [true, implode("\n", $lines)]; }
         $to = admin_recipients(); $rc = array_values(array_unique(array_filter(array_merge($to, ['info@racikin.com']))));
-        $h = (string)SMTP_HOST; $local = ['127.0.0.1'];
-        $combos = [[$h, 465, 'ssl'], [$h, 587, 'tls'], [$local[0], 25, '']];
-        $lines[] = 'Diagnosa SMTP (tanpa mengirim email) — penerima uji: ' . implode(', ', $rc);
-        foreach ($combos as [$hh, $pp, $sc]) $lines[] = smtp_probe($hh, $pp, $sc, $rc);
+        $h = (string)SMTP_HOST;
+        $lines[] = 'SMTP (tanpa mengirim email), penerima uji: ' . implode(', ', $rc);
+        foreach ([[$h, 465, 'ssl'], [$h, 587, 'tls']] as [$hh, $pp, $sc]) {
+            foreach ($rc as $r) {
+                if ($left() < 14) { $lines[] = "  $hh:$pp/$sc → $r: (dilewati: sisa waktu PHP habis)"; continue; }
+                [$ok, $info] = smtp_try($hh, $pp, $sc, $r, 6);
+                $lines[] = "  $hh:$pp/$sc → $r: " . ($ok ? '✓ ' : '✗ ') . $info;
+            }
+        }
         $lines[] = 'Versi mail.php v' . mail_build();
         return [true, implode("\n", $lines)];
     } catch (Throwable $e) { return [false, 'Diagnosa gagal: ' . get_class($e) . ': ' . $e->getMessage() . ' (' . basename($e->getFile()) . ':' . $e->getLine() . ')']; }
