@@ -1,0 +1,22 @@
+/* toko.css — halaman Master Toko */
+/* ---- Master Toko ---- */
+.tokogrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:16px}
+.tcard{background:#fff;border-radius:22px;padding:16px 16px 14px;box-shadow:0 8px 22px rgba(40,40,60,.06);cursor:pointer;transition:transform .22s cubic-bezier(.2,.8,.2,1),box-shadow .22s;animation:dUp .55s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--k,0)*45ms)}
+.tcard:hover{transform:translateY(-5px);box-shadow:0 18px 34px rgba(40,40,60,.12)}
+.tc-top{display:flex;align-items:center;gap:12px}
+.tc-av{width:46px;height:46px;border-radius:15px;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;flex-shrink:0;transition:transform .3s cubic-bezier(.3,1.6,.5,1)}
+.tcard:hover .tc-av{transform:rotate(-8deg) scale(1.1)}
+.tc-id{flex:1;min-width:0}
+.tc-name{font-weight:800;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tc-sub{font-size:12px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tc-sub a{color:var(--muted);text-decoration:none}.tc-sub a:hover{color:var(--red)}
+.tc-x{border:none;background:#fbeeea;color:var(--red);width:28px;height:28px;border-radius:9px;cursor:pointer;opacity:0;transition:opacity .2s;font-size:12px}
+.tcard:hover .tc-x{opacity:1}
+@media (hover:none){.tc-x{opacity:.7}}
+.tc-addr{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.4}
+.tc-stats{display:grid;grid-template-columns:1.3fr 1.3fr .7fr;gap:8px;margin-top:12px}
+.tc-stats span{display:block;font-size:10.5px;color:var(--muted);font-weight:600}
+.tc-stats b{display:block;font-size:14px;margin-top:2px;letter-spacing:-.01em}
+.tc-bar{height:6px;background:#f1eeed;border-radius:6px;margin-top:12px;overflow:hidden}
+.tc-bar i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,var(--orange),var(--red));transform-origin:left;animation:dGrow .9s .3s cubic-bezier(.2,.8,.2,1) both}
+.tc-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:12px;min-height:30px}

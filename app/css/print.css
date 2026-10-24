@@ -1,0 +1,26 @@
+/* print.css — cetak laporan A4 */
+/* ---- cetak laporan (A4) ---- */
+#printArea{display:none}
+.preport{color:#000;font-size:12px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.preport h1{font-size:19px;color:var(--red);text-align:center;margin-bottom:3px;letter-spacing:.02em}
+.preport .psub{text-align:center;color:#555;font-size:11px;margin-bottom:16px}
+.preport .psec{background:var(--red);color:#fff;font-weight:700;padding:6px 11px;border-radius:5px;margin:16px 0 8px;font-size:12.5px}
+.preport table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:6px}
+.preport th,.preport td{border:1px solid #dcdcdc;padding:6px 9px;text-align:left;vertical-align:top}
+.preport th{background:#f6f6f6;font-weight:700}
+.preport td.num,.preport th.num{text-align:right;white-space:nowrap}
+.preport tr.tot td{font-weight:700;background:#faf1ee}
+.preport i{color:var(--red);font-style:normal;font-size:11px}
+.preport .phead{display:flex;align-items:center;gap:14px;border-bottom:2px solid var(--red);padding-bottom:10px;margin-bottom:14px}
+.preport .plogo{width:58px;height:58px;object-fit:contain;flex-shrink:0}
+.preport .pbiz{font-size:16px;font-weight:800;color:#111;letter-spacing:.01em}
+.preport .pcontact{font-size:10.5px;color:#555;margin-top:3px;line-height:1.45}
+.preport .phead+h1{margin-top:6px}
+@page{size:A4 portrait;margin:14mm}
+@media print{
+  html,body{background:#fff!important;display:block!important;margin:0;min-height:0!important}
+  .sidebar,.content,.topbar,main,.modal-bg,.sheet-bg,.botnav,#toast,.loginbg{display:none!important}
+  #printArea{display:block!important;min-height:0!important}
+  .preport{width:182mm;margin:0 auto}
+  .preport table,.preport tr,.preport .psec{page-break-inside:avoid}
+}

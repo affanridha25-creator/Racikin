@@ -1,0 +1,23 @@
+/* login-outro.css — login: animasi keluar + layar sambutan */
+/* ---- login: animasi keluar + layar sambutan ---- */
+.loginbg.lsplit.leaving{background:transparent!important;animation:none}
+.lsplit.leaving::before,.lsplit.leaving::after{display:none}
+.lsplit.leaving .lhero{animation:lgOutHero .7s .08s cubic-bezier(.6,0,.2,1) forwards}
+.lsplit.leaving .lpanel{animation:lgOutPanel .55s .12s ease forwards}
+.lsplit.leaving .loginbox{animation:lgOutCard .5s cubic-bezier(.5,0,.8,.4) forwards}
+.wsplash{position:fixed;inset:0;z-index:99;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#fff;text-align:center;padding:24px;background:linear-gradient(150deg,#F26A2E 0%,#D53E0F 46%,#8F1208 100%);clip-path:circle(75% at 50% 50%)}
+.wsplash::before{content:"";position:absolute;width:70vmin;height:70vmin;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.22),rgba(255,255,255,0) 70%);animation:lgDrift1 6s ease-in-out infinite alternate}
+.wsplash>*{position:relative}
+.wsplash:not(.go) .wbowl,.wsplash:not(.go) .wh,.wsplash:not(.go) .wsub,.wsplash:not(.go) .wbar{opacity:0;animation:none}
+.wbowl{width:112px;height:112px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 22px 50px rgba(80,10,0,.4),0 0 0 12px rgba(255,255,255,.16);animation:lgPop .7s cubic-bezier(.3,1.5,.5,1) both,lgBob 2.6s .8s ease-in-out infinite}
+.wbowl img{width:74%;height:auto}
+.wh{font-size:clamp(22px,4vw,32px);font-weight:800;letter-spacing:-.01em;margin-top:14px;animation:lgUp .6s .25s both}
+.wsub{font-size:13.5px;opacity:.9;animation:lgUp .6s .4s both}
+.wbar{width:160px;height:5px;border-radius:5px;background:rgba(255,255,255,.28);overflow:hidden;margin-top:10px;animation:lgUp .6s .5s both}
+.wbar i{display:block;height:100%;width:100%;background:#fff;border-radius:5px;transform-origin:left;animation:dGrow 1.15s .4s cubic-bezier(.4,0,.2,1) both}
+.wsplash.out{animation:wOut .6s cubic-bezier(.7,0,.3,1) forwards}
+@keyframes wOut{to{clip-path:circle(0% at 50% 50%)}}
+@keyframes lgOutHero{to{transform:translateX(-105%)}}
+@keyframes lgOutPanel{to{opacity:0}}
+@keyframes lgOutCard{to{opacity:0;transform:translateY(-34px) scale(.93)}}
+@media (prefers-reduced-motion:reduce){.wsplash *,.wsplash::before{animation:none!important}.lsplit.leaving *{animation:none!important}}

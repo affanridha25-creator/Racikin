@@ -42,3 +42,22 @@ Keuangan (laba rugi + kas) · Bahan baku + tren harga · Produk · Toko · Profi
 Multi-user + hak akses per-user · Rekap penjualan per kasir · Backup · Reset password via email · PWA (installable).
 
 > Aplikasi asal dari klien tunggal "ANNA Snack & Kitchen", kini jadi produk multi-tenant **Racikin**.
+
+## Struktur kode aplikasi (`app/`)
+
+`index.php` hanya berisi kerangka HTML (sidebar, topbar, kontainer `#v-*`) + daftar `<link>`/`<script>`.
+CSS dan JS dipecah per area. **Urutan muat penting** (JS klasik, satu lingkup global): lihat daftar di `index.php`.
+
+| Area | JS (`app/js/`) | CSS (`app/css/`) |
+|---|---|---|
+| Inti | `core` (util, combobox, API), `offline`, `tenant` (hak akses, tipe usaha), `derived`, `nav` (navigasi, modal) | `base`, `components` |
+| Dashboard | `dashboard` | `dashboard`, `dashboard-v2` |
+| Kasir | `pos`, `qris`, `print-thermal` | `pos` |
+| Produksi / Bahan / Produk | `produksi`, `bahan`, `produk` | `p-produksi`, `p-bahan`, `p-produk` |
+| Distribusi / Pembayaran / Toko | `distribusi`, `pembayaran`, `toko` | `p-distribusi`, `p-pembayaran`, `toko` |
+| Keuangan / Export | `keuangan`, `export-csv`, `export-data` | `p-keuangan`, `p-export` |
+| Rekap / Pengguna / Profil | `rekap`, `pengguna`, `profil` | `p-rekap`, `p-pengguna`, `profil` |
+| Login & langganan | `auth`, `langganan` | `login`, `login-outro`, `langganan` |
+| Lainnya | `push`, `boot` (**harus terakhir**), `export-csv` | `print`, `base-v2` (gaya v2 global) |
+
+Backend: `api.php` (+ `db.php`). Service worker `sw.js` men-cache semua aset (naikkan versi `CACHE` saat menambah file).

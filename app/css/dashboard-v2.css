@@ -1,0 +1,73 @@
+/* dashboard-v2.css — dashboard v2: hero, KPI, grafik, keyframes d* */
+/* ---- dashboard v2: hero, KPI, animasi ---- */
+.dash-in>*{animation:dUp .6s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i,0)*70ms)}
+.view.active:not(#v-dashboard){animation:viewIn .32s ease both}
+.cnt{font-variant-numeric:tabular-nums}
+.dhero{position:relative;display:grid;grid-template-columns:1.5fr 1fr;gap:22px;align-items:stretch;color:#fff;border-radius:28px;padding:26px 28px;margin-bottom:18px;overflow:hidden;background:linear-gradient(140deg,#F26A2E -10%,#D53E0F 44%,#7E0306 115%);box-shadow:0 22px 46px rgba(126,3,6,.28)}
+.dh-bg{position:absolute;inset:0;pointer-events:none}
+.dh-bg i{position:absolute;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.22),rgba(255,255,255,0) 70%)}
+.dh-bg i:nth-child(1){width:340px;height:340px;right:-70px;top:-120px;animation:lgDrift1 16s ease-in-out infinite alternate}
+.dh-bg i:nth-child(2){width:260px;height:260px;left:30%;bottom:-150px;background:radial-gradient(circle,rgba(255,196,120,.35),rgba(255,196,120,0) 70%);animation:lgDrift2 19s ease-in-out infinite alternate}
+.dh-bg i:nth-child(3){width:150px;height:150px;left:-40px;top:-50px;animation:lgDrift2 13s ease-in-out infinite alternate}
+.dh-main,.dh-side{position:relative;z-index:1}
+.dh-side{display:flex;flex-direction:column;justify-content:flex-end;gap:14px}
+.dh-ringrow{display:flex;align-items:center;gap:14px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:22px;padding:14px 16px;backdrop-filter:blur(8px)}
+.dh-ring{position:relative;width:84px;height:84px;flex-shrink:0}
+.dh-ring svg{width:100%;height:100%;display:block}
+.dh-ring .rg{stroke-dasharray:1;stroke-dashoffset:var(--off);animation:dRing 1.4s .5s cubic-bezier(.4,0,.2,1) both}
+.dh-ring b{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:800}
+.dh-rl{font-size:15px;font-weight:800}
+.dh-rs{font-size:11.5px;opacity:.85;margin-top:2px;line-height:1.4}
+.dh-lab{display:flex;justify-content:space-between;font-size:10.5px;opacity:.8;margin-top:4px;padding:0 2px}
+@keyframes dRing{from{stroke-dashoffset:1}}
+.dh-top{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:16px}
+.dh-hi{font-size:22px;font-weight:800;letter-spacing:-.01em}
+.dh-sub{font-size:12.5px;opacity:.85;margin-top:3px}
+.dh-month .monthsel{margin:0;background-color:rgba(255,255,255,.96);color:var(--ink);border-color:transparent}
+.dh-lbl{font-size:13px;opacity:.9;font-weight:600}
+.dh-val{font-size:clamp(34px,4.2vw,52px);font-weight:800;letter-spacing:-.03em;line-height:1.05;margin:6px 0 4px}
+.dh-pills{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.dh-act{display:flex;gap:9px;flex-wrap:wrap;margin-top:20px}
+.dh-act button{background:rgba(255,255,255,.17);border:1px solid rgba(255,255,255,.32);color:#fff;border-radius:999px;padding:10px 17px;font-size:13px;font-weight:700;cursor:pointer;backdrop-filter:blur(6px);transition:transform .18s,background .18s,box-shadow .18s}
+.dh-act button:hover{background:#fff;color:var(--red);transform:translateY(-2px);box-shadow:0 10px 20px rgba(0,0,0,.18)}
+.dh-spark{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:22px;padding:16px 16px 12px;backdrop-filter:blur(8px)}
+.dh-sl{font-size:11.5px;opacity:.85;margin-top:6px;text-align:center}
+.dh-nospark{height:120px;display:flex;align-items:center;justify-content:center;font-size:12px;opacity:.8}
+.spark{display:block;overflow:visible}
+.ln{stroke-dasharray:1;stroke-dashoffset:1;animation:dDraw 1.5s .35s cubic-bezier(.4,0,.2,1) forwards}
+.ln.l2{animation-delay:.6s}
+.ar-fade,.sp-area{animation:dFade 1.1s .9s both}
+.dpop,.sp-dot{transform-box:fill-box;transform-origin:center;animation:dPop .45s cubic-bezier(.3,1.6,.5,1) both}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:20px}
+.kpi{position:relative;background:#fff;border-radius:22px;padding:18px 18px 16px;box-shadow:0 8px 22px rgba(40,40,60,.06);overflow:hidden;transition:transform .22s cubic-bezier(.2,.8,.2,1),box-shadow .22s}
+.kpi[onclick]{cursor:pointer}
+.kpi:hover{transform:translateY(-5px);box-shadow:0 18px 34px rgba(40,40,60,.12)}
+.kpi::after{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:linear-gradient(180deg,var(--orange),var(--red));transform:scaleY(0);transform-origin:top;animation:dGrowY .7s .5s cubic-bezier(.2,.8,.2,1) forwards}
+.kpi-i{width:40px;height:40px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:12px;transition:transform .3s cubic-bezier(.3,1.6,.5,1)}
+.kpi:hover .kpi-i{transform:rotate(-8deg) scale(1.12)}
+.kpi-l{font-size:12.5px;color:var(--muted);font-weight:600}
+.kpi-v{font-size:23px;font-weight:800;letter-spacing:-.02em;margin-top:3px}
+.kpi-s{font-size:11.5px;color:var(--muted);margin-top:6px;font-weight:600}
+.panel{transition:box-shadow .25s}.panel:hover{box-shadow:0 12px 28px rgba(40,40,60,.09)}
+.barrow2 .brbar>span{transform-origin:left;animation:dGrow .9s cubic-bezier(.2,.8,.2,1) both}
+.barrow2:nth-child(1) .brbar>span{animation-delay:.35s}.barrow2:nth-child(2) .brbar>span{animation-delay:.45s}.barrow2:nth-child(3) .brbar>span{animation-delay:.55s}.barrow2:nth-child(4) .brbar>span{animation-delay:.65s}.barrow2:nth-child(5) .brbar>span{animation-delay:.75s}.barrow2:nth-child(6) .brbar>span{animation-delay:.85s}
+.hlcard{position:relative;overflow:hidden;transition:transform .2s}
+.hlcard:hover{transform:translateY(-2px)}
+.hlcard::after{content:"";position:absolute;top:0;left:-60%;width:40%;height:100%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.16),transparent);transform:skewX(-18deg);animation:dShine 5s 1.5s ease-in-out infinite}
+.hlcard .hli{animation:lgBob 3.2s ease-in-out infinite}
+.actdot{animation:dPulse 2.2s ease-in-out infinite}
+.mcard{transition:transform .2s}.mcard:active{transform:scale(.98)}
+.hero2{background-size:140% 140%;animation:lgBgShift 14s ease-in-out infinite}
+@keyframes viewIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes dUp{from{opacity:0;transform:translateY(18px) scale(.985)}to{opacity:1;transform:none}}
+@keyframes dDraw{to{stroke-dashoffset:0}}
+@keyframes dFade{from{opacity:0}to{opacity:1}}
+@keyframes dPop{from{opacity:0;transform:scale(0)}to{opacity:1;transform:scale(1)}}
+@keyframes dGrow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes dGrowY{to{transform:scaleY(1)}}
+@keyframes dShine{0%,70%,100%{left:-60%}85%{left:130%}}
+@keyframes dPulse{0%,100%{box-shadow:0 0 0 0 rgba(213,62,15,.45)}60%{box-shadow:0 0 0 7px rgba(213,62,15,0)}}
+@keyframes lgBgShift{0%,100%{background-position:0% 30%}50%{background-position:100% 70%}}
+@media (max-width:1100px){.dhero{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){.dash-in>*,.view.active:not(#v-dashboard),.dh-bg i,.ln,.ar-fade,.sp-area,.dpop,.sp-dot,.kpi::after,.dh-ring .rg,.barrow2 .brbar>span,.hlcard::after,.hlcard .hli,.actdot,.hero2{animation:none!important}.ln{stroke-dashoffset:0}.kpi::after{transform:none}}
+
