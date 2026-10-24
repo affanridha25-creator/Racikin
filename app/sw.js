@@ -1,6 +1,6 @@
 // Service worker Racikin — cache shell, biarkan API selalu ke jaringan.
-const CACHE = 'racikin-v34';
-const ASSETS = ['./', './index.php', './manifest.webmanifest', './icons/favicon.png', './icons/icon-192.png', './icons/icon-512.png'];
+const CACHE = 'racikin-v35';
+const ASSETS = ['./', './index.php', './manifest.webmanifest', './icons/favicon.png', './icons/icon-192.png', './icons/icon-512.png', './css/base-v2.css', './css/p-keuangan.css', './css/p-produksi.css', './css/p-produk-kasir.css', './css/p-rekap-users.css'];
 
 self.addEventListener('install', e => {
   e.waitUntil(

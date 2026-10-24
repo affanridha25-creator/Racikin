@@ -380,6 +380,77 @@ main{flex:1;padding:16px 30px 60px}
 @keyframes lgOutPanel{to{opacity:0}}
 @keyframes lgOutCard{to{opacity:0;transform:translateY(-34px) scale(.93)}}
 @media (prefers-reduced-motion:reduce){.wsplash *,.wsplash::before{animation:none!important}.lsplit.leaving *{animation:none!important}}
+/* ---- Master Toko ---- */
+.tokogrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:16px}
+.tcard{background:#fff;border-radius:22px;padding:16px 16px 14px;box-shadow:0 8px 22px rgba(40,40,60,.06);cursor:pointer;transition:transform .22s cubic-bezier(.2,.8,.2,1),box-shadow .22s;animation:dUp .55s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--k,0)*45ms)}
+.tcard:hover{transform:translateY(-5px);box-shadow:0 18px 34px rgba(40,40,60,.12)}
+.tc-top{display:flex;align-items:center;gap:12px}
+.tc-av{width:46px;height:46px;border-radius:15px;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;flex-shrink:0;transition:transform .3s cubic-bezier(.3,1.6,.5,1)}
+.tcard:hover .tc-av{transform:rotate(-8deg) scale(1.1)}
+.tc-id{flex:1;min-width:0}
+.tc-name{font-weight:800;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tc-sub{font-size:12px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tc-sub a{color:var(--muted);text-decoration:none}.tc-sub a:hover{color:var(--red)}
+.tc-x{border:none;background:#fbeeea;color:var(--red);width:28px;height:28px;border-radius:9px;cursor:pointer;opacity:0;transition:opacity .2s;font-size:12px}
+.tcard:hover .tc-x{opacity:1}
+@media (hover:none){.tc-x{opacity:.7}}
+.tc-addr{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.4}
+.tc-stats{display:grid;grid-template-columns:1.3fr 1.3fr .7fr;gap:8px;margin-top:12px}
+.tc-stats span{display:block;font-size:10.5px;color:var(--muted);font-weight:600}
+.tc-stats b{display:block;font-size:14px;margin-top:2px;letter-spacing:-.01em}
+.tc-bar{height:6px;background:#f1eeed;border-radius:6px;margin-top:12px;overflow:hidden}
+.tc-bar i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,var(--orange),var(--red));transform-origin:left;animation:dGrow .9s .3s cubic-bezier(.2,.8,.2,1) both}
+.tc-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:12px;min-height:30px}
+/* ---- Profil Usaha ---- */
+.pf-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:18px;align-items:start;max-width:1100px}
+.pf-col{display:flex;flex-direction:column;gap:18px;min-width:0}
+.pfc{background:#fff;border-radius:24px;padding:20px 20px 18px;box-shadow:0 8px 22px rgba(40,40,60,.06);animation:dUp .6s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--k,0)*90ms)}
+.pfc h3{font-size:15.5px;font-weight:800;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.pf-hero{position:relative;overflow:hidden;color:#fff;background:linear-gradient(140deg,#F26A2E -10%,#D53E0F 46%,#7E0306 118%);box-shadow:0 20px 40px rgba(126,3,6,.25)}
+.pf-hbg{position:absolute;inset:0;pointer-events:none}
+.pf-hbg i{position:absolute;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.24),rgba(255,255,255,0) 70%)}
+.pf-hbg i:nth-child(1){width:260px;height:260px;right:-60px;top:-90px;animation:lgDrift1 15s ease-in-out infinite alternate}
+.pf-hbg i:nth-child(2){width:170px;height:170px;left:30%;bottom:-90px;background:radial-gradient(circle,rgba(255,196,120,.34),rgba(255,196,120,0) 70%);animation:lgDrift2 18s ease-in-out infinite alternate}
+.pf-hmain,.pf-meter{position:relative}
+.pf-hmain{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.pf-hero .logobox{width:96px;height:96px;border-radius:24px;background:#fff;border:3px solid rgba(255,255,255,.55);box-shadow:0 12px 26px rgba(0,0,0,.22);animation:lgPop .8s .1s cubic-bezier(.3,1.5,.5,1) both}
+.pf-hid{flex:1;min-width:190px}
+.pf-name{font-size:21px;font-weight:800;letter-spacing:-.01em}
+.pf-badge{display:inline-block;margin-top:6px;background:rgba(255,255,255,.2);border-radius:999px;padding:4px 12px;font-size:12px;font-weight:700}
+.pf-meter{margin-top:18px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:18px;padding:12px 14px;backdrop-filter:blur(6px)}
+.pf-mt{display:flex;justify-content:space-between;font-size:12.5px;font-weight:700;margin-bottom:8px}
+.pf-mbar{height:8px;border-radius:8px;background:rgba(255,255,255,.25);overflow:hidden}
+.pf-mbar i{display:block;height:100%;background:#fff;border-radius:8px;transform-origin:left;animation:dGrow 1.2s .5s cubic-bezier(.4,0,.2,1) both}
+.pf-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.pf-chips span{font-size:11px;font-weight:700;border-radius:999px;padding:3px 10px;background:rgba(255,255,255,.14);opacity:.8}
+.pf-chips span.ok{background:#fff;color:var(--red);opacity:1}
+.pf-types{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pf-types button{position:relative;text-align:left;border:2px solid #eee;background:#fff;border-radius:18px;padding:14px;cursor:pointer;display:flex;flex-direction:column;gap:3px;font-family:inherit;transition:border-color .2s,background .2s,transform .2s,box-shadow .2s}
+.pf-types button:hover{transform:translateY(-2px);box-shadow:0 10px 20px rgba(40,40,60,.08)}
+.pf-types button i{font-style:normal;font-size:24px;margin-bottom:4px}
+.pf-types button b{font-size:13px}
+.pf-types button span{font-size:11px;color:var(--muted);line-height:1.35}
+.pf-types button.on{border-color:var(--red);background:linear-gradient(160deg,#fff,#fff3ec)}
+.pf-types button.on::after{content:"✓";position:absolute;top:10px;right:12px;width:22px;height:22px;border-radius:50%;background:var(--red);color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;animation:dPop .35s cubic-bezier(.3,1.6,.5,1) both}
+.pf-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
+.pf-row:last-of-type{border-bottom:none}
+.pf-ri{width:38px;height:38px;border-radius:12px;background:var(--cream);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.pf-rt{flex:1;min-width:0}.pf-rt b{display:block;font-size:13.5px}.pf-rt span{display:block;font-size:11.5px;color:var(--muted);margin-top:1px;line-height:1.35}
+.pf-rate{display:flex;align-items:center;gap:4px}
+.pf-rate input{width:64px;text-align:right;padding:7px 9px}
+.sw{position:relative;display:inline-block;width:46px;height:27px;flex-shrink:0}
+.sw>input[type=checkbox]{-webkit-appearance:none;appearance:none;width:46px;height:27px;min-width:0;margin:0;padding:0;border:none;border-radius:999px;background:#dcd6d2;cursor:pointer;transition:background .25s;display:block}
+.sw>input[type=checkbox]::after{content:"";position:absolute;top:3px;left:3px;width:21px;height:21px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.28);transition:transform .28s cubic-bezier(.3,1.5,.5,1)}
+.sw>input[type=checkbox]:checked{background:var(--red)}
+.sw>input[type=checkbox]:checked::after{transform:translateX(19px)}
+.sw>input[type=checkbox]:focus-visible{outline:3px solid rgba(213,62,15,.3);outline-offset:2px}
+.pf-save{position:sticky;bottom:14px;z-index:6;max-width:1100px;margin-top:18px;display:flex;justify-content:flex-end;pointer-events:none}
+.pf-savein{pointer-events:auto;display:flex;align-items:center;gap:14px;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);border:1px solid rgba(0,0,0,.06);border-radius:999px;padding:8px 8px 8px 18px;box-shadow:0 14px 34px rgba(40,40,60,.18)}
+.pf-dirty{font-size:12px;color:var(--muted);font-weight:600;opacity:.0;max-width:0;overflow:hidden;white-space:nowrap;transition:opacity .3s,max-width .35s}
+.pf-dirty.on{opacity:1;max-width:240px;color:var(--amber)}
+.pf-savein .btn{border-radius:999px;padding:11px 20px}
+@media (max-width:900px){.pf-grid{grid-template-columns:1fr}.pf-types{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){.tcard,.pfc,.tc-bar i,.pf-mbar i,.pf-hbg i,.pf-hero .logobox,.pf-types button.on::after{animation:none!important}}
 @media (prefers-reduced-motion:reduce){.lhero::before,.lhero::after,.lh-word,.lh-copy *,.lplate,.ldisc,.lorbit,.lfc,.lwave,.lwave-b,.lhead,.lh-tag{animation:none!important}}
 @media (prefers-reduced-motion:reduce){.loginbg,.loginbg::before,.loginbg::after,.loginbox,.loginbox *,.lfx span{animation:none!important;transition:none!important}.lfx{display:none}}
 
@@ -619,6 +690,11 @@ label.f{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;font-w
 .amtbox{background:var(--red);color:#fff;border-radius:14px;padding:14px;text-align:center;font-size:26px;font-weight:800;letter-spacing:.5px;margin:8px 0}
 .bankbox{background:var(--bg);border:1px dashed var(--line);border-radius:12px;padding:12px 14px;font-size:14px;line-height:1.55;white-space:pre-line}
 </style>
+<link rel="stylesheet" href="css/base-v2.css?v=1">
+<link rel="stylesheet" href="css/p-keuangan.css?v=1">
+<link rel="stylesheet" href="css/p-produksi.css?v=1">
+<link rel="stylesheet" href="css/p-produk-kasir.css?v=1">
+<link rel="stylesheet" href="css/p-rekap-users.css?v=1">
 </head>
 <body>
 <aside class="sidebar">
@@ -1256,11 +1332,11 @@ function penunggakRows(penunggak){
 }
 // ---- animasi dashboard: sapaan, hitung-naik angka, stagger, sparkline ----
 function greetWord(){const h=new Date().getHours();return h<11?"Selamat pagi":h<15?"Selamat siang":h<18?"Selamat sore":"Selamat malam";}
-function cnt(v,f){v=Math.round(+v||0);return `<span class="cnt" data-v="${v}" data-f="${f||"rp"}">${f==="pct"?v+"%":rp(v)}</span>`;}
+function cnt(v,f){v=Math.round(+v||0);return `<span class="cnt" data-v="${v}" data-f="${f||"rp"}">${f==="pct"?v+"%":f==="num"?v:rp(v)}</span>`;}
 function runCounts(root){
   const reduce=window.matchMedia&&matchMedia("(prefers-reduced-motion:reduce)").matches;
   (root||document).querySelectorAll(".cnt").forEach(el=>{
-    const v=+el.dataset.v||0,f=el.dataset.f,fmt=x=>f==="pct"?Math.round(x)+"%":rp(Math.round(x));
+    const v=+el.dataset.v||0,f=el.dataset.f,fmt=x=>f==="pct"?Math.round(x)+"%":f==="num"?String(Math.round(x)):rp(Math.round(x));
     if(reduce||!v){el.textContent=fmt(v);return;}
     const t0=performance.now()+(+el.dataset.d||250),dur=1100;el.textContent=fmt(0);
     const step=now=>{const p=Math.min(1,Math.max(0,(now-t0)/dur)),e=1-Math.pow(1-p,3);el.textContent=fmt(v*e);if(p<1&&el.isConnected)requestAnimationFrame(step);};
@@ -2591,18 +2667,51 @@ async function delStockAdj(aid,id){if(confirm("Hapus penyesuaian ini? Stok akan 
 async function delProd(id){const used=S.batches.some(b=>(b.outputs||[]).some(o=>o.productId===id))||S.notas.some(n=>notaItems(n).some(it=>it.productId===id));if(used){toast("Produk dipakai di batch/nota.");return;}if(confirm("Hapus produk ini?")){await api("deleteProduct",{id});await reload();rProduk();}}
 
 // ================= TOKO =================
+// ---- Master Toko: kartu per toko, ringkasan, cari, urut, tagih ----
+let TOKO_SORT="omzet",TOKO_Q="";
+const avHue=n=>{let h=0;for(const c of String(n||"?"))h=(h*31+c.charCodeAt(0))%360;return h;};
+function tokoData(){
+  return S.stores.map(s=>{const ns=S.notas.filter(n=>n.storeId===s.id);
+    const omz=ns.reduce((a,n)=>a+notaOmzet(n),0),due=ns.reduce((a,n)=>a+Math.max(0,notaDue(n)),0);
+    const open=ns.filter(n=>notaStatus(n)!=="lunas"&&notaDue(n)>0).sort((x,y)=>(x.date||"").localeCompare(y.date||""));
+    const last=ns.reduce((m,n)=>(n.date||"")>m?(n.date||""):m,"");
+    return {s,omz,due,nNota:ns.length,open,last,oldest:open.length?open[0]:null};});
+}
+function tokoListHtml(){
+  const q=TOKO_Q.trim().toLowerCase();
+  let list=tokoData().filter(x=>!q||x.s.name.toLowerCase().includes(q)||(x.s.contact||"").toLowerCase().includes(q)||(x.s.address||"").toLowerCase().includes(q));
+  const cmp={omzet:(a,b)=>b.omz-a.omz,piutang:(a,b)=>b.due-a.due,terbaru:(a,b)=>(b.last||"").localeCompare(a.last||""),nama:(a,b)=>a.s.name.localeCompare(b.s.name)}[TOKO_SORT];
+  list=list.sort(cmp);
+  if(!list.length)return `<div class="empty">${S.stores.length?"Tak ada toko yang cocok.":"Belum ada toko. Tambah toko pertama kamu 🏪"}</div>`;
+  const mx=Math.max(1,...list.map(x=>x.omz));
+  return `<div class="tokogrid">${list.map((x,k)=>{const s=x.s,h=avHue(s.name),ph=waPhone(s.contact),pct=x.omz>0?Math.min(100,x.due/x.omz*100):0;
+    const age=x.oldest?daysSince(x.oldest.date):0;
+    return `<div class="tcard" style="--k:${k}" onclick="editStore('${s.id}')">
+      <div class="tc-top"><div class="tc-av" style="background:hsl(${h},75%,92%);color:hsl(${h},55%,32%)">${esc((s.name[0]||"?").toUpperCase())}</div>
+        <div class="tc-id"><div class="tc-name">${esc(s.name)}</div><div class="tc-sub">${s.contact?(ph?`<a href="https://wa.me/${ph}" target="_blank" rel="noopener" onclick="event.stopPropagation()">📞 ${esc(s.contact)}</a>`:`📞 ${esc(s.contact)}`):`<span class="muted">tanpa kontak</span>`}</div></div>
+        <button class="tc-x" title="Hapus" onclick="event.stopPropagation();delStore('${s.id}')">✕</button></div>
+      ${s.address?`<div class="tc-addr">📍 ${esc(s.address)}</div>`:""}
+      <div class="tc-stats"><div><span>Omzet</span><b>${rp(x.omz)}</b></div><div><span>Piutang</span><b style="color:${x.due>0?"var(--amber)":"var(--green)"}">${rp(x.due)}</b></div><div><span>Nota</span><b>${x.nNota}</b></div></div>
+      <div class="tc-bar" title="Omzet dibanding toko lain"><i style="width:${x.omz/mx*100}%"></i></div>
+      <div class="tc-foot">${x.due>0?`<button class="btn sm wa" onclick="event.stopPropagation();waTagih('${x.oldest.id}')">💬 Tagih</button><span class="mini" style="color:${age>=30?"var(--red)":age>=14?"var(--amber)":"var(--muted)"}">${x.open.length} nota · tertua ${age} hr</span>`:`<span class="mini" style="color:var(--green);font-weight:700">✓ Tidak ada piutang</span>${x.last?`<span class="mini">terakhir ${fmtDate(x.last)}</span>`:""}`}</div>
+    </div>`;}).join("")}</div>`;
+}
+function setTokoQ(v){TOKO_Q=v;const el=document.getElementById("tokoList");if(el)el.innerHTML=tokoListHtml();}
+function setTokoSort(v){TOKO_SORT=v;rToko();}
 function rToko(){
-  if(isMobile()){
-    const rows=S.stores.map(s=>{const ns=S.notas.filter(n=>n.storeId===s.id);const omz=ns.reduce((a,n)=>a+notaOmzet(n),0),due=ns.reduce((a,n)=>a+notaDue(n),0);
-      return crow({icon:"🏪",title:esc(s.name),sub:`${esc(s.contact||"tanpa kontak")}${due>0?` · piutang ${rp(due)}`:""}`,amt:rp(omz),onclick:`editStore('${s.id}')`,del:`delStore('${s.id}')`});}).join("");
-    document.getElementById("v-toko").innerHTML=`<div class="desc">Daftar toko/warung tempat titip atau jual.</div><button class="btn" style="width:100%;margin-bottom:14px" onclick="editStore()">+ Toko Baru</button>${S.stores.length===0?'<div class="empty">Belum ada toko.</div>':`<div class="clist">${rows}</div>`}`;
-    return;
-  }
-  const rows=S.stores.map(s=>{const ns=S.notas.filter(n=>n.storeId===s.id);const omz=ns.reduce((a,n)=>a+notaOmzet(n),0),due=ns.reduce((a,n)=>a+notaDue(n),0);
-    return `<tr><td>${esc(s.name)}</td><td>${esc(s.contact||"")}</td><td>${esc(s.address||"")}</td><td class="num">${rp(omz)}</td><td class="num" style="color:var(--amber)">${rp(due)}</td><td class="num"><div class="acts"><button class="btn sm gray" onclick="editStore('${s.id}')">Edit</button><button class="btn sm del" onclick="delStore('${s.id}')">✕</button></div></td></tr>`;}).join("");
-  document.getElementById("v-toko").innerHTML=`<h2 class="title">Master Toko</h2><div class="desc">Daftar toko/warung tempat titip atau jual produk.</div>
-  <div class="flexbtns"><button class="btn" onclick="editStore()">+ Toko Baru</button></div>
-  <div class="panel">${S.stores.length===0?'<div class="empty">Belum ada toko.</div>':`<table><thead><tr><th>Nama</th><th>Kontak</th><th>Alamat</th><th class="num">Omzet</th><th class="num">Piutang</th><th></th></tr></thead><tbody>${rows}</tbody></table>`}</div>`;
+  const d=tokoData();
+  const totO=d.reduce((a,x)=>a+x.omz,0),totD=d.reduce((a,x)=>a+x.due,0),nD=d.filter(x=>x.due>0).length;
+  const mob=isMobile();
+  const card=(l,v,cl)=>`<div class="card ${cl||""}"><div class="lbl">${l}</div><div class="val">${v}</div></div>`;
+  const chip=(v,l)=>`<button class="btn sm ${TOKO_SORT===v?"":"gray"}" onclick="setTokoSort('${v}')">${l}</button>`;
+  const el=document.getElementById("v-toko");
+  el.innerHTML=`${mob?"":`<h2 class="title">Master Toko</h2><div class="desc">Daftar toko/warung tempat titip atau jual produk — lengkap dengan omzet &amp; piutang tiap toko.</div>`}
+  <div class="cards">${card("Jumlah Toko",cnt(d.length,"num"))}${card("Total Omzet",cnt(totO))}${card("Total Piutang",cnt(totD),"amber")}${card("Toko Berpiutang",cnt(nD,"num"))}</div>
+  <div class="flexbtns" style="align-items:center;flex-wrap:wrap;margin-bottom:16px"><button class="btn" onclick="editStore()">+ Toko Baru</button>
+    <input type="search" placeholder="Cari toko / kontak / alamat…" value="${esc(TOKO_Q)}" oninput="setTokoQ(this.value)" style="flex:1;min-width:150px">
+    ${chip("omzet","Omzet")}${chip("piutang","Piutang")}${chip("terbaru","Terbaru")}${chip("nama","A–Z")}</div>
+  <div id="tokoList">${tokoListHtml()}</div>`;
+  runCounts(el);
 }
 function editStore(id){const s=id?S.stores.find(x=>x.id===id):{id:null,name:"",contact:"",address:""};
   openModal(`<button class="close" onclick="closeModal()">×</button><h3>${id?"Edit":"Tambah"} Toko</h3>
@@ -2761,61 +2870,69 @@ async function delUser(email){if(confirm("Hapus pengguna "+email+"?")){await api
 let _prof={};
 function rProfile(){
   _prof=JSON.parse(JSON.stringify(S.profile||{}));
-  const logo=_prof.logo||"";
-  document.getElementById("v-profile").innerHTML=`<h2 class="title">Profil Usaha</h2>
-  <div class="desc">Logo &amp; kontak muncul di aplikasi, <b>struk PDF</b>, &amp; kop laporan cetak. <span class="mini">(Struk thermal 58mm hanya teks — tak memuat gambar logo.)</span></div>
-  <div class="panel" style="max-width:600px">
-    <label class="f">Jenis Usaha</label>
-    <div class="posseg" id="bizTypeSeg" style="margin-top:6px">
-      <button class="${(_prof.biz_type||"produksi")!=="fnb"?"on":""}" onclick="setBizType('produksi')">🏭 Produksi &amp; Distribusi</button>
-      <button class="${_prof.biz_type==="fnb"?"on":""}" onclick="setBizType('fnb')">🍽️ F&amp;B / Warung</button>
+  const logo=_prof.logo||"",fnb=_prof.biz_type==="fnb";
+  // kelengkapan profil
+  const chk=[["Logo",!!logo],["Alamat",!!(_prof.address||"").trim()],["Telepon / WA",!!((_prof.phone||_prof.whatsapp)||"").trim()],["Sosmed",!!((_prof.instagram||_prof.facebook||_prof.tiktok)||"").trim()],["Pesan struk",!!(_prof.footer||"").trim()],["QRIS",!!(_prof.qris||"").trim()]];
+  const done=chk.filter(c=>c[1]).length,pct=Math.round(done/chk.length*100);
+  const sw=(id,on)=>`<span class="sw"><input type="checkbox" id="${id}" ${on?"checked":""}></span>`;
+  const row=(ic,t,desc,ctl)=>`<div class="pf-row"><div class="pf-ri">${ic}</div><div class="pf-rt"><b>${t}</b><span>${desc}</span></div>${ctl}</div>`;
+  const rate=(id,v)=>`<div class="pf-rate"><input id="${id}" inputmode="decimal" value="${v&&+v?(+v):""}" placeholder="0"><b>%</b></div>`;
+  const qv=_prof.qris?(qrisValid(_prof.qris)?'<span style="color:var(--green)">✓ QRIS valid — nanti muncul di Kasir saat pilih QRIS.</span>':'<span style="color:var(--red)">⚠ Kode QRIS belum valid.</span>'):'Scan sticker QRIS-mu pakai app pembaca QR, salin teksnya ke sini. Kosongkan kalau belum ada.';
+  const el=document.getElementById("v-profile");
+  el.innerHTML=`<div class="pf-head"><h2 class="title">Profil Usaha</h2><div class="desc">Logo &amp; kontak muncul di aplikasi, <b>struk PDF</b>, &amp; kop laporan cetak. <span class="mini">(Struk thermal 58mm hanya teks — tak memuat gambar logo.)</span></div></div>
+  <div class="pf-grid">
+   <div class="pf-col">
+    <div class="pfc pf-hero" style="--k:0">
+      <div class="pf-hbg" aria-hidden="true"><i></i><i></i></div>
+      <div class="pf-hmain"><div id="logoPrev" class="logobox">${logo?`<img src="${logo}" alt="logo">`:`<span>🍲</span>`}</div>
+        <div class="pf-hid"><div class="pf-name">${esc(BIZ.name||"Usaha")}</div><div class="pf-badge">${fnb?"🍽️ F&amp;B / Warung":"🏭 Produksi &amp; Distribusi"}</div>
+          <div class="flexbtns" style="margin:10px 0 0"><button class="btn sm" style="background:#fff;color:var(--red)" onclick="document.getElementById('logoInp').click()">⬆ Unggah Logo</button><button class="btn sm" style="background:rgba(255,255,255,.2)" id="logoDel" onclick="removeLogo()" ${logo?"":'style="display:none"'}>Hapus</button></div>
+          <input type="file" id="logoInp" accept="image/*" style="display:none" onchange="pickLogo(this)"></div></div>
+      <div class="pf-meter"><div class="pf-mt"><span>Kelengkapan profil</span><b>${pct}%</b></div><div class="pf-mbar"><i style="width:${pct}%"></i></div>
+        <div class="pf-chips">${chk.map(c=>`<span class="${c[1]?"ok":""}">${c[1]?"✓":"○"} ${c[0]}</span>`).join("")}</div></div>
     </div>
-    <div class="mini" id="bizTypeHint" style="margin:6px 0 18px">${_prof.biz_type==="fnb"?"Fokus Kasir — menu Produksi, Distribusi, Pembayaran &amp; Toko disembunyikan.":"Alur lengkap: produksi batch (HPP) → distribusi/titip ke toko → piutang."}</div>
-    <div style="display:flex;gap:18px;align-items:center;margin-bottom:20px;flex-wrap:wrap">
-      <div id="logoPrev" class="logobox">${logo?`<img src="${logo}" alt="logo">`:`<span>🍲</span>`}</div>
-      <div style="flex:1;min-width:190px">
-        <div style="font-weight:800;font-size:16px;margin-bottom:2px">${esc(BIZ.name||"Usaha")}</div>
-        <div class="mini" style="margin-bottom:10px">Logo untuk kop laporan — disarankan gambar persegi (maks 2MB, otomatis diperkecil).</div>
-        <div class="flexbtns" style="margin-bottom:0"><button class="btn sm ghost" onclick="document.getElementById('logoInp').click()">⬆ Unggah Logo</button><button class="btn sm gray" id="logoDel" onclick="removeLogo()" ${logo?"":'style="display:none"'}>Hapus Logo</button></div>
-        <input type="file" id="logoInp" accept="image/*" style="display:none" onchange="pickLogo(this)">
-      </div>
+    <div class="pfc" style="--k:1"><h3>📇 Info &amp; Kontak</h3>
+      <label class="f">Alamat</label><textarea id="pfAddr" rows="2" style="margin-bottom:14px" placeholder="mis. Jl. Melati No. 10, Bandung">${esc(_prof.address||"")}</textarea>
+      <div class="grid2" style="margin-bottom:14px"><div><label class="f">No. Telepon</label><input id="pfPhone" value="${esc(_prof.phone||"")}" placeholder="0812xxxx"></div><div><label class="f">WhatsApp</label><input id="pfWa" value="${esc(_prof.whatsapp||"")}" placeholder="0812xxxx"></div></div>
+      <div class="grid2" style="margin-bottom:14px"><div><label class="f">Instagram</label><input id="pfIg" value="${esc(_prof.instagram||"")}" placeholder="@usaha"></div><div><label class="f">Facebook</label><input id="pfFb" value="${esc(_prof.facebook||"")}" placeholder="nama halaman"></div></div>
+      <label class="f">TikTok / sosmed lain</label><input id="pfTt" value="${esc(_prof.tiktok||"")}" placeholder="@usaha">
     </div>
-    <label class="f">Alamat</label><textarea id="pfAddr" rows="2" style="margin-bottom:14px" placeholder="mis. Jl. Melati No. 10, Bandung">${esc(_prof.address||"")}</textarea>
-    <div class="grid2" style="margin-bottom:14px"><div><label class="f">No. Telepon</label><input id="pfPhone" value="${esc(_prof.phone||"")}" placeholder="0812xxxx"></div><div><label class="f">WhatsApp</label><input id="pfWa" value="${esc(_prof.whatsapp||"")}" placeholder="0812xxxx"></div></div>
-    <div class="grid2" style="margin-bottom:14px"><div><label class="f">Instagram</label><input id="pfIg" value="${esc(_prof.instagram||"")}" placeholder="@usaha"></div><div><label class="f">Facebook</label><input id="pfFb" value="${esc(_prof.facebook||"")}" placeholder="nama halaman"></div></div>
-    <label class="f">TikTok / sosmed lain</label><input id="pfTt" value="${esc(_prof.tiktok||"")}" placeholder="@usaha" style="margin-bottom:14px">
-    <label class="f">Pesan bawah struk <span class="mini">(kaki struk kasir — kosongkan = "Terima kasih :)")</span></label><input id="pfFooter" value="${esc(_prof.footer||"")}" placeholder="mis. Terima kasih & sampai jumpa lagi!" maxlength="120" style="margin-bottom:18px">
-    <div style="border-top:1px solid var(--line);padding-top:16px">
+    <div class="pfc" style="--k:2"><h3>🧾 Struk &amp; QRIS</h3>
+      <label class="f">Pesan bawah struk <span class="mini">(kaki struk kasir — kosongkan = "Terima kasih :)")</span></label><input id="pfFooter" value="${esc(_prof.footer||"")}" placeholder="mis. Terima kasih & sampai jumpa lagi!" maxlength="120" style="margin-bottom:16px">
       <label class="f">Kode QRIS <span class="mini">(untuk pembayaran di Kasir)</span></label>
       <textarea id="pfQris" rows="3" placeholder="Tempel string QRIS dari hasil scan sticker usahamu (mulai 0002...)" oninput="qrisCheck(this.value)" style="font-size:12px;font-family:monospace">${esc(_prof.qris||"")}</textarea>
-      <div id="qrisMsg" class="mini" style="margin-top:6px">${_prof.qris?(qrisValid(_prof.qris)?'<span style="color:var(--green)">✓ QRIS valid — nanti muncul di Kasir saat pilih QRIS.</span>':'<span style="color:var(--red)">⚠ Kode QRIS belum valid.</span>'):'Scan sticker QRIS-mu pakai app pembaca QR, salin teksnya ke sini. Kosongkan kalau belum ada.'}</div>
+      <div id="qrisMsg" class="mini" style="margin-top:6px">${qv}</div>
     </div>
-    <div style="border-top:1px solid var(--line);padding-top:16px;margin-top:16px">
-      <label class="f">Service Charge &amp; Pajak <span class="mini">(otomatis di transaksi Kasir)</span></label>
-      <div class="grid2" style="margin-top:8px;align-items:center">
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="pfSvcOn" ${+_prof.svc_enabled?"checked":""}> Service charge</label>
-        <div style="display:flex;align-items:center;gap:6px;justify-content:flex-end"><input id="pfSvcRate" inputmode="decimal" value="${_prof.svc_rate&&+_prof.svc_rate?(+_prof.svc_rate):""}" placeholder="0" style="width:80px;text-align:right"><b>%</b></div>
+   </div>
+   <div class="pf-col">
+    <div class="pfc" style="--k:1"><h3>🏷️ Jenis Usaha</h3>
+      <div class="pf-types" id="bizTypeSeg">
+        <button class="${!fnb?"on":""}" onclick="setBizType('produksi')"><i>🏭</i><b>Produksi &amp; Distribusi</b><span>Batch &amp; HPP → titip ke toko → piutang</span></button>
+        <button class="${fnb?"on":""}" onclick="setBizType('fnb')"><i>🍽️</i><b>F&amp;B / Warung</b><span>Fokus Kasir &amp; menu</span></button>
       </div>
-      <div class="grid2" style="margin-top:10px;align-items:center">
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="pfTaxOn" ${+_prof.tax_enabled?"checked":""}> Pajak / PPN</label>
-        <div style="display:flex;align-items:center;gap:6px;justify-content:flex-end"><input id="pfTaxRate" inputmode="decimal" value="${_prof.tax_rate&&+_prof.tax_rate?(+_prof.tax_rate):""}" placeholder="0" style="width:80px;text-align:right"><b>%</b></div>
-      </div>
-      <div class="mini" style="margin-top:8px">Pajak dihitung di atas (subtotal − diskon + service). Muncul terpisah di struk &amp; "Pajak Terkumpul" di Laba-Rugi (bukan laba).</div>
+      <div class="mini" id="bizTypeHint" style="margin-top:10px">${fnb?"Fokus Kasir — menu Produksi, Distribusi, Pembayaran &amp; Toko disembunyikan.":"Alur lengkap: produksi batch (HPP) → distribusi/titip ke toko → piutang."}</div>
     </div>
-    <div style="border-top:1px solid var(--line);padding-top:16px;margin-top:16px">
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="pfOversell" ${+_prof.oversell?"checked":""}> <span class="f" style="margin:0">Boleh jual walau stok habis</span></label>
-      <div class="mini" style="margin-top:6px">Kalau aktif, kasir &amp; distribusi tetap bisa jual meski stok 0 (stok jadi minus). Cocok untuk pre-order / stok tak selalu dicatat. Kalau nonaktif, penjualan melebihi stok ditolak.</div>
+    <div class="pfc" style="--k:2"><h3>💳 Service Charge &amp; Pajak</h3>
+      ${row("🛎️","Service charge","dihitung dari subtotal setelah diskon",sw("pfSvcOn",+_prof.svc_enabled)+rate("pfSvcRate",_prof.svc_rate))}
+      ${row("🏛️","Pajak / PPN","dihitung di atas subtotal − diskon + service",sw("pfTaxOn",+_prof.tax_enabled)+rate("pfTaxRate",_prof.tax_rate))}
+      <div class="mini" style="margin-top:10px">Muncul terpisah di struk &amp; "Pajak Terkumpul" di Laba-Rugi (bukan laba).</div>
     </div>
-    <div style="text-align:right;margin-top:16px"><button class="btn" onclick="saveProfile()">💾 Simpan Profil</button></div>
+    <div class="pfc" style="--k:3"><h3>📦 Stok</h3>
+      ${row("🚦","Boleh jual walau stok habis","stok boleh jadi minus (cocok untuk pre-order)",sw("pfOversell",+_prof.oversell))}
+      <div class="mini" style="margin-top:10px">Kalau nonaktif, penjualan melebihi stok ditolak.</div>
+    </div>
+    ${NativePrinter.isNative()?`<div class="pfc" style="--k:4"><h3>🖨 Printer Struk</h3>
+      <p class="mini" style="margin-bottom:12px">Cetak langsung ke printer thermal Bluetooth (58mm), lengkap dengan logo — tanpa app RawBT. ${(()=>{const c=NativePrinter.saved();return c?`Printer aktif: <b>${esc(c.name||c.address)}</b>.`:"Belum ada printer dipilih.";})()}</p>
+      <button class="btn ghost" onclick="printerSettingsModal()">Atur Printer</button></div>`:""}
+    <div class="pfc" style="--k:5"><h3>🔒 Keamanan</h3>
+      <label class="f">Password Lama</label>${pwField("cpOld","password sekarang")}
+      <label class="f" style="margin-top:12px">Password Baru <span class="mini">(min 8 karakter)</span></label>${pwField("cpNew","password baru")}
+      <div style="text-align:right;margin-top:14px"><button class="btn ghost" onclick="doChangePassword()">Ubah Password</button></div>
+    </div>
+   </div>
   </div>
-  ${NativePrinter.isNative()?`<div class="panel" style="max-width:600px"><h3>🖨 Printer Struk</h3>
-    <p class="mini" style="margin-bottom:12px">Cetak struk langsung ke printer thermal Bluetooth (58mm), lengkap dengan logo — tanpa perlu app RawBT. ${(()=>{const c=NativePrinter.saved();return c?`Printer aktif: <b>${esc(c.name||c.address)}</b>.`:"Belum ada printer dipilih.";})()}</p>
-    <button class="btn ghost" onclick="printerSettingsModal()">Atur Printer</button>
-  </div>`:""}
-  <div class="panel" style="max-width:600px"><h3>🔒 Keamanan</h3>
-    <div class="grid2" style="margin-bottom:12px"><div><label class="f">Password Lama</label><input id="cpOld" type="password" placeholder="password sekarang"></div><div><label class="f">Password Baru (min 8 karakter)</label><input id="cpNew" type="password" placeholder="password baru"></div></div>
-    <div style="text-align:right"><button class="btn ghost" onclick="doChangePassword()">Ubah Password</button></div>
-  </div>`;
+  <div class="pf-save"><div class="pf-savein"><span class="pf-dirty" id="pfDirty">● Ada perubahan belum disimpan</span><button class="btn" onclick="saveProfile()">💾 Simpan Profil</button></div></div>`;
+  el.oninput=el.onchange=()=>{const d=document.getElementById("pfDirty");if(d)d.classList.add("on");};
 }
 // pilih jenis usaha di Profil (tanpa rerender penuh — isian lain di form tak hilang)
 function setBizType(t){_prof.biz_type=t==="fnb"?"fnb":"produksi";
