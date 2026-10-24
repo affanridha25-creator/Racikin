@@ -1669,7 +1669,7 @@ function rProduksi(){
       const prods=(b.outputs||[]).map(o=>esc((prod(o.productId)||{}).name||"?")).join(", ");
       const acts=`<div class="cacts"><button class="btn sm" onclick="event.stopPropagation();printBatch('${b.id}')">🖨 Cetak</button></div>`;
       return crow({icon:"🏭",title:(b.note?esc(b.note):prods)||"Batch",sub:`${b.batchNo?esc(b.batchNo)+" · ":""}${fmtDate(b.date)} · ${c.bottles} botol · HPP ${rp(c.avg)}`,amt:rp(c.total),acts,onclick:`editBatch('${b.id}')`,del:`delBatch('${b.id}')`});}).join("");
-    document.getElementById("v-produksi").innerHTML=`<div class="desc">Racik bahan + biaya → HPP per batch otomatis.</div><button class="btn" style="width:100%;margin-bottom:14px" onclick="editBatch()">+ Batch Baru</button>${S.batches.length===0?'<div class="empty">Belum ada batch.</div>':`<div class="clist">${rows}</div>`}`;
+    document.getElementById("v-produksi").innerHTML=`<div class="desc">Racik bahan + biaya → HPP per batch otomatis.</div><button class="btn" style="width:100%;margin-bottom:8px" onclick="editBatch()">+ Batch Baru</button><button class="btn gray" style="width:100%;margin-bottom:14px" onclick="cmpBatch()">⚖ Bandingkan Batch</button>${S.batches.length===0?'<div class="empty">Belum ada batch.</div>':`<div class="clist">${rows}</div>`}`;
     return;
   }
   const rows=S.batches.map(b=>{const c=batchCalc(b);const o=(b.outputs||[]).map(x=>`<div class="li"><span>${esc((prod(x.productId)||{}).name||"?")}</span><span class="q">×${x.qty}</span></div>`).join("")||'<span class="muted">—</span>';
@@ -1677,8 +1677,57 @@ function rProduksi(){
   document.getElementById("v-produksi").innerHTML=`
   <h2 class="title">Produksi &amp; HPP per Batch</h2>
   <div class="desc">Pilih bahan baku (harga otomatis dari master) + biaya → tentukan produk jadi &amp; qty → HPP per batch dihitung otomatis.</div>
-  <div class="flexbtns"><button class="btn" onclick="editBatch()">+ Batch Baru</button></div>
+  <div class="flexbtns"><button class="btn" onclick="editBatch()">+ Batch Baru</button><button class="btn gray" onclick="cmpBatch()">⚖ Bandingkan Batch</button></div>
   <div class="panel"><h3>Riwayat Batch</h3>${S.batches.length===0?'<div class="empty">Belum ada batch.</div>':`<table><thead><tr><th>No. Batch</th><th>Tanggal</th><th>Produk Jadi</th><th class="num">Botol</th><th class="num">Bahan</th><th class="num">Ops</th><th class="num">Total Modal</th><th class="num">HPP rata/botol</th><th></th></tr></thead><tbody>${rows}</tbody></table>`}</div>`;
+}
+// ---- bandingkan batch untuk produk yang sama: perubahan harga/qty bahan + item yang hilang/baru ----
+function cmpBatch(pid){
+  const withProd=id=>S.batches.filter(b=>(b.outputs||[]).some(o=>o.productId===id&&+o.qty>0));
+  const cands=S.products.filter(p=>withProd(p.id).length>=2);
+  if(!cands.length){toast("Perlu minimal 2 batch untuk produk yang sama.");return;}
+  if(!pid||!cands.some(p=>p.id===pid))pid=cands[0].id;
+  const bs=withProd(pid).sort((x,y)=>(x.date||"").localeCompare(y.date||"")||(x.id>y.id?1:-1));
+  const cs=bs.map(b=>batchCalc(b));
+  const pq=bs.map(b=>b.outputs.filter(o=>o.productId===pid).reduce((a,o)=>a+(+o.qty||0),0));
+  const num=x=>String(Number((+x).toPrecision(3)));
+  const rows={},ops={};
+  bs.forEach((b,i)=>{
+    (b.materials||[]).forEach(m=>{
+      const t=m.targetProduct;if(t&&t!==pid&&(b.outputs||[]).some(o=>o.productId===t))return;   // bahan khusus produk lain
+      const own=t===pid,den=own?pq[i]:cs[i].bottles;if(!(den>0))return;
+      const k=(m.materialId||(m.name||"").trim().toLowerCase());
+      const r=rows[k]||(rows[k]={name:m.name,unit:m.unit,c:[]});
+      const c=r.c[i]||(r.c[i]={qty:0,cost:0,price:+m.price||0});
+      c.qty+=(+m.qty||0)/den;c.cost+=(+m.qty||0)*(+m.price||0)/den;c.price=+m.price||0;
+    });
+    (b.ops||[]).forEach(o=>{
+      if(!cs[i].bottles)return;
+      const k=(o.name||"").trim().toLowerCase();
+      const r=ops[k]||(ops[k]={name:o.name,c:[]});
+      const c=r.c[i]||(r.c[i]={cost:0});c.cost+=(+o.amount||0)/cs[i].bottles;
+    });
+  });
+  const dl=(cur,prev)=>{if(prev==null||!prev||cur===prev)return"";const d=(cur-prev)/prev*100;return ` <span style="color:${d>0?"#c0392b":"#1e8e3e"};font-size:11px">${d>0?"▲":"▼"}${Math.abs(d).toFixed(0)}%</span>`;};
+  const miss=`<span style="color:var(--amber);font-size:11px">⚠ tidak ada</span>`;
+  const itemRow=r=>{let prevP=null,prevQ=null;
+    const tds=bs.map((b,i)=>{const c=r.c[i];if(!c)return `<td class="num">${miss}</td>`;
+      const h=`<td class="num">${rp(c.price)}${dl(c.price,prevP)}<div class="mini">${num(c.qty)} ${esc(r.unit||"")}/botol${dl(c.qty,prevQ)}</div></td>`;prevP=c.price;prevQ=c.qty;return h;}).join("");
+    const gone=r.c.filter(Boolean).length<bs.length;
+    return `<tr${gone?' style="background:var(--amber-bg)"':""}><td>${esc(r.name||"?")}</td>${tds}</tr>`;};
+  const opRow=r=>{let prev=null;
+    const tds=bs.map((b,i)=>{const c=r.c[i];if(!c)return `<td class="num">${miss}</td>`;const h=`<td class="num">${rp(Math.round(c.cost))}${dl(c.cost,prev)}</td>`;prev=c.cost;return h;}).join("");
+    return `<tr${r.c.filter(Boolean).length<bs.length?' style="background:var(--amber-bg)"':""}><td>${esc(r.name||"?")}</td>${tds}</tr>`;};
+  const sec=t=>`<tr><td colspan="${bs.length+1}" style="font-weight:700;background:var(--bg)">${t}</td></tr>`;
+  let pv=null;
+  const hppTds=bs.map((b,i)=>{const h=cs[i].perProduct[pid]||0;const out=`<td class="num"><b>${rp(Math.round(h))}</b>${dl(h,pv)}</td>`;pv=h;return out;}).join("");
+  const sel=`<select onchange="cmpBatch(this.value)" style="width:100%;margin-bottom:10px">${cands.map(p=>`<option value="${p.id}"${p.id===pid?" selected":""}>${esc(p.name)}</option>`).join("")}</select>`;
+  openModal(`<button class="close" onclick="closeModal()">×</button><h3>Bandingkan Batch</h3>${sel}
+  <p class="mini" style="margin-bottom:8px">Harga bahan &amp; qty per botol tiap batch, urut dari terlama. ▲▼ = perubahan vs batch sebelumnya. Baris kuning ⚠ = item ada di batch lain tapi tidak di batch ini (mungkin lupa diinput).</p>
+  <div style="overflow-x:auto"><table><thead><tr><th></th>${bs.map((b,i)=>`<th class="num">${esc(b.batchNo||"-")}<div class="mini">${fmtDate(b.date)} · ${pq[i]} btl</div></th>`).join("")}</tr></thead><tbody>
+  <tr><td><b>HPP / botol</b></td>${hppTds}</tr>
+  ${sec("Bahan baku (harga satuan · qty per botol)")}${Object.values(rows).map(itemRow).join("")}
+  ${Object.keys(ops).length?sec("Biaya operasional (per botol)")+Object.values(ops).map(opRow).join(""):""}
+  </tbody></table></div>`);
 }
 function printBatch(id){
   const b=S.batches.find(x=>x.id===id);if(!b)return;
