@@ -574,12 +574,12 @@ label.f{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;font-w
     <div class="lfx" aria-hidden="true"><span style="--x:8%;--s:30px;--d:19s;--w:0s">🌶️</span><span style="--x:24%;--s:24px;--d:23s;--w:-7s">🧅</span><span style="--x:41%;--s:28px;--d:21s;--w:-12s">🍤</span><span style="--x:58%;--s:26px;--d:25s;--w:-4s">🧄</span><span style="--x:73%;--s:32px;--d:20s;--w:-15s">🍅</span><span style="--x:88%;--s:24px;--d:24s;--w:-9s">🍋</span></div>
     <div class="lhero-in">
       <img class="lh-word" src="icons/logo-word-white.png" alt="Racikin">
-      <div class="lh-copy"><h1>Racik. Hitung. <span>Jual.</span></h1><p>Kelola produksi, HPP, distribusi &amp; kasir usaha kamu dalam satu aplikasi.</p></div>
-      <div class="lh-tag">Kelola produksi, HPP &amp; penjualan UMKM</div>
+      <div class="lh-copy"><h1>Racik. Hitung. <span>Jual.</span></h1><p>Hitung HPP otomatis, tagih piutang sekali klik, jualan lewat kasir QRIS — semua dalam satu aplikasi. Usaha lebih rapi, untung lebih jelas.</p></div>
+      <div class="lh-tag">Tahu untung tiap produk. Tagih piutang tanpa ribet.</div>
       <div class="lstage" aria-hidden="true">
         <div class="lplate"><div class="lorbit"><i>🌶️</i><i>🧅</i><i>🍤</i><i>🧄</i></div><div class="ldisc"><img src="icons/logo-bowl.png" alt=""></div></div>
-        <div class="lfc lfc1"><b>📦</b><div><strong>HPP otomatis</strong><span>dari bahan &amp; biaya produksi</span></div></div>
-        <div class="lfc lfc2"><b>🧾</b><div><strong>Nota &amp; piutang</strong><span>tagih lewat WhatsApp</span></div></div>
+        <div class="lfc lfc1"><b>📦</b><div><strong>Untung jelas</strong><span>HPP otomatis dari bahan &amp; biaya</span></div></div>
+        <div class="lfc lfc2"><b>🧾</b><div><strong>Piutang tertagih</strong><span>kirim tagihan via WhatsApp</span></div></div>
         <div class="lfc lfc3"><b>📱</b><div><strong>Kasir + QRIS</strong><span>cetak struk Bluetooth</span></div></div>
       </div>
     </div>
@@ -2796,8 +2796,8 @@ function renderLogin(mode){
       <button class="btn lsubmit" style="width:100%;margin-top:6px" onclick="doLogin()">Masuk</button>
       <div style="text-align:center;margin-top:14px"><a ${llink} onclick="renderLogin('forgot')">Lupa password?</a></div>`;
   }
-  const head=mode==='login'?`<div class="lhead"><h2>Selamat datang kembali 👋</h2><p>Masuk untuk mengelola produksi, HPP &amp; penjualan usahamu.</p></div>`:mode==='reg'?`<div class="lhead"><h2>Daftarkan usahamu 🚀</h2><p>Buat akun usaha baru — isi data di bawah ini.</p></div>`:"";
-  box.innerHTML=`<img class="lgo" src="icons/logo-bowl.png" alt=""><img class="lword" src="icons/logo-word.png" alt="Racikin"><div class="lsub ltag">Kelola produksi, HPP &amp; penjualan UMKM</div>${head}<div class="lform">${form}</div>${mode==='login'||mode==='reg'?'<div class="lfoot">🔒 Data tiap usaha tersimpan terpisah</div>':""}<div class="lcopy">© ${new Date().getFullYear()} Racikin · Developer: Ahmad Affan Ridha</div>`;
+  const head=mode==='login'?`<div class="lhead"><h2>Selamat datang kembali 👋</h2><p>Yuk lanjut racik usahamu — cek untung, stok, dan tagihan hari ini.</p></div>`:mode==='reg'?`<div class="lhead"><h2>Mulai racik usahamu 🚀</h2><p>Daftar sekarang dan rapikan produksi, HPP, nota, sampai kasir dalam satu aplikasi.</p></div>`:"";
+  box.innerHTML=`<img class="lgo" src="icons/logo-bowl.png" alt=""><img class="lword" src="icons/logo-word.png" alt="Racikin"><div class="lsub ltag">Tahu untung tiap produk. Tagih piutang tanpa ribet.</div>${head}<div class="lform">${form}</div>${mode==='login'||mode==='reg'?'<div class="lfoot">🔒 Data tiap usaha tersimpan terpisah</div>':""}<div class="lcopy">© ${new Date().getFullYear()} Racikin · Developer: Ahmad Affan Ridha</div>`;
   box.onkeydown=e=>{if(e.key!=="Enter"||e.target.tagName!=="INPUT"||e.target.type==="checkbox")return;const b=box.querySelector(".lsubmit");if(b&&!b.classList.contains("busy")){e.preventDefault();b.click();}};
 }
 async function doForgot(){
