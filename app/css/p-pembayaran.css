@@ -1,1 +1,190 @@
-/* p-pembayaran.css — gaya v2 khusus area ini (dimuat SETELAH semua css lama) */
+/* p-pembayaran.css — Pembayaran & Piutang v2 (prefix py-): hero piutang, meter umur, kartu toko & tagihan, modal bayar */
+.py-wrap.py-in>*{animation:dUp .6s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i,0)*70ms)}
+.py-wrap .g,.py-form .g{color:var(--green)}.py-wrap .a,.py-form .a{color:var(--amber)}.py-wrap .m,.py-form .m{color:var(--muted)}
+/* ---- hero ---- */
+.py-hero{position:relative;display:grid;grid-template-columns:1.5fr 1fr;gap:22px;align-items:stretch;color:#fff;border-radius:28px;padding:26px 28px;margin-bottom:18px;overflow:hidden;background:linear-gradient(140deg,#F26A2E -10%,#D53E0F 44%,#7E0306 115%);box-shadow:0 22px 46px rgba(126,3,6,.28)}
+.py-hero .dh-bg{position:absolute;inset:0;pointer-events:none}
+.py-h-main,.py-h-side{position:relative;z-index:1}
+.py-h-top{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap}
+.py-h-kick{display:inline-block;font-size:12px;font-weight:800;background:rgba(255,255,255,.17);border:1px solid rgba(255,255,255,.3);border-radius:999px;padding:5px 12px;backdrop-filter:blur(6px)}
+.py-h-lbl{font-size:13px;opacity:.92;font-weight:600;margin-top:12px}.py-h-lbl span{opacity:.75;font-weight:500}
+.py-h-month .monthsel{margin:0;max-width:220px;border-radius:999px;background-color:rgba(255,255,255,.96);color:var(--ink);border-color:transparent;font-weight:700;padding:9px 34px 9px 16px}
+.py-h-val{font-size:clamp(36px,5vw,58px);font-weight:800;letter-spacing:-.035em;line-height:1.05;margin:6px 0 2px;font-variant-numeric:tabular-nums}
+.py-h-pills{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.py-hp{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.28);border-radius:999px;padding:6px 13px;font-size:12.5px;font-weight:700;backdrop-filter:blur(6px)}
+.py-hp.hot{background:#fff;color:var(--red);border-color:transparent;box-shadow:0 0 0 0 rgba(255,255,255,.6);animation:pyHot 2.2s ease-in-out infinite}
+@keyframes pyHot{0%,100%{box-shadow:0 0 0 0 rgba(255,255,255,.55)}60%{box-shadow:0 0 0 8px rgba(255,255,255,0)}}
+.py-h-act{display:flex;gap:9px;flex-wrap:wrap;margin-top:20px}
+.py-h-act button{background:rgba(255,255,255,.17);border:1px solid rgba(255,255,255,.34);color:#fff;border-radius:999px;padding:11px 20px;font-size:13px;font-weight:800;cursor:pointer;backdrop-filter:blur(6px);transition:transform .18s,background .18s,box-shadow .18s,color .18s}
+.py-h-act button:hover{background:#fff;color:var(--red);transform:translateY(-2px);box-shadow:0 10px 20px rgba(0,0,0,.18)}
+.py-h-side{display:flex;flex-direction:column;justify-content:flex-end}
+.py-ringrow{display:flex;align-items:center;gap:14px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:22px;padding:14px 16px;backdrop-filter:blur(8px)}
+.py-ring{position:relative;width:84px;height:84px;flex-shrink:0}
+.py-ring svg{width:100%;height:100%;display:block}
+.py-ring .rg{stroke-dasharray:1;stroke-dashoffset:var(--off);animation:dRing 1.4s .5s cubic-bezier(.4,0,.2,1) both}
+.py-ring b{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:800}
+.py-rl{font-size:15px;font-weight:800}.py-rs{font-size:11.5px;opacity:.88;margin-top:2px;line-height:1.4}
+/* ---- KPI ---- */
+.py-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
+.py-kpi{background:#fff;border-radius:22px;padding:16px 16px 14px;box-shadow:0 8px 22px rgba(40,40,60,.06);transition:transform .22s cubic-bezier(.2,.8,.2,1),box-shadow .22s}
+.py-kpi:hover{transform:translateY(-4px);box-shadow:0 18px 34px rgba(40,40,60,.12)}
+.py-kpi-i{width:38px;height:38px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:19px;margin-bottom:10px;transition:transform .3s cubic-bezier(.3,1.6,.5,1)}
+.py-kpi:hover .py-kpi-i{transform:rotate(-8deg) scale(1.12)}
+.py-kpi-l{font-size:12px;color:var(--muted);font-weight:700}
+.py-kpi-v{font-size:21px;font-weight:800;letter-spacing:-.02em;margin-top:2px;font-variant-numeric:tabular-nums}
+.py-kpi-s{font-size:11.5px;color:var(--muted);margin-top:4px;font-weight:600}
+/* ---- kartu ---- */
+.py-card{background:#fff;border-radius:24px;padding:20px 20px 16px;margin-bottom:20px;box-shadow:0 8px 24px rgba(40,40,60,.06)}
+.py-card h3{font-size:16px;font-weight:800;letter-spacing:-.01em;margin-bottom:14px;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.py-card h3 .mini{font-weight:600;color:var(--muted)}
+/* ---- meter umur piutang ---- */
+.py-stack{display:flex;gap:3px;height:16px;border-radius:999px;overflow:hidden;margin-bottom:16px;background:#f6f1ee}
+.py-stack i{display:block;min-width:6px;transform-origin:left;animation:dGrow 1s .25s cubic-bezier(.2,.8,.2,1) both}
+.py-stack i.new,.py-m-bar .new i,.py-meter.new .py-m-bar i{background:linear-gradient(90deg,#7fd8a4,var(--green))}
+.py-stack i.mid,.py-meter.mid .py-m-bar i{background:linear-gradient(90deg,#f8c36a,var(--amber))}
+.py-stack i.old,.py-meter.old .py-m-bar i{background:linear-gradient(90deg,#f26a2e,#c4200a)}
+.py-meters{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.py-meter{background:#fcfaf9;border-radius:20px;padding:14px;position:relative;overflow:hidden}
+.py-meter.old{background:#fff3f0}.py-meter.mid{background:#fff8ee}.py-meter.new{background:#f2faf5}
+.py-m-top{display:flex;align-items:center;gap:10px}
+.py-m-i{width:36px;height:36px;border-radius:12px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;box-shadow:0 3px 8px rgba(40,40,60,.08)}
+.py-meter.old .py-m-i{animation:lgBob 2.6s ease-in-out infinite}
+.py-m-t{flex:1;min-width:0}
+.py-m-l{font-weight:800;font-size:13.5px}.py-m-h{font-size:11px;color:var(--muted);font-weight:600}
+.py-m-v{text-align:right;flex-shrink:0}
+.py-m-v b{display:block;font-size:15px;font-weight:800;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+.py-meter.old .py-m-v b{color:var(--red)}.py-meter.mid .py-m-v b{color:var(--amber)}.py-meter.new .py-m-v b{color:var(--green)}
+.py-m-v span{font-size:11px;color:var(--muted);font-weight:600}
+.py-m-bar{height:8px;background:rgba(0,0,0,.06);border-radius:8px;overflow:hidden;margin-top:12px}
+.py-m-bar i{display:block;height:100%;border-radius:8px;min-width:3px;transform-origin:left;animation:dGrow 1s cubic-bezier(.2,.8,.2,1) both}
+/* umur (pil kecil) */
+.py-age{display:inline-block;font-size:11px;font-weight:800;border-radius:999px;padding:3px 10px;background:#f3efec;color:var(--muted)}
+.py-age.mid{background:var(--amber-bg);color:var(--amber)}.py-age.old{background:#fde4df;color:var(--red)}
+/* ---- piutang per toko ---- */
+.py-stores{display:grid;grid-template-columns:repeat(auto-fill,minmax(285px,1fr));gap:14px}
+.py-sc{background:#fcfaf9;border-radius:22px;padding:14px;border:1.5px solid transparent;animation:dUp .55s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i,0)*60ms);transition:transform .22s cubic-bezier(.2,.8,.2,1),box-shadow .22s,background .2s}
+.py-sc:hover{transform:translateY(-4px);box-shadow:0 16px 30px rgba(40,40,60,.1);background:#fff}
+.py-sc.old{border-color:#f7c9bf}
+.py-sc-top{display:flex;align-items:center;gap:11px}
+.py-av{width:42px;height:42px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;flex-shrink:0;transition:transform .3s cubic-bezier(.3,1.6,.5,1)}
+.py-sc:hover .py-av{transform:rotate(-8deg) scale(1.1)}
+.py-sc-id{flex:1;min-width:0}
+.py-sc-n{font-weight:800;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.py-sc-s{font-size:12px;color:var(--muted);margin-top:2px}
+.py-sc-v{font-weight:800;font-size:16px;color:var(--amber);letter-spacing:-.01em;font-variant-numeric:tabular-nums;text-align:right}
+.py-sc.old .py-sc-v{color:var(--red)}
+.py-sc-list{margin:11px 0 4px;border-top:1px dashed #e9dfd9;padding-top:8px;font-size:12px;color:var(--muted)}
+.py-sc-list>div{display:flex;justify-content:space-between;gap:8px;line-height:1.75}
+.py-sc-list b{color:var(--ink);font-variant-numeric:tabular-nums}
+.py-sc-list .more{color:var(--red);font-weight:700}
+.py-sc-act{display:flex;gap:8px;margin-top:10px}
+.py-sc-act .py-ab{flex:1}
+/* tombol aksi */
+.py-ab{border:none;background:#f3efec;color:#555;border-radius:999px;padding:8px 14px;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap;transition:transform .15s,background .2s,color .2s,box-shadow .2s}
+.py-ab:hover{background:var(--cream);color:var(--red);transform:translateY(-1px)}
+.py-ab.wa{background:#25D366;color:#fff}.py-ab.wa:hover{background:#1eb457;color:#fff;box-shadow:0 8px 16px rgba(37,211,102,.3)}
+.py-ab.pri{background:linear-gradient(135deg,var(--orange),var(--red));color:#fff}.py-ab.pri:hover{color:#fff;box-shadow:0 8px 16px rgba(213,62,15,.3)}
+/* ---- filter & daftar ---- */
+.py-tools{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:14px}
+.py-chips-row{display:flex;gap:8px;flex-wrap:wrap}
+.py-chip{display:inline-flex;align-items:center;gap:7px;border:none;background:#f6f1ee;color:#555;border-radius:999px;padding:8px 8px 8px 16px;font-size:13px;font-weight:700;cursor:pointer;transition:transform .15s,background .2s,color .2s}
+.py-chip em{font-style:normal;font-size:11px;min-width:22px;text-align:center;background:#fff;color:var(--muted);border-radius:999px;padding:2px 7px}
+.py-chip:hover{transform:translateY(-1px)}
+.py-chip.on{background:linear-gradient(135deg,var(--orange),var(--red));color:#fff;box-shadow:0 8px 18px rgba(213,62,15,.28)}
+.py-chip.on em{background:rgba(255,255,255,.25);color:#fff}
+.py-tools input{flex:1;max-width:320px;min-width:180px;border-radius:999px;padding:10px 16px;border-color:#ece6e2;font-size:13px}
+.py-tools input:focus{box-shadow:0 0 0 3px rgba(213,62,15,.15);border-color:var(--red)}
+.py-tbl{overflow-x:auto}
+.py-tbl table{border-collapse:separate;border-spacing:0 8px;margin-top:-8px}
+.py-tbl th{border:none;padding:6px 12px}
+.py-tbl td{border:none;background:#fcfaf9;padding:11px 12px;vertical-align:middle;transition:background .2s}
+.py-tbl td:first-child{border-radius:16px 0 0 16px}.py-tbl td:last-child{border-radius:0 16px 16px 0}
+.py-tbl tbody tr{animation:dUp .5s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i,0)*35ms)}
+.py-tbl tbody tr:hover td{background:#fff4ec}
+.py-sto{display:flex;align-items:center;gap:9px;font-weight:700;min-width:120px}
+.py-sto .py-av{width:32px;height:32px;border-radius:11px;font-size:14px}
+.py-paid{min-width:96px}.py-paid>span{font-weight:700;font-variant-numeric:tabular-nums}
+.py-acts{display:flex;gap:6px;justify-content:flex-end}
+.py-pbar{height:6px;background:#f1eeed;border-radius:6px;overflow:hidden}
+.py-pbar.sm{height:4px;margin-top:5px}
+.py-pbar i{display:block;height:100%;border-radius:6px;transform-origin:left;animation:dGrow .9s .3s cubic-bezier(.2,.8,.2,1) both;background:linear-gradient(90deg,var(--orange),var(--red))}
+.py-pbar.sebagian i{background:linear-gradient(90deg,#f6b34f,var(--amber))}
+.py-pbar.lunas i{background:linear-gradient(90deg,#5fcf8d,var(--green))}
+.py-empty{text-align:center;padding:34px 16px;display:flex;flex-direction:column;align-items:center;gap:5px}
+.py-empty-i{font-size:40px;animation:lgBob 3.2s ease-in-out infinite}
+.py-empty span{color:var(--muted);font-size:13px;max-width:340px}
+/* kartu tagihan (mobile) */
+.py-ncs{display:flex;flex-direction:column;gap:12px}
+.py-nc{background:#fcfaf9;border-radius:22px;padding:14px;box-shadow:0 6px 18px rgba(40,40,60,.06);animation:dUp .5s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i,0)*45ms);cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .15s}
+.py-nc:active{transform:scale(.985)}
+.py-nc-top{display:flex;align-items:center;gap:11px}
+.py-nc-id{flex:1;min-width:0}
+.py-nc-store{font-weight:800;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.py-nc-sub{font-size:12px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.py-nc-mid{display:grid;grid-template-columns:1fr 1fr 1.2fr;gap:8px;margin:12px 0 10px}
+.py-nc-mid span,.py-info-r span{display:block;font-size:10.5px;color:var(--muted);font-weight:700}
+.py-nc-mid b,.py-info-r b{display:block;font-size:14px;font-weight:800;letter-spacing:-.01em;margin-top:1px;font-variant-numeric:tabular-nums}
+.py-nc-act{display:flex;gap:8px;margin-top:12px}
+.py-nc-act .py-ab{flex:1;padding:11px 8px;font-size:12.5px}
+/* ---- modal bayar & riwayat ---- */
+.modal:has(.py-form){border-radius:28px;padding:22px;max-width:520px}
+.py-form .close{width:34px;height:34px;border-radius:50%;background:#f3efec;display:flex;align-items:center;justify-content:center;font-size:19px;transition:.2s}
+.py-form .close:hover{background:var(--cream);color:var(--red);transform:rotate(90deg)}
+.py-mh{display:flex;align-items:center;gap:13px;margin-bottom:16px}
+.py-mh-i{width:48px;height:48px;border-radius:16px;background:linear-gradient(140deg,var(--orange),var(--red));display:flex;align-items:center;justify-content:center;font-size:23px;box-shadow:0 10px 20px rgba(213,62,15,.28);animation:dPop .5s cubic-bezier(.3,1.6,.5,1) both}
+.py-mh h3{font-size:19px;font-weight:800;letter-spacing:-.02em;margin:0}
+.py-mh-s{font-size:12.5px;color:var(--muted);margin-top:1px}
+.py-info{background:#fcfaf9;border-radius:20px;padding:14px;margin-bottom:14px}
+.py-info-r{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:11px}
+.py-info-r b{font-size:15px}
+.py-form label.f{font-size:11.5px;font-weight:700;color:var(--muted);margin-bottom:4px;display:block}
+.py-form input{border-radius:14px;padding:11px 14px;border-color:#ece6e2}
+.py-form input:focus{border-color:var(--red);box-shadow:0 0 0 3px rgba(213,62,15,.12)}
+.py-quick{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px}
+.py-quick button{border:none;background:var(--cream);color:var(--red);border-radius:999px;padding:7px 14px;font-size:12px;font-weight:800;cursor:pointer;transition:.15s}
+.py-quick button:hover{background:var(--red);color:#fff;transform:translateY(-1px)}
+.py-foot{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
+.py-foot.wrap{flex-wrap:wrap}
+.py-foot .btn{border-radius:999px;padding:12px 20px;font-weight:800}
+.py-foot .btn:not(.gray):not(.ghost):not(.wa){background:linear-gradient(135deg,var(--orange),var(--red));box-shadow:0 10px 20px rgba(213,62,15,.28);flex:1}
+.py-foot .btn.gray{background:#f3efec;color:#555}
+.py-foot .btn.wa{background:#25D366}
+.py-none{text-align:center;color:var(--muted);padding:22px;font-size:13px}
+.py-tl{position:relative;padding-left:18px;max-height:46vh;overflow-y:auto}
+.py-tl::before{content:"";position:absolute;left:5px;top:8px;bottom:8px;width:2px;background:linear-gradient(var(--orange),#f3d8c9);border-radius:2px}
+.py-tl-i{position:relative;display:flex;align-items:center;gap:10px;background:#fcfaf9;border-radius:16px;padding:10px 12px;margin-bottom:8px;animation:dUp .4s cubic-bezier(.2,.8,.2,1) both}
+.py-tl-i>i{position:absolute;left:-18px;top:50%;width:12px;height:12px;margin-top:-6px;border-radius:50%;background:var(--green);box-shadow:0 0 0 4px var(--green-bg)}
+.py-tl-m{flex:1;min-width:0}
+.py-tl-m b{display:block;font-size:15px;font-weight:800;color:var(--green);font-variant-numeric:tabular-nums}
+.py-tl-m span{font-size:12px;color:var(--muted)}
+.py-tl-x{border:none;background:#fbe7e5;color:var(--red);width:30px;height:30px;border-radius:50%;font-size:16px;cursor:pointer;flex-shrink:0;transition:.2s}
+.py-tl-x:hover{background:var(--red);color:#fff}
+/* ---- responsif ---- */
+@media (max-width:1100px){.py-hero{grid-template-columns:1fr}.py-kpis{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:820px){
+  .py-hero{border-radius:26px;padding:20px 18px 18px;margin-bottom:14px;gap:16px}
+  .py-h-top{flex-direction:column-reverse;gap:10px}
+  .py-h-month .monthsel{max-width:none;width:100%}
+  .py-h-lbl{margin-top:2px}
+  .py-h-val{font-size:clamp(34px,11vw,46px)}
+  .py-h-act button{flex:1;padding:12px 10px}
+  .py-kpis{display:flex;overflow-x:auto;gap:11px;margin:0 -14px 16px;padding:2px 14px 8px;scroll-snap-type:x proximity;scrollbar-width:none}
+  .py-kpis::-webkit-scrollbar{display:none}
+  .py-kpi{flex:0 0 150px;scroll-snap-align:start}
+  .py-card{padding:16px 14px 14px;margin-bottom:16px}
+  .py-meters{grid-template-columns:1fr;gap:10px}
+  .py-stores{grid-template-columns:1fr}
+  .py-tools{flex-direction:column;align-items:stretch;gap:10px}
+  .py-chips-row{flex-wrap:nowrap;overflow-x:auto;margin:0 -14px;padding:2px 14px 6px;scrollbar-width:none}
+  .py-chips-row::-webkit-scrollbar{display:none}
+  .py-chip{flex:0 0 auto}
+  .py-tools input{max-width:none;width:100%}
+  .modal:has(.py-form){border-radius:28px 28px 0 0;padding:20px 16px calc(18px + var(--sab))}
+  .py-form input{font-size:16px}
+  .py-foot{flex-wrap:wrap}.py-foot .btn{flex:1 1 40%}
+}
+@media (prefers-reduced-motion:reduce){
+  .py-wrap.py-in>*,.py-tbl tbody tr,.py-nc,.py-sc,.py-pbar i,.py-stack i,.py-m-bar i,.py-ring .rg,.py-hp.hot,.py-meter.old .py-m-i,.py-empty-i,.py-mh-i,.py-tl-i{animation:none!important}
+  .py-ring .rg{stroke-dashoffset:var(--off)}
+  .py-sc,.py-kpi,.py-ab,.py-nc{transition:none!important}
+}
