@@ -30,14 +30,21 @@ function smtp_read($fp) {
 
 function smtp_cmd($fp, $cmd, $okPrefix) {
     if ($cmd !== null) fwrite($fp, $cmd . "\r\n");
+    $t0 = microtime(true);
     $r = smtp_read($fp);
-    $GLOBALS['smtp_last_reply'] = trim(preg_replace('/\s+/', ' ', $r));   // jawaban server (untuk diagnosis)
+    $dt = round(microtime(true) - $t0, 1);
+    $rep = trim(preg_replace('/\s+/', ' ', $r));
+    if ($rep === '') {   // server diam: bedakan waktu habis vs koneksi ditutup
+        $meta = @stream_get_meta_data($fp);
+        $rep = !empty($meta['timed_out']) ? "(server tidak menjawab dalam {$dt} detik — waktu habis)" : (@feof($fp) ? "(server menutup koneksi setelah {$dt} detik)" : '(jawaban kosong)');
+    }
+    $GLOBALS['smtp_last_reply'] = $rep;   // jawaban server (untuk diagnosis)
     return strpos($r, (string)$okPrefix) === 0;
 }
 
 function smtp_send($to, $subject, $body, $headers) {
     $GLOBALS['smtp_last_reply'] = '';
-    @set_time_limit(60);   // beri ruang; batas waktu bawaan hosting (30 dtk) bisa terlewati bila server mail lambat
+    @set_time_limit(120);   // beri ruang; batas waktu bawaan hosting (30 dtk) bisa terlewati bila server mail lambat
     $host = (string)SMTP_HOST; $port = defined('SMTP_PORT') ? (int)SMTP_PORT : 465;
     $secure = defined('SMTP_SECURE') ? strtolower((string)SMTP_SECURE) : 'ssl';
     $user = defined('SMTP_USER') ? (string)SMTP_USER : ''; $pass = defined('SMTP_PASS') ? (string)SMTP_PASS : '';
@@ -58,7 +65,7 @@ function smtp_send($to, $subject, $body, $headers) {
     $ctx = stream_context_create(['ssl' => ['verify_peer' => true, 'verify_peer_name' => true]]);
     $fp = @stream_socket_client(($secure === 'ssl' ? 'ssl://' : 'tcp://') . $host . ':' . $port, $en, $es, 10, STREAM_CLIENT_CONNECT, $ctx);
     if (!$fp) { $GLOBALS['smtp_last_error'] = "tidak bisa terhubung ke $host:$port ($es). Cek SMTP_HOST/SMTP_PORT/SMTP_SECURE."; error_log("smtp connect gagal: $es"); return false; }
-    stream_set_timeout($fp, 12);
+    stream_set_timeout($fp, 25);
     try {
         if (!smtp_cmd($fp, null, '220')) throw new Exception('greeting');
         $ehlo = preg_replace('/[^A-Za-z0-9.\-]/', '', (string)($_SERVER['SERVER_NAME'] ?? 'localhost')) ?: 'localhost';
