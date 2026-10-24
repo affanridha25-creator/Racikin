@@ -581,11 +581,24 @@ body.lg::after{width:46vmax;height:46vmax;right:-14vmax;bottom:-16vmax;backgroun
     function f(t){if(t0===null)t0=t;var p=Math.min(1,(t-t0)/dur);p=1-Math.pow(1-p,3);el.textContent=Math.round(to*p);if(p<1)requestAnimationFrame(f);}
     requestAnimationFrame(f);
   });
-  // pratinjau format ribuan harga (nilai yang dikirim tetap angka biasa)
+  // format ribuan langsung di dalam kolom harga saat mengetik (125.000). Server membuang non-angka, jadi nilai tersimpan tetap angka biasa.
   document.querySelectorAll('.rpf input').forEach(function(inp){
-    var pv=inp.parentNode.nextElementSibling;
-    function u(){var n=parseInt(String(inp.value).replace(/\D/g,''),10)||0;pv.innerHTML=n>0?'= <b>Rp '+n.toString().replace(/\B(?=(\d{3})+(?!\d))/g,'.')+'</b>':'';}
-    inp.addEventListener('input',u);u();
+    var pv=inp.parentNode.nextElementSibling; if(pv)pv.innerHTML='';
+    function fmt(v){var d=String(v).replace(/\D/g,'').replace(/^0+(?=\d)/,'');return d.replace(/\B(?=(\d{3})+(?!\d))/g,'.');}
+    var last=String(inp.value).replace(/\D/g,'').length;
+    function run(ev){
+      var pos=inp.selectionStart,raw=inp.value,before=raw.slice(0,pos).replace(/\D/g,'').length;   // jumlah digit di kiri kursor
+      // Backspace tepat setelah titik hanya menghapus titik → hapus digit di depannya supaya terasa wajar
+      if(ev&&ev.inputType==='deleteContentBackward'&&raw.replace(/\D/g,'').length===last&&before>0){
+        var ds=raw.replace(/\D/g,'');ds=ds.slice(0,before-1)+ds.slice(before);raw=ds;before=before-1;
+      }
+      var f=fmt(raw);inp.value=f;last=f.replace(/\D/g,'').length;
+      var i=0,n=0;while(i<f.length&&n<before){if(/\d/.test(f.charAt(i)))n++;i++;}          // pulihkan kursor setelah titik disisipkan
+      try{inp.setSelectionRange(i,i);}catch(e){}
+    }
+    inp.addEventListener('input',run);
+    inp.addEventListener('focus',function(){if(inp.value==='0')inp.select();});
+    inp.value=fmt(inp.value)||'0';
   });
   // pencarian + filter daftar usaha
   var rows=[].slice.call(document.querySelectorAll('#ulist .urow')),q=document.getElementById('q'),chips=[].slice.call(document.querySelectorAll('#chips .chip')),nr=document.getElementById('noresult'),cur='all';
