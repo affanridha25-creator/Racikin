@@ -225,6 +225,13 @@ input,select,textarea{font-family:inherit;font-size:13px;padding:8px 10px;border
 input[type="date"],input[type="time"],input[type="datetime-local"]{-webkit-appearance:none;appearance:none}
 input:focus,select:focus{outline:none;border-color:var(--red)}
 label>input[type="checkbox"],label>input[type="radio"]{width:auto;min-width:0;margin:0;flex-shrink:0}
+/* dropdown seragam: panah custom, tinggi & radius sama di semua tempat */
+select,.combo-in{-webkit-appearance:none;appearance:none;background-color:#fff;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%238a8f99' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 11px center;background-size:12px 8px;padding-right:32px;cursor:pointer;text-overflow:ellipsis;line-height:1.35}
+select:hover,.combo-in:hover{border-color:#c9ccd1}
+.combo.open .combo-in{border-color:var(--red)}
+.combo-opt{line-height:1.35}
+.combo-opt:hover{background:var(--cream)}
+.monthsel{font-weight:600}
 .cmpt{width:100%;border-collapse:separate;border-spacing:0;font-size:12.5px}
 .cmpt th,.cmpt td{padding:5px 10px;border-bottom:1px solid var(--line);vertical-align:top;white-space:nowrap;text-transform:none;letter-spacing:0}
 .cmpt th{font-size:11px;font-weight:700;color:var(--muted);text-align:right;vertical-align:bottom}
@@ -2221,7 +2228,7 @@ function stockAdjModal(id){const p=S.products.find(x=>x.id===id);if(!p){toast("P
   openModal(`<button class="close" onclick="closeModal()">×</button><h3>⚖️ Penyesuaian Stok — ${esc(p.name)}</h3>
   <div class="poskembali" style="justify-content:space-between;margin-bottom:14px"><span>Stok tercatat sekarang</span><b>${cur}</b></div>
   <label class="f">Jenis</label>
-  <select id="adjReason" onchange="adjModeChange()" style="width:100%;padding:10px;border:1px solid #d8d8d8;border-radius:10px;margin-bottom:12px">
+  <select id="adjReason" onchange="adjModeChange()" style="margin-bottom:12px">
     <option value="rusak">Rusak</option><option value="expired">Kadaluarsa</option><option value="hilang">Hilang</option><option value="pakai">Dipakai sendiri</option><option value="koreksi">Koreksi (+/−)</option><option value="opname">Stok Opname (set jumlah fisik)</option>
   </select>
   <div id="adjQtyWrap"><label class="f" id="adjQtyLbl">Jumlah berkurang</label><input id="adjQty" inputmode="numeric" placeholder="mis. 3"></div>
