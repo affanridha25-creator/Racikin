@@ -18,3 +18,7 @@ _sql/
 
 # worktree & data sesi agent
 .claude/
+
+# kredensial (jangan pernah masuk repo publik)
+Email Credential.md
+*[Cc]redential*

@@ -62,3 +62,8 @@
   .dh-month,.kn-month,.py-h-month,.ds-h-month{position:absolute;top:24px;right:28px;z-index:3;margin:0}
   .dh-side{margin-top:62px}   /* ruang agar panel samping tak tertimpa pil */
 }
+
+/* login mobile: gelombang di bawah hero lebih lebar dari layar, supaya animasi goyang tak membuka celah di tepi kanan */
+@media (max-width:899px){
+  .lwave-b{left:-24px;right:auto;width:calc(100% + 48px)}
+}
