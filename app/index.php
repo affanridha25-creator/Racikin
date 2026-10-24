@@ -286,6 +286,97 @@ main{flex:1;padding:16px 30px 60px}
   .lpanel{flex:none;margin-top:-6px;padding:0 16px calc(28px + var(--sab));align-items:flex-start;overflow:visible}
   .lsplit .loginbox{padding:24px 20px 20px;border-radius:26px}
 }
+/* ---- dashboard v2: hero, KPI, animasi ---- */
+.dash-in>*{animation:dUp .6s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i,0)*70ms)}
+.view.active:not(#v-dashboard){animation:viewIn .32s ease both}
+.cnt{font-variant-numeric:tabular-nums}
+.dhero{position:relative;display:grid;grid-template-columns:1.5fr 1fr;gap:22px;align-items:stretch;color:#fff;border-radius:28px;padding:26px 28px;margin-bottom:18px;overflow:hidden;background:linear-gradient(140deg,#F26A2E -10%,#D53E0F 44%,#7E0306 115%);box-shadow:0 22px 46px rgba(126,3,6,.28)}
+.dh-bg{position:absolute;inset:0;pointer-events:none}
+.dh-bg i{position:absolute;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.22),rgba(255,255,255,0) 70%)}
+.dh-bg i:nth-child(1){width:340px;height:340px;right:-70px;top:-120px;animation:lgDrift1 16s ease-in-out infinite alternate}
+.dh-bg i:nth-child(2){width:260px;height:260px;left:30%;bottom:-150px;background:radial-gradient(circle,rgba(255,196,120,.35),rgba(255,196,120,0) 70%);animation:lgDrift2 19s ease-in-out infinite alternate}
+.dh-bg i:nth-child(3){width:150px;height:150px;left:-40px;top:-50px;animation:lgDrift2 13s ease-in-out infinite alternate}
+.dh-main,.dh-side{position:relative;z-index:1}
+.dh-side{display:flex;flex-direction:column;justify-content:flex-end;gap:14px}
+.dh-ringrow{display:flex;align-items:center;gap:14px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:22px;padding:14px 16px;backdrop-filter:blur(8px)}
+.dh-ring{position:relative;width:84px;height:84px;flex-shrink:0}
+.dh-ring svg{width:100%;height:100%;display:block}
+.dh-ring .rg{stroke-dasharray:1;stroke-dashoffset:var(--off);animation:dRing 1.4s .5s cubic-bezier(.4,0,.2,1) both}
+.dh-ring b{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:800}
+.dh-rl{font-size:15px;font-weight:800}
+.dh-rs{font-size:11.5px;opacity:.85;margin-top:2px;line-height:1.4}
+.dh-lab{display:flex;justify-content:space-between;font-size:10.5px;opacity:.8;margin-top:4px;padding:0 2px}
+@keyframes dRing{from{stroke-dashoffset:1}}
+.dh-top{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:16px}
+.dh-hi{font-size:22px;font-weight:800;letter-spacing:-.01em}
+.dh-sub{font-size:12.5px;opacity:.85;margin-top:3px}
+.dh-month .monthsel{margin:0;background-color:rgba(255,255,255,.96);color:var(--ink);border-color:transparent}
+.dh-lbl{font-size:13px;opacity:.9;font-weight:600}
+.dh-val{font-size:clamp(34px,4.2vw,52px);font-weight:800;letter-spacing:-.03em;line-height:1.05;margin:6px 0 4px}
+.dh-pills{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.dh-act{display:flex;gap:9px;flex-wrap:wrap;margin-top:20px}
+.dh-act button{background:rgba(255,255,255,.17);border:1px solid rgba(255,255,255,.32);color:#fff;border-radius:999px;padding:10px 17px;font-size:13px;font-weight:700;cursor:pointer;backdrop-filter:blur(6px);transition:transform .18s,background .18s,box-shadow .18s}
+.dh-act button:hover{background:#fff;color:var(--red);transform:translateY(-2px);box-shadow:0 10px 20px rgba(0,0,0,.18)}
+.dh-spark{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:22px;padding:16px 16px 12px;backdrop-filter:blur(8px)}
+.dh-sl{font-size:11.5px;opacity:.85;margin-top:6px;text-align:center}
+.dh-nospark{height:120px;display:flex;align-items:center;justify-content:center;font-size:12px;opacity:.8}
+.spark{display:block;overflow:visible}
+.ln{stroke-dasharray:1;stroke-dashoffset:1;animation:dDraw 1.5s .35s cubic-bezier(.4,0,.2,1) forwards}
+.ln.l2{animation-delay:.6s}
+.ar-fade,.sp-area{animation:dFade 1.1s .9s both}
+.dpop,.sp-dot{transform-box:fill-box;transform-origin:center;animation:dPop .45s cubic-bezier(.3,1.6,.5,1) both}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:20px}
+.kpi{position:relative;background:#fff;border-radius:22px;padding:18px 18px 16px;box-shadow:0 8px 22px rgba(40,40,60,.06);overflow:hidden;transition:transform .22s cubic-bezier(.2,.8,.2,1),box-shadow .22s}
+.kpi[onclick]{cursor:pointer}
+.kpi:hover{transform:translateY(-5px);box-shadow:0 18px 34px rgba(40,40,60,.12)}
+.kpi::after{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:linear-gradient(180deg,var(--orange),var(--red));transform:scaleY(0);transform-origin:top;animation:dGrowY .7s .5s cubic-bezier(.2,.8,.2,1) forwards}
+.kpi-i{width:40px;height:40px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:12px;transition:transform .3s cubic-bezier(.3,1.6,.5,1)}
+.kpi:hover .kpi-i{transform:rotate(-8deg) scale(1.12)}
+.kpi-l{font-size:12.5px;color:var(--muted);font-weight:600}
+.kpi-v{font-size:23px;font-weight:800;letter-spacing:-.02em;margin-top:3px}
+.kpi-s{font-size:11.5px;color:var(--muted);margin-top:6px;font-weight:600}
+.panel{transition:box-shadow .25s}.panel:hover{box-shadow:0 12px 28px rgba(40,40,60,.09)}
+.barrow2 .brbar>span{transform-origin:left;animation:dGrow .9s cubic-bezier(.2,.8,.2,1) both}
+.barrow2:nth-child(1) .brbar>span{animation-delay:.35s}.barrow2:nth-child(2) .brbar>span{animation-delay:.45s}.barrow2:nth-child(3) .brbar>span{animation-delay:.55s}.barrow2:nth-child(4) .brbar>span{animation-delay:.65s}.barrow2:nth-child(5) .brbar>span{animation-delay:.75s}.barrow2:nth-child(6) .brbar>span{animation-delay:.85s}
+.hlcard{position:relative;overflow:hidden;transition:transform .2s}
+.hlcard:hover{transform:translateY(-2px)}
+.hlcard::after{content:"";position:absolute;top:0;left:-60%;width:40%;height:100%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.16),transparent);transform:skewX(-18deg);animation:dShine 5s 1.5s ease-in-out infinite}
+.hlcard .hli{animation:lgBob 3.2s ease-in-out infinite}
+.actdot{animation:dPulse 2.2s ease-in-out infinite}
+.mcard{transition:transform .2s}.mcard:active{transform:scale(.98)}
+.hero2{background-size:140% 140%;animation:lgBgShift 14s ease-in-out infinite}
+@keyframes viewIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes dUp{from{opacity:0;transform:translateY(18px) scale(.985)}to{opacity:1;transform:none}}
+@keyframes dDraw{to{stroke-dashoffset:0}}
+@keyframes dFade{from{opacity:0}to{opacity:1}}
+@keyframes dPop{from{opacity:0;transform:scale(0)}to{opacity:1;transform:scale(1)}}
+@keyframes dGrow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes dGrowY{to{transform:scaleY(1)}}
+@keyframes dShine{0%,70%,100%{left:-60%}85%{left:130%}}
+@keyframes dPulse{0%,100%{box-shadow:0 0 0 0 rgba(213,62,15,.45)}60%{box-shadow:0 0 0 7px rgba(213,62,15,0)}}
+@keyframes lgBgShift{0%,100%{background-position:0% 30%}50%{background-position:100% 70%}}
+@media (max-width:1100px){.dhero{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){.dash-in>*,.view.active:not(#v-dashboard),.dh-bg i,.ln,.ar-fade,.sp-area,.dpop,.sp-dot,.kpi::after,.dh-ring .rg,.barrow2 .brbar>span,.hlcard::after,.hlcard .hli,.actdot,.hero2{animation:none!important}.ln{stroke-dashoffset:0}.kpi::after{transform:none}}
+
+/* ---- login: animasi keluar + layar sambutan ---- */
+.lsplit.leaving .lhero{animation:lgOutHero .7s .08s cubic-bezier(.6,0,.2,1) forwards}
+.lsplit.leaving .lpanel{animation:lgOutPanel .55s .12s ease forwards}
+.lsplit.leaving .loginbox{animation:lgOutCard .5s cubic-bezier(.5,0,.8,.4) forwards}
+.wsplash{position:fixed;inset:0;z-index:300;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#fff;text-align:center;padding:24px;background:linear-gradient(150deg,#F26A2E 0%,#D53E0F 46%,#8F1208 100%);clip-path:circle(75% at 50% 50%)}
+.wsplash::before{content:"";position:absolute;width:70vmin;height:70vmin;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.22),rgba(255,255,255,0) 70%);animation:lgDrift1 6s ease-in-out infinite alternate}
+.wsplash>*{position:relative}
+.wbowl{width:112px;height:112px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 22px 50px rgba(80,10,0,.4),0 0 0 12px rgba(255,255,255,.16);animation:lgPop .7s cubic-bezier(.3,1.5,.5,1) both,lgBob 2.6s .8s ease-in-out infinite}
+.wbowl img{width:74%;height:auto}
+.wh{font-size:clamp(22px,4vw,32px);font-weight:800;letter-spacing:-.01em;margin-top:14px;animation:lgUp .6s .25s both}
+.wsub{font-size:13.5px;opacity:.9;animation:lgUp .6s .4s both}
+.wbar{width:160px;height:5px;border-radius:5px;background:rgba(255,255,255,.28);overflow:hidden;margin-top:10px;animation:lgUp .6s .5s both}
+.wbar i{display:block;height:100%;width:100%;background:#fff;border-radius:5px;transform-origin:left;animation:dGrow 1.15s .4s cubic-bezier(.4,0,.2,1) both}
+.wsplash.out{animation:wOut .6s cubic-bezier(.7,0,.3,1) forwards}
+@keyframes wOut{to{clip-path:circle(0% at 50% 50%)}}
+@keyframes lgOutHero{to{transform:translateX(-105%)}}
+@keyframes lgOutPanel{to{opacity:0}}
+@keyframes lgOutCard{to{opacity:0;transform:translateY(-34px) scale(.93)}}
+@media (prefers-reduced-motion:reduce){.wsplash *,.wsplash::before{animation:none!important}.lsplit.leaving *{animation:none!important}}
 @media (prefers-reduced-motion:reduce){.lhero::before,.lhero::after,.lh-word,.lh-copy *,.lplate,.ldisc,.lorbit,.lfc,.lwave,.lwave-b,.lhead,.lh-tag{animation:none!important}}
 @media (prefers-reduced-motion:reduce){.loginbg,.loginbg::before,.loginbg::after,.loginbox,.loginbox *,.lfx span{animation:none!important;transition:none!important}.lfx{display:none}}
 
@@ -1095,7 +1186,8 @@ function computeDash(){
   const overdue=S.notas.filter(n=>notaStatus(n)!=="lunas"&&daysSince(n.date)>14);
   const priceUp=S.materials.map(m=>{const st=matStat(m);return{n:m.name,chg:st.chg,cur:st.cur??m.price};}).filter(x=>x.chg!=null&&x.chg>0.005).sort((a,b)=>b.chg-a.chg);
   const recent=[...fnotas].slice(0,6);
-  return {fnotas,omzet,laba,margin,dOmz,dLab,saldoKas,piutang,nilaiStok,trend,prodRank,penunggak,low,overdue,priceUp,recent};
+  const tNotas=S.notas.filter(n=>n.date===today());const todayOmzet=tNotas.reduce((a,n)=>a+notaOmzet(n),0),todayN=tNotas.length;
+  return {todayOmzet,todayN,fnotas,omzet,laba,margin,dOmz,dLab,saldoKas,piutang,nilaiStok,trend,prodRank,penunggak,low,overdue,priceUp,recent};
 }
 // --- grafik garis tren 6 bulan (Omzet oranye + Laba biru, satu sumbu Rupiah) ---
 function trendChart(trend){
@@ -1104,16 +1196,16 @@ function trendChart(trend){
   const X=i=>padL+(W-padL-padR)*(n<=1?0.5:i/(n-1));
   const Y=v=>H-padB-(H-padT-padB)*(v/mx);
   const path=key=>trend.map((t,i)=>(i?"L":"M")+X(i).toFixed(1)+" "+Y(t[key]).toFixed(1)).join(" ");
-  const dots=(key,color)=>trend.map((t,i)=>`<circle cx="${X(i).toFixed(1)}" cy="${Y(t[key]).toFixed(1)}" r="3" fill="${color}"><title>${monthLabelFull(t.m)} — ${key==="omzet"?"Omzet":"Laba"} ${rp(t[key])}</title></circle>`).join("");
+  const dots=(key,color)=>trend.map((t,i)=>`<circle class="dpop" style="animation-delay:${1+i*.1}s" cx="${X(i).toFixed(1)}" cy="${Y(t[key]).toFixed(1)}" r="3" fill="${color}"><title>${monthLabelFull(t.m)} — ${key==="omzet"?"Omzet":"Laba"} ${rp(t[key])}</title></circle>`).join("");
   const labels=trend.map((t,i)=>`<text x="${X(i).toFixed(1)}" y="${H-8}" font-size="10" fill="#8a8f99" text-anchor="middle">${monthLabel(t.m)}</text>`).join("");
   if(vals.every(v=>v===0))return '<div class="empty">Belum ada data penjualan.</div>';
   const areaO=`M${X(0).toFixed(1)} ${(H-padB).toFixed(1)} `+trend.map((t,i)=>`L${X(i).toFixed(1)} ${Y(t.omzet).toFixed(1)}`).join(" ")+` L${X(n-1).toFixed(1)} ${(H-padB).toFixed(1)} Z`;
   return `<div class="pchart"><svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" preserveAspectRatio="xMidYMid meet" style="min-width:340px">
     <defs><linearGradient id="tg" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="var(--orange)" stop-opacity=".28"/><stop offset="1" stop-color="var(--orange)" stop-opacity="0"/></linearGradient></defs>
     <line x1="${padL}" y1="${H-padB}" x2="${W-padR}" y2="${H-padB}" stroke="#eee"/>
-    <path d="${areaO}" fill="url(#tg)"/>
-    <path d="${path("omzet")}" fill="none" stroke="var(--red)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
-    <path d="${path("laba")}" fill="none" stroke="#2471a3" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <path class="ar-fade" d="${areaO}" fill="url(#tg)"/>
+    <path class="ln" pathLength="1" d="${path("omzet")}" fill="none" stroke="var(--red)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <path class="ln l2" pathLength="1" d="${path("laba")}" fill="none" stroke="#2471a3" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
     ${dots("omzet","var(--red)")}${dots("laba","#2471a3")}${labels}
   </svg></div><div class="legend2"><span><i style="background:var(--red)"></i>Omzet</span><span><i style="background:#2471a3"></i>Laba</span></div>`;
 }
@@ -1159,15 +1251,38 @@ function penunggakRows(penunggak){
   if(!penunggak.length)return '<div class="empty">Tidak ada piutang. 🎉</div>';
   return `<div class="clist">${penunggak.slice(0,5).map(s=>`<div class="crow" onclick="go('pembayaran')"><div class="ci mono">${esc((s.n[0]||"?").toUpperCase())}</div><div class="cmain"><div class="ctitle">${esc(s.n)}</div><div class="csub">piutang · ${s.days} hari</div></div><div class="cright"><div class="camt" style="color:var(--amber)">${rp(s.due)}</div></div></div>`).join("")}</div>`;
 }
+// ---- animasi dashboard: sapaan, hitung-naik angka, stagger, sparkline ----
+function greetWord(){const h=new Date().getHours();return h<11?"Selamat pagi":h<15?"Selamat siang":h<18?"Selamat sore":"Selamat malam";}
+function cnt(v,f){v=Math.round(+v||0);return `<span class="cnt" data-v="${v}" data-f="${f||"rp"}">${f==="pct"?v+"%":rp(v)}</span>`;}
+function runCounts(root){
+  const reduce=window.matchMedia&&matchMedia("(prefers-reduced-motion:reduce)").matches;
+  (root||document).querySelectorAll(".cnt").forEach(el=>{
+    const v=+el.dataset.v||0,f=el.dataset.f,fmt=x=>f==="pct"?Math.round(x)+"%":rp(Math.round(x));
+    if(reduce||!v){el.textContent=fmt(v);return;}
+    const t0=performance.now()+(+el.dataset.d||250),dur=1100;el.textContent=fmt(0);
+    const step=now=>{const p=Math.min(1,Math.max(0,(now-t0)/dur)),e=1-Math.pow(1-p,3);el.textContent=fmt(v*e);if(p<1&&el.isConnected)requestAnimationFrame(step);};
+    requestAnimationFrame(step);
+  });
+}
+function dashAnimate(el){el.classList.remove("dash-in");[...el.children].forEach((c,i)=>c.style.setProperty("--i",i));void el.offsetWidth;el.classList.add("dash-in");runCounts(el);}
+function sparkline(trend){
+  const W=300,H=120,pad=8,n=trend.length,mx=Math.max(1,...trend.map(t=>t.omzet));
+  if(trend.every(t=>!t.omzet))return `<div class="dh-nospark">Belum ada data</div>`;
+  const X=i=>pad+(W-2*pad)*(n<=1?.5:i/(n-1)),Y=v=>H-pad-(H-2*pad)*(v/mx);
+  const line=trend.map((t,i)=>(i?"L":"M")+X(i).toFixed(1)+" "+Y(t.omzet).toFixed(1)).join(" ");
+  const area=`M${X(0).toFixed(1)} ${H-pad} `+trend.map((t,i)=>`L${X(i).toFixed(1)} ${Y(t.omzet).toFixed(1)}`).join(" ")+` L${X(n-1).toFixed(1)} ${H-pad} Z`;
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" preserveAspectRatio="none" class="spark"><defs><linearGradient id="spg" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".38"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient></defs><path class="sp-area" d="${area}" fill="url(#spg)"/><path class="sp-line ln" pathLength="1" d="${line}" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>${trend.map((t,i)=>`<circle class="sp-dot" style="animation-delay:${1.1+i*.12}s" cx="${X(i).toFixed(1)}" cy="${Y(t.omzet).toFixed(1)}" r="3.2" fill="#fff"><title>${monthLabelFull(t.m)} — ${rp(t.omzet)}</title></circle>`).join("")}</svg>`;
+}
 function rDashM(){
   const d=computeDash();
   const uname=BIZ.user||"Racikin";
-  document.getElementById("v-dashboard").innerHTML=`
-  <div class="dgreet"><div><h2>Halo, ${esc(uname)} 👋</h2><p>Ringkasan ${esc(BIZ.name||"usaha")}</p></div></div>
+  const el=document.getElementById("v-dashboard");
+  el.innerHTML=`
+  <div class="dgreet"><div><h2>${greetWord()}, ${esc(uname)} 👋</h2><p>Ringkasan ${esc(BIZ.name||"usaha")}</p></div></div>
   ${monthBar()}
   <div class="hero2">
     <div class="hl">💰 Omzet · ${monthLabelFull(FILTER_MONTH)}</div>
-    <div class="hv">${rp(d.omzet)}</div>
+    <div class="hv">${cnt(d.omzet)}</div>
     <div class="hpills">${heroPill(d.dOmz)}<span class="hpill">Laba ${rp(d.laba)} · ${d.margin.toFixed(0)}%</span></div>
     <div class="hact">
       <button onclick="go('pos')"><span class="hai">🛒</span>Kasir</button>
@@ -1177,10 +1292,10 @@ function rDashM(){
   </div>
   ${dashHighlight(d)}
   <div class="tiles">
-    <div class="mcard"><div class="mi" style="background:var(--green-bg);color:var(--green)">🏦</div><div class="ml">Saldo Kas</div><div class="mv" style="color:${d.saldoKas>=0?"var(--green)":"var(--red)"}">${rp(d.saldoKas)}</div><div class="ms muted">posisi sekarang</div></div>
-    <div class="mcard"><div class="mi" style="background:var(--amber-bg);color:var(--amber)">⏳</div><div class="ml">Piutang</div><div class="mv" style="color:var(--amber)">${rp(d.piutang)}</div><div class="ms muted">belum tertagih</div></div>
-    <div class="mcard"><div class="mi" style="background:var(--green-bg);color:var(--green)">💵</div><div class="ml">Laba Kotor</div><div class="mv">${rp(d.laba)}</div><div class="ms">${deltaTag(d.dLab)}</div></div>
-    <div class="mcard"><div class="mi" style="background:var(--blue-bg);color:var(--blue)">📦</div><div class="ml">Nilai Stok</div><div class="mv">${rp(d.nilaiStok)}</div><div class="ms muted">HPP di gudang</div></div>
+    <div class="mcard"><div class="mi" style="background:var(--green-bg);color:var(--green)">🏦</div><div class="ml">Saldo Kas</div><div class="mv" style="color:${d.saldoKas>=0?"var(--green)":"var(--red)"}">${cnt(d.saldoKas)}</div><div class="ms muted">posisi sekarang</div></div>
+    <div class="mcard"><div class="mi" style="background:var(--amber-bg);color:var(--amber)">⏳</div><div class="ml">Piutang</div><div class="mv" style="color:var(--amber)">${cnt(d.piutang)}</div><div class="ms muted">belum tertagih</div></div>
+    <div class="mcard"><div class="mi" style="background:var(--green-bg);color:var(--green)">💵</div><div class="ml">Laba Kotor</div><div class="mv">${cnt(d.laba)}</div><div class="ms">${deltaTag(d.dLab)}</div></div>
+    <div class="mcard"><div class="mi" style="background:var(--blue-bg);color:var(--blue)">📦</div><div class="ml">Nilai Stok</div><div class="mv">${cnt(d.nilaiStok)}</div><div class="ms muted">HPP di gudang</div></div>
   </div>
   <div class="dsec"><h3>Tren 6 Bulan</h3></div>
   <div class="card2">${trendChart(d.trend)}</div>
@@ -1192,22 +1307,36 @@ function rDashM(){
   <div class="card2">${actionCenter(d)}</div>
   <div class="dsec"><h3>Nota Terbaru</h3><a onclick="go('distribusi')">Semua</a></div>
   ${d.recent.length===0?'<div class="empty">Belum ada nota.</div>':`<div class="clist">${d.recent.map(n=>crow({icon:"🧾",title:esc(n.notaNo||"-"),sub:`${esc((store(n.storeId)||{}).name||"?")} · ${fmtDate(n.date)}`,amt:rp(notaTotal(n)),status:notaStatus(n),onclick:"go('distribusi')"})).join("")}</div>`}`;
+  dashAnimate(el);
 }
 function rDash(){
   if(isMobile())return rDashM();
   const d=computeDash();
-  document.getElementById("v-dashboard").innerHTML=`
-  <h2 class="title">Dashboard</h2><div class="desc">Kokpit bisnis — pilih periode di kanan; posisi kas selalu kondisi terkini.</div>
-  ${monthBar()}
-  <div class="cards">
-    <div class="card accent"><div class="lbl">Omzet · ${monthLabelFull(FILTER_MONTH)}</div><div class="val">${rp(d.omzet)}</div><div class="lbl" style="margin:8px 0 0">${d.dOmz==null?"belum ada pembanding":`${d.dOmz>=0?"▲":"▼"} ${Math.abs(d.dOmz*100).toFixed(0)}% vs bln lalu`}</div></div>
-    <div class="card green"><div class="lbl">Laba Kotor</div><div class="val">${rp(d.laba)}</div><div class="lbl" style="margin:8px 0 0">margin ${d.margin.toFixed(0)}% · ${deltaTag(d.dLab)}</div></div>
-    <div class="card"><div class="lbl">Margin</div><div class="val">${d.margin.toFixed(0)}%</div><div class="lbl" style="margin:8px 0 0">laba per rupiah omzet</div></div>
+  const uname=BIZ.user||"Racikin",fnb=bizType()==="fnb";
+  const tl=new Date().toLocaleDateString("id-ID",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+  const kpi=(ic,bg,fg,lbl,val,sub,go)=>`<div class="kpi"${go?` onclick="go('${go}')"`:""}><div class="kpi-i" style="background:${bg};color:${fg}">${ic}</div><div class="kpi-l">${lbl}</div><div class="kpi-v">${val}</div><div class="kpi-s">${sub}</div></div>`;
+  const el=document.getElementById("v-dashboard");
+  el.innerHTML=`
+  <div class="dhero">
+    <div class="dh-bg" aria-hidden="true"><i></i><i></i><i></i></div>
+    <div class="dh-main">
+      <div class="dh-top"><div><div class="dh-hi">${greetWord()}, ${esc(uname)} 👋</div><div class="dh-sub">${esc(BIZ.name||"")} · ${tl}</div></div><div class="dh-month">${monthBar()}</div></div>
+      <div class="dh-lbl">💰 Omzet · ${monthLabelFull(FILTER_MONTH)}</div>
+      <div class="dh-val">${cnt(d.omzet)}</div>
+      <div class="dh-pills">${heroPill(d.dOmz)}<span class="hpill">Laba ${rp(d.laba)} · ${d.margin.toFixed(0)}%</span><span class="hpill">🗓 Hari ini ${rp(d.todayOmzet)} · ${d.todayN} nota</span></div>
+      <div class="dh-act"><button onclick="go('pos')">🛒 Kasir</button><button onclick="editNota()">🧾 Nota Baru</button><button onclick="go('pembayaran')">💰 Catat Bayar</button>${fnb?"":`<button onclick="editBatch()">🏭 Batch Baru</button>`}</div>
+    </div>
+    <div class="dh-side">
+      <div class="dh-ringrow"><div class="dh-ring"><svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="32" fill="none" stroke="rgba(255,255,255,.22)" stroke-width="8"/><circle class="rg" cx="40" cy="40" r="32" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" pathLength="1" style="--off:${(1-Math.max(0,Math.min(1,d.margin/100))).toFixed(3)}" transform="rotate(-90 40 40)"/></svg><b>${cnt(Math.max(0,d.margin),"pct")}</b></div><div><div class="dh-rl">Margin laba</div><div class="dh-rs">laba kotor per rupiah omzet bulan ini</div></div></div>
+      <div class="dh-spark">${sparkline(d.trend)}<div class="dh-lab">${d.trend.map(t=>`<span>${monthLabel(t.m)}</span>`).join("")}</div><div class="dh-sl">Omzet 6 bulan terakhir</div></div>
+    </div>
   </div>
-  <div class="cards">
-    <div class="card"><div class="lbl">🏦 Saldo Kas <span class="mini">(sekarang)</span></div><div class="val sm" style="color:${d.saldoKas>=0?"var(--green)":"var(--red)"}">${rp(d.saldoKas)}</div></div>
-    <div class="card amber"><div class="lbl">⏳ Piutang <span class="mini">(belum tertagih)</span></div><div class="val sm">${rp(d.piutang)}</div></div>
-    <div class="card"><div class="lbl">📦 Nilai Stok <span class="mini">(HPP di gudang)</span></div><div class="val sm">${rp(d.nilaiStok)}</div></div>
+  ${dashHighlight(d)}
+  <div class="kpis">
+    ${kpi("💵","var(--green-bg)","var(--green)","Laba Kotor",cnt(d.laba),`${deltaTag(d.dLab)}`)}
+    ${kpi("🏦","var(--blue-bg)","var(--blue)","Saldo Kas",`<span style="color:${d.saldoKas>=0?"var(--green)":"var(--red)"}">${cnt(d.saldoKas)}</span>`,"posisi sekarang","keuangan")}
+    ${kpi("⏳","var(--amber-bg)","var(--amber)","Piutang",`<span style="color:var(--amber)">${cnt(d.piutang)}</span>`,`${d.penunggak.length} toko belum lunas`,"pembayaran")}
+    ${kpi("📦","#efe9ff","#6b4bd1","Nilai Stok",cnt(d.nilaiStok),"HPP di gudang","produk")}
   </div>
   <div class="grid2">
     <div class="panel"><h3>Tren 6 Bulan — Omzet &amp; Laba</h3>${trendChart(d.trend)}</div>
@@ -1218,6 +1347,7 @@ function rDash(){
     <div class="panel"><h3>⚡ Perlu Tindakan</h3>${actionCenter(d)}</div>
   </div>
   <div class="panel"><h3>Nota Terbaru</h3>${d.recent.length===0?'<div class="empty">Belum ada nota.</div>':`<table><thead><tr><th>Tgl</th><th>No. Nota</th><th>Toko</th><th class="num">Item</th><th class="num">Total</th><th>Status</th></tr></thead><tbody>${d.recent.map(n=>`<tr><td>${fmtDate(n.date)}</td><td>${esc(n.notaNo||"-")}</td><td>${esc((store(n.storeId)||{}).name||"?")}</td><td class="num">${notaItems(n).length}</td><td class="num">${rp(notaTotal(n))}</td><td><span class="pill ${notaStatus(n)}">${notaStatus(n).toUpperCase()}</span></td></tr>`).join("")}</tbody></table>`}</div>`;
+  dashAnimate(el);
 }
 
 // ===== QR ENCODER + QRIS (di-embed, offline) =====
@@ -2817,7 +2947,20 @@ async function doResetConfirm(){
   }catch(e){loginErr(e.message||"Link reset tidak valid atau kadaluarsa.");}
 }
 function loginErr(m){const e=document.getElementById("lerr");if(e){e.textContent=m;e.style.display="block";e.style.animation="none";void e.offsetWidth;e.style.animation="";}}
-async function doLogin(){const code=document.getElementById("lCode").value.trim().toLowerCase(),email=document.getElementById("lEmail").value.trim().toLowerCase(),password=document.getElementById("lPass").value,remember=document.getElementById("lRemember").checked;if(!code||!email||!password){loginErr("Isi kode usaha, email & password.");return;}lBusy(true,"Masuk…");try{BIZ=await api("authLogin",{code,email,password,remember},{silent:true});await afterAuth();}catch(e){lBusy(false);loginErr(e.message||"Gagal masuk.");}}
+// animasi keluar login → layar sambutan beriris → dashboard
+function loginOutro(){
+  return new Promise(res=>{const b=document.querySelector("#loginBox .lsubmit");if(b){b.classList.remove("busy");b.innerHTML="✓ Berhasil";}
+    const ls=document.getElementById("loginScreen");ls.classList.add("leaving");setTimeout(res,720);});
+}
+function loginWelcome(){
+  const ls=document.getElementById("loginScreen");ls.classList.remove("leaving");
+  const lock=document.getElementById("subLock");if(lock&&lock.style.display!=="none")return;   // langganan habis → tak perlu sambutan
+  const w=document.createElement("div");w.className="wsplash";w.id="wsplash";
+  w.innerHTML=`<div class="wbowl"><img src="icons/logo-bowl.png" alt=""></div><div class="wh">${greetWord()}, ${esc(BIZ.user||"")}!</div><div class="wsub">Menyiapkan ${esc(BIZ.name||"usahamu")}…</div><div class="wbar"><i></i></div>`;
+  document.body.appendChild(w);
+  setTimeout(()=>{w.classList.add("out");if(curView==="dashboard")try{renderCur();}catch(e){}setTimeout(()=>w.remove(),620);},1500);
+}
+async function doLogin(){const code=document.getElementById("lCode").value.trim().toLowerCase(),email=document.getElementById("lEmail").value.trim().toLowerCase(),password=document.getElementById("lPass").value,remember=document.getElementById("lRemember").checked;if(!code||!email||!password){loginErr("Isi kode usaha, email & password.");return;}lBusy(true,"Masuk…");let ok=false;try{BIZ=await api("authLogin",{code,email,password,remember},{silent:true});ok=true;await loginOutro();await afterAuth();loginWelcome();}catch(e){if(!ok){lBusy(false);loginErr(e.message||"Gagal masuk.");}else throw e;}}
 async function doRegister(){const name=document.getElementById("rName").value.trim(),code=document.getElementById("rCode").value.trim().toLowerCase(),user=document.getElementById("rUser").value.trim(),email=document.getElementById("rEmail").value.trim().toLowerCase(),password=document.getElementById("rPass").value;if(!name||!code||!user||!email||!password){loginErr("Lengkapi semua kolom.");return;}
   {const pe=pwProblem(password);if(pe){loginErr(pe);return;}}
   lBusy(true,"Mendaftar…");
