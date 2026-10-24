@@ -225,6 +225,14 @@ input,select,textarea{font-family:inherit;font-size:13px;padding:8px 10px;border
 input[type="date"],input[type="time"],input[type="datetime-local"]{-webkit-appearance:none;appearance:none}
 input:focus,select:focus{outline:none;border-color:var(--red)}
 label>input[type="checkbox"],label>input[type="radio"]{width:auto;min-width:0;margin:0;flex-shrink:0}
+.cmpt{width:100%;border-collapse:separate;border-spacing:0;font-size:12.5px}
+.cmpt th,.cmpt td{padding:5px 10px;border-bottom:1px solid var(--line);vertical-align:top;white-space:nowrap;text-transform:none;letter-spacing:0}
+.cmpt th{font-size:11px;font-weight:700;color:var(--muted);text-align:right;vertical-align:bottom}
+.cmpt td:first-child,.cmpt th:first-child{position:sticky;left:0;z-index:1;background:var(--card);white-space:normal;min-width:96px;max-width:120px;font-weight:600;text-align:left}
+.cmpt tr.warn td{background:var(--amber-bg)}
+.cmpt tr.sec td{background:var(--bg);font-weight:700;padding:6px 10px}
+.cmpt tr.tot td{font-size:13.5px}
+.cmpt .mini{font-size:11px;font-weight:400;line-height:1.3}
 label.f{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;font-weight:500}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .pill{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700}
@@ -1714,18 +1722,18 @@ function cmpBatch(pid){
     const tds=bs.map((b,i)=>{const c=r.c[i];if(!c)return `<td class="num">${miss}</td>`;
       const h=`<td class="num">${rp(c.price)}${dl(c.price,prevP)}<div class="mini">${num(c.qty)} ${esc(r.unit||"")}/botol${dl(c.qty,prevQ)}</div></td>`;prevP=c.price;prevQ=c.qty;return h;}).join("");
     const gone=r.c.filter(Boolean).length<bs.length;
-    return `<tr${gone?' style="background:var(--amber-bg)"':""}><td>${esc(r.name||"?")}</td>${tds}</tr>`;};
+    return `<tr${gone?' class="warn"':""}><td>${esc(r.name||"?")}</td>${tds}</tr>`;};
   const opRow=r=>{let prev=null;
     const tds=bs.map((b,i)=>{const c=r.c[i];if(!c)return `<td class="num">${miss}</td>`;const h=`<td class="num">${rp(Math.round(c.cost))}${dl(c.cost,prev)}</td>`;prev=c.cost;return h;}).join("");
-    return `<tr${r.c.filter(Boolean).length<bs.length?' style="background:var(--amber-bg)"':""}><td>${esc(r.name||"?")}</td>${tds}</tr>`;};
-  const sec=t=>`<tr><td colspan="${bs.length+1}" style="font-weight:700;background:var(--bg)">${t}</td></tr>`;
+    return `<tr${r.c.filter(Boolean).length<bs.length?' class="warn"':""}><td>${esc(r.name||"?")}</td>${tds}</tr>`;};
+  const sec=t=>`<tr class="sec"><td colspan="${bs.length+1}">${t}</td></tr>`;
   let pv=null;
   const hppTds=bs.map((b,i)=>{const h=cs[i].perProduct[pid]||0;const out=`<td class="num"><b>${rp(Math.round(h))}</b>${dl(h,pv)}</td>`;pv=h;return out;}).join("");
   const sel=`<select onchange="cmpBatch(this.value)" style="width:100%;margin-bottom:10px">${cands.map(p=>`<option value="${p.id}"${p.id===pid?" selected":""}>${esc(p.name)}</option>`).join("")}</select>`;
   openModal(`<button class="close" onclick="closeModal()">×</button><h3>Bandingkan Batch</h3>${sel}
   <p class="mini" style="margin-bottom:8px">Harga bahan &amp; qty per botol tiap batch, urut dari terlama. ▲▼ = perubahan vs batch sebelumnya. Baris kuning ⚠ = item ada di batch lain tapi tidak di batch ini (mungkin lupa diinput).</p>
-  <div style="overflow-x:auto"><table><thead><tr><th></th>${bs.map((b,i)=>`<th class="num">${esc(b.batchNo||"-")}<div class="mini">${fmtDate(b.date)} · ${pq[i]} btl</div></th>`).join("")}</tr></thead><tbody>
-  <tr><td><b>HPP / botol</b></td>${hppTds}</tr>
+  <div style="overflow-x:auto"><table class="cmpt"><thead><tr><th></th>${bs.map((b,i)=>`<th class="num">${esc(b.batchNo||"-")}<div class="mini">${fmtDate(b.date)} · ${pq[i]} btl</div></th>`).join("")}</tr></thead><tbody>
+  <tr class="tot"><td><b>HPP / botol</b></td>${hppTds}</tr>
   ${sec("Bahan baku (harga satuan · qty per botol)")}${Object.values(rows).map(itemRow).join("")}
   ${Object.keys(ops).length?sec("Biaya operasional (per botol)")+Object.values(ops).map(opRow).join(""):""}
   </tbody></table></div>`);
