@@ -1,0 +1,50 @@
+/* responsive.css — tata letak dinamis: grid menyesuaikan lebar yang tersedia (bukan jumlah kolom tetap).
+   Dimuat PALING AKHIR. Pola: repeat(auto-fit, minmax(min(100%, X), 1fr)) → kolom bertambah/berkurang otomatis. */
+
+/* --- statistik di dalam hero (kaca) --- */
+.pr-stats,.pb-stats,.tk-h4,.pd-kpis,.rk-hstats{grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr))!important}
+.pd-kpis{grid-template-columns:repeat(auto-fit,minmax(min(100%,120px),1fr))!important}
+.tk-hrow:not(.tk-h4){grid-template-columns:repeat(auto-fit,minmax(min(100%,130px),1fr))}
+
+/* --- kartu KPI (putih) --- */
+.ds-kpis,.py-kpis,.kn-cards{grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr))}
+@media (max-width:560px){   /* HP: baris KPI tetap bisa digeser (desain mobile) */
+  .ds-kpis,.py-kpis{display:flex}
+}
+
+/* --- panel berisi beberapa blok kecil --- */
+.py-meters{grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr))}
+.kn-duo{grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr))}
+.kn-cats,.ex-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr))}
+.ex-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr))}
+.pr-dfig,.pb-mfig,.pr-pn{grid-template-columns:repeat(auto-fit,minmax(min(100%,110px),1fr))}
+.rk-pgrid{grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr))}
+.pf-types{grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr))}
+
+/* --- dua kolom utama: satu kolom bila sempit, dua bila lega --- */
+.pf-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,460px),1fr))}
+
+/* --- hero dua kolom (isi + panel samping): panel turun ke bawah bila sempit --- */
+.dhero,.kn-hero,.py-hero{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr)}
+@media (max-width:1180px){.dhero,.kn-hero,.py-hero{grid-template-columns:1fr}}
+
+/* --- daftar kartu: kolom mengikuti lebar; di layar sangat lebar kartu tak jadi terlalu lebar --- */
+@media (min-width:1900px){
+  .pr-list{grid-template-columns:repeat(auto-fill,minmax(400px,1fr))}
+  .pd-grid{grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
+  .tokogrid,.pb-grid,.rk-grid,.rk-ugrid,.py-stores{grid-template-columns:repeat(auto-fill,minmax(330px,1fr))}
+  .posgrid{grid-template-columns:repeat(auto-fill,minmax(190px,1fr))}
+}
+@media (min-width:2400px){main{padding-left:48px;padding-right:48px}}
+
+/* --- teks & angka besar ikut lebar layar --- */
+.dh-val,.kn-hv,.py-hv,.tk-hv{font-size:clamp(30px,2.2vw + 14px,52px)}
+
+/* --- tablet: grid produk/kasir pakai lebih dari 2 kolom --- */
+@media (min-width:561px) and (max-width:820px){
+  .pd-grid{grid-template-columns:repeat(auto-fill,minmax(210px,1fr))}
+  .posgrid{grid-template-columns:repeat(auto-fill,minmax(170px,1fr))}
+}
+
+/* --- grafik tren mengisi lebar panel (skala proporsional) --- */
+.pchart svg,.kn-trend svg{width:100%;height:auto;max-height:340px}

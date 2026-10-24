@@ -37,6 +37,7 @@ function asset($p){return $p.'?v='.(@filemtime(__DIR__.'/'.$p)?:1);} ?>
 <link rel="stylesheet" href="<?=asset('css/p-rekap.css')?>">
 <link rel="stylesheet" href="<?=asset('css/p-pengguna.css')?>">
 <link rel="stylesheet" href="<?=asset('css/p-export.css')?>">
+<link rel="stylesheet" href="<?=asset('css/responsive.css')?>">
 </head>
 <body>
 <aside class="sidebar">
