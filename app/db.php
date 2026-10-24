@@ -171,6 +171,38 @@ function cpanel_create_db($dbname, $dbuser) {
     return true;
 }
 
+// ---- KOLAM DATABASE TRIAL (tanpa cPanel API) ----
+// Admin menyiapkan beberapa database KOSONG di cPanel sekali (mis. racn9542_t01 … t20), semuanya diberi hak ke user MySQL utama,
+// lalu mendaftarkannya di config.php: define('TRIAL_POOL', ['racn9542_t01','racn9542_t02', ...]).
+// Tiap pendaftar trial mengambil satu yang masih kosong & belum dipakai usaha lain.
+function pool_names() { return (defined('TRIAL_POOL') && is_array(TRIAL_POOL)) ? array_values(array_filter(array_map('strval', TRIAL_POOL))) : []; }
+function pool_db_free($m, $name) {   // true bila DB ada, bisa diakses, kosong (0 tabel) & belum dipakai usaha manapun
+    global $DB_HOST, $DB_USER, $DB_PASS;
+    if (!preg_match('/^[A-Za-z0-9_]{1,64}$/', $name)) return false;
+    $q = $m->prepare("SELECT COUNT(*) FROM businesses WHERE db_name=?"); $q->execute([$name]);
+    if ((int)$q->fetchColumn() > 0) return false;
+    try {
+        $p = new PDO("mysql:host=$DB_HOST;dbname=$name;charset=utf8mb4", $DB_USER, $DB_PASS, _pdo_opt());
+        return (int)$p->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()")->fetchColumn() === 0;
+    } catch (Exception $e) { return false; }
+}
+function pool_free_count($m) { $n = 0; foreach (pool_names() as $nm) if (pool_db_free($m, $nm)) $n++; return $n; }
+// Ambil 1 DB kosong dari kolam untuk usaha $alias (atomik lewat GET_LOCK). Return nama DB atau null.
+function pool_claim_db($m, $alias) {
+    $names = pool_names(); if (!$names) return null;
+    $got = (int)$m->query("SELECT GET_LOCK('racikin_trial_pool', 5)")->fetchColumn();
+    if ($got !== 1) return null;
+    try {
+        foreach ($names as $nm) {
+            if (pool_db_free($m, $nm)) {
+                $m->prepare("UPDATE businesses SET db_name=? WHERE alias=?")->execute([$nm, $alias]);
+                return $nm;
+            }
+        }
+        return null;
+    } finally { $m->query("SELECT RELEASE_LOCK('racikin_trial_pool')"); }
+}
+
 // usaha yang sedang login (dari session)
 function current_business() {
     if (session_status() !== PHP_SESSION_ACTIVE) @session_start();

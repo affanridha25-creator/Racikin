@@ -172,6 +172,7 @@ function handle_auth($action, $in) {
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) { http_response_code(400); echo json_encode(['error' => 'Email tidak valid.']); return; }
         if (($pe = pw_problem($pass)) !== '') { http_response_code(400); echo json_encode(['error' => $pe]); return; }
         // atomik: kalau salah satu insert gagal, semua batal (alias tak terkunci). DB tenant dibuat lazy saat bootstrap.
+        $ee = $m->prepare("SELECT COUNT(*) FROM users WHERE email=?"); $ee->execute([$email]); $emailSeen = (int)$ee->fetchColumn() > 0;   // email yg sudah pernah daftar tak dapat trial otomatis lagi
         try {
             $m->beginTransaction();
             $q = $m->prepare("SELECT COUNT(*) FROM businesses WHERE alias=?"); $q->execute([$alias]);
@@ -189,19 +190,26 @@ function handle_auth($action, $in) {
         session_regenerate_id(true);
         // FREE TRIAL: coba auto-provision DB tenant via cPanel API → aktif 30 hari langsung.
         // Kalau tak dikonfigurasi / gagal → fallback PENDING (tunggu aktivasi admin). Defensif, tak bikin nyangkut.
-        if (defined('TRIAL_ON') && TRIAL_ON) {
+        $trialWhy = '';
+        if ($emailSeen) {
+            $trialWhy = 'email sudah pernah terdaftar → tak dapat trial otomatis';
+        } elseif ((defined('TRIAL_ON') && TRIAL_ON) || pool_names()) {
             $days = defined('TRIAL_DAYS') ? max(1, (int)TRIAL_DAYS) : 30;
             $dbUser = defined('CPANEL_DB_USER') && CPANEL_DB_USER ? CPANEL_DB_USER : $DB_USER;
-            if (cpanel_create_db(DB_PREFIX . $alias, $dbUser)) {
+            $ready = false;
+            if (defined('TRIAL_ON') && TRIAL_ON && cpanel_create_db(DB_PREFIX . $alias, $dbUser)) $ready = true;   // cara 1: buat DB via cPanel API
+            if (!$ready && pool_names()) { $ready = pool_claim_db($m, $alias) !== null; if (!$ready) $trialWhy = 'kolam database trial HABIS → isi ulang di cPanel'; }   // cara 2: ambil dari kolam
+            if ($ready) {
                 $m->prepare("UPDATE businesses SET active=1, paid_until=DATE_ADD(CURDATE(), INTERVAL ? DAY) WHERE alias=?")->execute([$days, $alias]);
                 $_SESSION['alias'] = $alias; $_SESSION['user_name'] = $user; $_SESSION['email'] = $email; $_SESSION['role'] = 'owner'; $_SESSION['perms'] = '';
                 notify_admin_signup($name, $alias, $user, $email, "AKTIF — trial gratis $days hari (otomatis)");
                 $b2 = $m->prepare("SELECT * FROM businesses WHERE alias=?"); $b2->execute([$alias]); $b2 = $b2->fetch();
                 echo json_encode(['ok'=>true, 'trial'=>true, 'loggedIn'=>true, 'trialDays'=>$days, 'name'=>$name, 'alias'=>$alias, 'user'=>$user, 'email'=>$email, 'sub'=>sub_status($b2)] + me_payload()); return;
             }
+            if ($trialWhy === '') $trialWhy = 'provisioning database otomatis gagal';
         }
         // akun dibuat sebagai PENDING — tidak auto-login; tunggu aktivasi admin (setelah bayar)
-        notify_admin_signup($name, $alias, $user, $email, 'PENDING — menunggu aktivasi di admin.php');
+        notify_admin_signup($name, $alias, $user, $email, 'PENDING — menunggu aktivasi di admin.php' . ($trialWhy !== '' ? " ($trialWhy)" : ''));
         echo json_encode(['ok'=>true, 'pending'=>true, 'name'=>$name, 'alias'=>$alias]); return;
     }
     // ---- ganti password (sedang login) ----
@@ -373,7 +381,7 @@ function notify_admin_signup($name, $alias, $user, $email, $status) {
     $subject = 'Pendaftar baru Racikin: ' . $clean($name) . ' (' . $clean($alias) . ')';
     $body = "Ada usaha baru mendaftar di Racikin.\n\n"
           . "Usaha   : " . $clean($name) . "\nKode    : " . $clean($alias) . "\nPemilik : " . $clean($user) . "\nEmail   : " . $clean($email) . "\n"
-          . "Status  : " . $status . "\nWaktu   : " . date('Y-m-d H:i') . "\n\n"
+          . "Status  : " . $status . "\nWaktu   : " . date('Y-m-d H:i') . "\nIP      : " . $clean($_SERVER['REMOTE_ADDR'] ?? '?') . "\n\n"
           . "Kelola di: " . app_base_url() . "/admin.php\n\n— Racikin";
     $headers = "From: Racikin <$from>\r\nContent-Type: text/plain; charset=UTF-8\r\nMIME-Version: 1.0\r\n";
     foreach (array_filter(array_map('trim', explode(',', (string)ADMIN_EMAIL))) as $to) {

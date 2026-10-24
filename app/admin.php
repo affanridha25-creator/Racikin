@@ -102,6 +102,7 @@ $rows = $isAdmin ? $m->query("SELECT b.alias,b.name,b.db_name,b.active,b.created
     (SELECT email FROM users u WHERE u.alias=b.alias AND u.role='owner' LIMIT 1) AS owner_email,
     (SELECT COUNT(*) FROM users u WHERE u.alias=b.alias) AS user_count
     FROM businesses b ORDER BY b.active ASC, b.created DESC")->fetchAll() : [];
+$poolTotal = $isAdmin ? count(pool_names()) : 0; $poolFree = ($isAdmin && $poolTotal) ? pool_free_count($m) : 0;
 $pending = 0; $recent = 0;
 foreach ($rows as $r) { if ((int)$r['active'] === 0) $pending++; if (strtotime((string)$r['created']) >= strtotime('-7 days')) $recent++; }
 ?>
@@ -220,6 +221,11 @@ details summary{list-style:none}details summary::-webkit-details-marker{display:
   </details>
 
   <div class="card">
+    <?php if ($poolTotal): ?>
+    <div class="msg <?= $poolFree <= 2 ? 'err' : 'ok' ?>" style="margin-bottom:14px">
+      <b>Trial otomatis:</b> <?= $poolFree ?> dari <?= $poolTotal ?> database kolam masih kosong<?= $poolFree <= 2 ? ' — <b>segera tambah database baru di cPanel</b> lalu daftarkan di <code>TRIAL_POOL</code> (config.php). Kalau habis, pendaftar jadi PENDING.' : '.' ?>
+    </div>
+    <?php endif; ?>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
       <h2 style="font-size:17px">Daftar Usaha</h2>
       <span class="count"><?= count($rows) ?> usaha · <b style="color:var(--amber)"><?= $pending ?></b> menunggu aktivasi · <b style="color:var(--red)"><?= $recent ?></b> baru (7 hari)</span>

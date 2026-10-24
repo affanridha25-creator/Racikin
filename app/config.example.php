@@ -54,6 +54,11 @@ define('APP_HOSTS', ['login.racikin.com', 'racikin.com']);
 // + isi CPANEL_* di bawah, lalu tes di server. Kalau token tak tersedia, tetap pakai cara manual.
 define('TRIAL_ON', false);          // true hanya kalau punya cPanel API Token & CPANEL_* terisi
 define('TRIAL_DAYS', 30);           // lama trial gratis (hari)
+// TRIAL OTOMATIS TANPA cPanel API (kolam database): buat beberapa database KOSONG di cPanel (mis. NAMACPANEL_t01 … t20),
+// beri user MySQL utama hak ALL PRIVILEGES ke tiap DB, lalu daftarkan di sini. Pendaftar baru otomatis dapat 1 DB & trial TRIAL_DAYS hari.
+// Kolam habis → pendaftar jadi PENDING (kamu dikabari lewat ADMIN_EMAIL). Pantau sisa kolam di admin.php.
+define('TRIAL_POOL', []);           // mis. ['NAMACPANEL_t01','NAMACPANEL_t02','NAMACPANEL_t03']
+
 // cPanel API token: cPanel > "Manage API Tokens" > Create. RAHASIA — jangan dibagikan.
 // CPANEL_HOST = host cPanel (mis. 'srv123.rumahweb.com' atau domainmu). CPANEL_USER = username cPanel.
 // CPANEL_DB_USER = user MySQL yang diberi hak ke DB baru (kosongkan = pakai DB_USER di atas).
