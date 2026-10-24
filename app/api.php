@@ -1034,7 +1034,7 @@ function update_product_hpp($pdo, $b, $onlyProduct = null) {
     foreach ($qtyByProd as $pid => $q) {
         if ($onlyProduct !== null && $pid !== $onlyProduct) continue;  // hanya tulis HPP produk ini (recompute)
         $g = $grams[$pid] ?? 1;
-        $fromPool = $pool * $g / $wsum;             // per botol
+        $fromPool = $pool * $g / $wsum;             // per unit
         $fromAssigned = $q > 0 ? ($assigned[$pid] ?? 0) / $q : 0;
         $up->execute([round($fromPool + $fromAssigned), $pid]);
     }
