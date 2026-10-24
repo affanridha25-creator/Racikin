@@ -797,9 +797,11 @@ const notaDue=n=>notaTotal(n)-notaPaid(n);
 function notaStatus(n){const t=notaTotal(n),p=notaPaid(n);if(t<=0)return"lunas";if(p<=0)return"belum";if(p>=t)return"lunas";return"sebagian";}
 // nomor nota default: NOTA-YYYYMMDD-NNN (urut per hari)
 function nextNotaNo(dateStr){
+  // angka urut = nomor tertinggi yang sudah ada untuk tanggal itu + 1 (bukan jumlah nota → aman setelah ada yang dihapus)
   const ymd=(dateStr||today()).replace(/-/g,"");
-  const n=S.notas.filter(x=>(x.date||"").replace(/-/g,"")===ymd).length+1;
-  return `${(BIZ.alias||"nota").toUpperCase()}-${ymd}-${String(n).padStart(3,"0")}`;
+  const pre=`${(BIZ.alias||"nota").toUpperCase()}-${ymd}-`;
+  let max=0;S.notas.forEach(x=>{const no=x.notaNo||"";if(no.startsWith(pre)){const k=parseInt(no.slice(pre.length),10);if(k>max)max=k;}});
+  return pre+String(max+1).padStart(3,"0");
 }
 function batchCalc(b){
   const mat=(b.materials||[]).reduce((a,x)=>a+(+x.qty||0)*(+x.price||0),0);
@@ -1920,6 +1922,7 @@ function editNota(id){
   if(S.stores.length===0){toast("Tambah toko dulu di menu Toko.");return;}
   if(S.products.length===0){toast("Tambah produk dulu di menu Produk.");return;}
   const n=id?JSON.parse(JSON.stringify(S.notas.find(x=>x.id===id))):{id:null,date:today(),storeId:"",notaNo:nextNotaNo(today()),items:[notaItemDefault()],payments:[]};
+  if(!id)n._auto=n.notaNo;
   window._n=n;openModal(notaForm());
 }
 function notaProdOpts(sel){return `<option value="" ${!sel?"selected":""}>— pilih produk —</option>`+S.products.map(p=>`<option value="${p.id}" ${p.id===sel?"selected":""}>${esc(p.name)} — stok ${stock(p.id)}</option>`).join("");}
@@ -1936,8 +1939,8 @@ function notaForm(){const n=window._n;comboReset();
     <div class="irtop">${prodCombo(it.productId,(id)=>notaPickProd(i,id))}<button class="x" onclick="_n.items.splice(${i},1);remoN()">×</button></div>
     <div class="irbot"><input type="number" inputmode="numeric" placeholder="Qty botol" value="${it.qty}" oninput="_n.items[${i}].qty=this.value;nSum()"><select onchange="notaSetKind(${i},this.value)" title="Jenis pemberian gratis">${NOTA_FREE_KINDS.map(([v,t])=>`<option value="${v}" ${it.kind===v?"selected":""}>${t}</option>`).join("")}</select></div></div>`).join("");
   return `<button class="close" onclick="closeModal()">×</button><h3>${n.id?"Edit":"Tambah"} Nota / Faktur</h3>
-  <div class="grid2" style="margin-bottom:12px"><div><label class="f">Tanggal</label><input type="date" value="${n.date}" oninput="_n.date=this.value"></div><div><label class="f">Toko / Penerima</label>${combo(S.stores.map(s=>({id:s.id,label:s.name})),n.storeId,(id)=>{window._n.storeId=id;},"— cari / pilih toko —")}</div></div>
-  <div style="margin-bottom:12px"><label class="f">No. Nota / Faktur <span class="mini">(otomatis, bisa diubah)</span></label><input value="${esc(n.notaNo||"")}" oninput="_n.notaNo=this.value" placeholder="mis. NOTA-20260704-001"></div>
+  <div class="grid2" style="margin-bottom:12px"><div><label class="f">Tanggal</label><input type="date" value="${n.date}" oninput="_n.date=this.value;autoNotaNo()"></div><div><label class="f">Toko / Penerima</label>${combo(S.stores.map(s=>({id:s.id,label:s.name})),n.storeId,(id)=>{window._n.storeId=id;},"— cari / pilih toko —")}</div></div>
+  <div style="margin-bottom:12px"><label class="f">No. Nota / Faktur <span class="mini">(otomatis, bisa diubah)</span></label><input id="nNo" value="${esc(n.notaNo||"")}" oninput="_n.notaNo=this.value" placeholder="mis. NOTA-20260704-001"></div>
   <label class="f">Produk Dijual <span class="mini">(ditagih ke toko)</span></label>${jualRows||'<div class="mini" style="margin-bottom:6px">Belum ada produk jual.</div>'}
   <button class="btn sm ghost" onclick="_n.items.push(notaItemDefault());remoN()">+ item jual</button>
   <div style="border-top:1px dashed var(--line);margin:16px 0 10px"></div>
@@ -1958,6 +1961,8 @@ function nSum(){const n=window._n;
   const freeQty=valid.filter(it=>(it.kind||"jual")!=="jual").reduce((a,it)=>a+(+it.qty||0),0);
   box.innerHTML=`<div><span>Jumlah item</span><span>${valid.length} baris · ${notaQty(n)} botol${freeQty?` (${freeQty} gratis)`:""}</span></div><div class="big"><span>Total tagihan</span><span>${rp(notaTotal(n))}</span></div><div><span>Estimasi laba</span><span style="color:var(--green)"><b>${rp(notaProfit(n))}</b></span></div>`;
 }
+// nomor otomatis ikut tanggal selama belum diubah manual (hanya nota baru)
+function autoNotaNo(){const n=window._n;if(!n||n.id||n.notaNo!==n._auto||!n.date)return;n.notaNo=n._auto=nextNotaNo(n.date);const el=document.getElementById("nNo");if(el)el.value=n.notaNo;}
 async function saveNota(){const n=window._n;if(!n.storeId){toast("Pilih toko/penerima dulu.");return;}if(n.items.filter(it=>it.productId&&+it.qty>0).length===0){toast("Isi minimal 1 item + qty.");return;}await api("saveNota",{nota:n});await reload();closeModal();toast("Nota tersimpan ✓");rDistribusi();}
 async function delNota(id){if(confirm("Hapus nota ini beserta pembayarannya? Stok kembali.")){await api("deleteNota",{id});await reload();rDistribusi();}}
 

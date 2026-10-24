@@ -965,6 +965,21 @@ function resync_materials($pdo, $matIds) {
     }
 }
 
+// Nomor nota untuk nota BARU: kalau sudah dipakai nota lain, naikkan angka urut di belakangnya (PREFIX-YYYYMMDD-NNN)
+function unique_nota_no($pdo, $no) {
+    $no = trim($no);
+    if ($no === '') return '';
+    $q = $pdo->prepare("SELECT COUNT(*) FROM notas WHERE nota_no=?");
+    $q->execute([$no]);
+    if (!(int)$q->fetchColumn()) return $no;
+    if (!preg_match('/^(.*-)(\d+)$/', $no, $m)) return $no;   // format bebas → biarkan
+    $like = $pdo->prepare("SELECT nota_no FROM notas WHERE nota_no LIKE ?");
+    $like->execute([$m[1] . '%']);
+    $max = 0; $w = strlen($m[2]);
+    foreach ($like->fetchAll(PDO::FETCH_COLUMN) as $x)
+        if (preg_match('/^' . preg_quote($m[1], '/') . '(\d+)$/', $x, $mm)) $max = max($max, (int)$mm[1]);
+    return $m[1] . str_pad($max + 1, max(3, $w), '0', STR_PAD_LEFT);
+}
 // Nomor batch berurutan per tanggal: BATCH-YYYYMMDD-001
 function next_batch_no($pdo, $date) {
     $ymd = str_replace('-', '', $date);
@@ -1096,7 +1111,9 @@ function persist_nota($pdo, $n) {
     }
     // catat kasir/pembuat + sesi kasir + metode bayar: pertahankan nilai asli saat edit, isi baru saat pertama
     $ex = $pdo->prepare("SELECT created_by, session_id, pay_method, service, tax, svc_rate, tax_rate, created FROM notas WHERE id=?"); $ex->execute([$id]); $ex = $ex->fetch();
+    $notaNo = (string)($n['notaNo'] ?? '');
     if ($ex === false) {   // nota baru
+        $notaNo = unique_nota_no($pdo, $notaNo);   // cegah nomor kembar (form lama / kasir offline)
         $creator   = $_SESSION['email'] ?? '';
         $sessionId = safe_id($n['sessionId'] ?? '') ?: null;
         $payMethod = in_array(($n['payMethod'] ?? ''), ['Tunai','Transfer','QRIS'], true) ? $n['payMethod'] : '';
@@ -1121,7 +1138,7 @@ function persist_nota($pdo, $n) {
         if (!empty($cfg['tax_enabled'])) { $taxRate = (float)$cfg['tax_rate']; $tax = (int) round(($base + $service) * $taxRate / 100); }  // pajak atas base+service
     }
     $pdo->prepare("REPLACE INTO notas (id,nota_no,ndate,store_id,created_by,session_id,pay_method,discount,service,tax,svc_rate,tax_rate) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")
-        ->execute([$id, $n['notaNo'] ?? '', $date, $storeId, $creator, $sessionId, $payMethod, $discount, $service, $tax, $svcRate, $taxRate]);
+        ->execute([$id, $notaNo, $date, $storeId, $creator, $sessionId, $payMethod, $discount, $service, $tax, $svcRate, $taxRate]);
     // waktu dibuat: nota baru → NOW(); edit → pertahankan nilai lama (REPLACE mengosongkan kolom yg tak diisi)
     if ($ex === false) $pdo->prepare("UPDATE notas SET created=NOW() WHERE id=?")->execute([$id]);
     elseif (!empty($ex['created'])) $pdo->prepare("UPDATE notas SET created=? WHERE id=?")->execute([$ex['created'], $id]);
