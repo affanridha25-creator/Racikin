@@ -134,7 +134,7 @@ function defer_after_response(callable $fn) {
         } catch (Throwable $e) { }
         @ignore_user_abort(true); @set_time_limit(120);
         $GLOBALS['smtp_io_timeout'] = (defined('SMTP_IO_TIMEOUT') && (int)SMTP_IO_TIMEOUT > 0) ? (int)SMTP_IO_TIMEOUT : 60;   // tak ada yang menunggu → boleh sabar (DNS server lambat: Gmail butuh ±35 dtk)
-        foreach ($queue as $f) { try { $f(); } catch (Throwable $e) { error_log('defer: ' . $e->getMessage()); } }
+        foreach ($queue as $f) { @set_time_limit(150); try { $f(); } catch (Throwable $e) { error_log('defer: ' . $e->getMessage()); } }   // batas waktu direset tiap email
     });
 }
 // Kode versi berkas ini (8 karakter pertama md5). Dipakai untuk memastikan versi yang berjalan di server sama dengan yang di-deploy.

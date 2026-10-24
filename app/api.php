@@ -359,25 +359,8 @@ function handle_auth($action, $in) {
                 $rq = $m->prepare("SELECT plan, amount FROM renewal_requests WHERE id=?"); $rq->execute([$rid]); $rq = $rq->fetch() ?: [];
                 $bq = $m->prepare("SELECT name, wa, paid_until FROM businesses WHERE alias=?"); $bq->execute([$alias]); $bq = $bq->fetch() ?: [];
                 $planLbl = ['1bln' => '1 bulan', '3bln' => '3 bulan', '1thn' => '1 tahun'][$rq['plan'] ?? ''] ?? ($rq['plan'] ?? '-');
-                $cl = function ($v) { return trim(preg_replace('/[\r\n]+/', ' ', (string)$v)); };
-                $amt = 'Rp' . number_format((int)($rq['amount'] ?? 0), 0, ',', '.');
-                $txt = "Ada bukti transfer perpanjangan yang perlu diverifikasi.\n\n"
-                  . "Usaha    : " . $cl($bq['name'] ?? $alias) . " (" . $cl($alias) . ")\n"
-                  . "Paket    : " . $planLbl . "\n"
-                  . "Nominal  : " . $amt . "  ← harus cocok dengan mutasi rekening\n"
-                  . "Masa aktif sekarang: " . ($bq['paid_until'] ?? '-') . "\n"
-                  . "Email    : " . $cl($email) . "\n"
-                  . (!empty($bq['wa']) ? "WhatsApp : https://wa.me/" . $cl($bq['wa']) . "\n" : '')
-                  . ($note !== '' ? "Catatan  : " . $cl($note) . "\n" : '')
-                  . "\nPeriksa mutasi rekening, lalu Setujui di: " . app_base_url() . "/admin.php\n\n— Racikin";
-                $html = etpl_html('Bukti transfer masuk 💸', $cl($bq['name'] ?? $alias) . ' — ' . $planLbl . ' — ' . $amt,
-                    etpl_p('Ada bukti transfer perpanjangan yang perlu kamu verifikasi.')
-                  . etpl_facts([['Usaha', etpl_h($cl($bq['name'] ?? $alias)) . ' <span style="color:#8a6f64;font-weight:400">(' . etpl_h($cl($alias)) . ')</span>'], ['Paket', etpl_h($planLbl)],
-                                ['Nominal transfer', '<span style="color:#D53E0F;font-size:17px">' . etpl_h($amt) . '</span>'], ['Masa aktif sekarang', etpl_h($bq['paid_until'] ?? '-')],
-                                ['Email', etpl_h($cl($email))], ['WhatsApp', !empty($bq['wa']) ? '<a href="https://wa.me/' . etpl_h($cl($bq['wa'])) . '" style="color:#1FA855;text-decoration:none">+' . etpl_h($cl($bq['wa'])) . '</a>' : ''], ['Catatan', $note !== '' ? etpl_h($cl($note)) : '']])
-                  . etpl_p('<span style="font-size:13px;color:#8a6f64">Pastikan <b>nominal</b> di atas sama persis dengan yang masuk di mutasi rekening, lalu setujui.</span>')
-                  . etpl_button('Verifikasi di admin', app_base_url() . '/admin.php'));
-                notify_admin('Bukti transfer masuk: ' . $cl($bq['name'] ?? $alias) . ' (' . $planLbl . ')', $txt, false, $html);
+                [$subject, $text, $html] = email_proof($bq['name'] ?? $alias, $alias, $planLbl, $rq['amount'] ?? 0, $bq['paid_until'] ?? '', $email, $bq['wa'] ?? '', $note);
+                notify_admin($subject, $text, false, $html);
             } catch (Throwable $e) { error_log('notif bukti: ' . $e->getMessage()); }
             echo json_encode(['ok' => true]); return;
         }
@@ -385,38 +368,14 @@ function handle_auth($action, $in) {
 }
 
 function notify_admin_signup($name, $alias, $user, $email, $status, $wa = '') {
-    $clean = function ($v) { return trim(preg_replace('/[\r\n]+/', ' ', (string)$v)); };   // cegah header injection
-    $when = gmdate('Y-m-d H:i', time() + 7 * 3600) . ' WIB';
-    $text = "Ada usaha baru mendaftar di Racikin.\n\n"
-      . "Usaha   : " . $clean($name) . "\nKode    : " . $clean($alias) . "\nPemilik : " . $clean($user) . "\nEmail   : " . $clean($email) . "\nWhatsApp: " . ($wa !== '' ? '+' . $clean($wa) . '  → https://wa.me/' . $clean($wa) : '-') . "\n"
-      . "Status  : " . $status . "\nWaktu   : " . $when . "\nIP      : " . $clean($_SERVER['REMOTE_ADDR'] ?? '?') . "\n\n"
-      . "Kelola di: " . app_base_url() . "/admin.php\n\n— Racikin";
-    $badge = (strpos($status, 'AKTIF') === 0) ? '<span style="background:#e6f5ec;color:#1e8449;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:800">' . etpl_h($status) . '</span>'
-                                               : '<span style="background:#fdeede;color:#b8560f;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:800">' . etpl_h($status) . '</span>';
-    $html = etpl_html('Pendaftar baru 🎉', $clean($name) . ' baru saja mendaftar.',
-        etpl_p('Ada usaha baru yang mendaftar di Racikin.')
-      . etpl_facts([['Usaha', etpl_h($clean($name))], ['Kode', etpl_h($clean($alias))], ['Pemilik', etpl_h($clean($user))], ['Email', etpl_h($clean($email))],
-                    ['WhatsApp', $wa !== '' ? '<a href="https://wa.me/' . etpl_h($clean($wa)) . '" style="color:#1FA855;text-decoration:none">+' . etpl_h($clean($wa)) . '</a>' : '-'],
-                    ['Status', $badge], ['Waktu', etpl_h($when)], ['IP', etpl_h($clean($_SERVER['REMOTE_ADDR'] ?? '?'))]])
-      . ($wa !== '' ? etpl_button('Sapa lewat WhatsApp', 'https://wa.me/' . $clean($wa) . '?text=' . rawurlencode('Halo ' . $clean($user) . ', terima kasih sudah mendaftar di Racikin 🙏'), '#1FA855') : '')
-      . etpl_button('Buka halaman admin', app_base_url() . '/admin.php'));
-    notify_admin('Pendaftar baru Racikin: ' . $clean($name) . ' (' . $clean($alias) . ')', $text, false, $html);
+    [$subject, $text, $html] = email_signup($name, $alias, $user, $email, $status, $wa, $_SERVER['REMOTE_ADDR'] ?? '?');
+    notify_admin($subject, $text, false, $html);
 }
 function send_reset_email($to, $name, $alias, $tokenStr) {
     $link = app_base_url() . '/?reset=' . $tokenStr;
     $host = preg_replace('/:\d+$/', '', app_host());                  // From juga pakai host tepercaya, bukan HTTP_HOST mentah
     $from = defined('RESET_FROM') && RESET_FROM ? RESET_FROM : ('noreply@' . preg_replace('/^www\./', '', $host));
-    $subject = 'Reset Password Racikin';
-    $body = "Halo" . ($name ? ' ' . $name : '') . ",\n\n"
-          . "Ada permintaan reset password untuk usaha \"$alias\" di Racikin.\n"
-          . "Klik link ini untuk membuat password baru (berlaku 1 jam):\n\n$link\n\n"
-          . "Kalau kamu tidak meminta ini, abaikan saja email ini. Butuh bantuan? Hubungi " . support_email() . ".\n\n— Racikin";
-    $html = etpl_html('Buat password baru', 'Klik tombol untuk membuat password baru (berlaku 1 jam).',
-        etpl_p('Halo' . ($name ? ' <b>' . etpl_h($name) . '</b>' : '') . ', ada permintaan reset password untuk usaha <b>' . etpl_h($alias) . '</b> di Racikin.')
-      . etpl_p('Klik tombol di bawah untuk membuat password baru. Tautan ini berlaku <b>1 jam</b> dan hanya bisa dipakai sekali.')
-      . etpl_button('Buat password baru', $link)
-      . etpl_p('<span style="font-size:12.5px;color:#8a6f64">Tombol tidak berfungsi? Salin tautan ini ke browser:<br><span style="word-break:break-all;color:#D53E0F">' . etpl_h($link) . '</span></span>')
-      . '<div style="margin:14px 0 0;padding:12px 14px;border-radius:12px;background:#fff6ef;font-size:13px;line-height:1.6;color:#6b4a3f">Kalau kamu <b>tidak</b> meminta ini, abaikan saja email ini. Passwordmu tidak akan berubah.</div>');
+    [$subject, $body, $html] = email_reset($name, $alias, $link);
     [$mh, $mbody] = etpl_multipart($body, $html);
     $headers = "From: Racikin <$from>\r\nReply-To: Racikin <" . support_email() . ">\r\n" . $mh;
     app_mail_later($to, $subject, $mbody, $headers);   // tanpa menunggu server mail (DNS lambat → Gmail ±35 dtk)
@@ -706,17 +665,7 @@ try {
             $biz = current_business(); $bizName = $biz['name'] ?? 'Racikin';
             $host = preg_replace('/:\d+$/', '', app_host());
             $from = defined('RESET_FROM') && RESET_FROM ? RESET_FROM : ('noreply@' . preg_replace('/^www\./', '', $host));
-            $subject = "Kode OTP Pembatalan Transaksi - $bizName";
-            $body = "Halo,\n\nKasir \"$staff\" meminta MEMBATALKAN transaksi " . ($n['nota_no'] ?: $notaId)
-                  . " senilai Rp" . number_format($total, 0, ',', '.') . ".\n\n"
-                  . "Kode OTP: $code\n(berlaku 10 menit, sekali pakai)\n\n"
-                  . "Berikan kode ini ke kasir HANYA jika kamu menyetujui pembatalan. Abaikan jika tidak.\n\n— $bizName";
-            $html = etpl_html('Kode OTP pembatalan', 'Kode OTP untuk menyetujui pembatalan transaksi.',
-                etpl_p('Kasir <b>' . etpl_h($staff) . '</b> meminta <b>membatalkan transaksi</b>:')
-              . etpl_facts([['Usaha', etpl_h($bizName)], ['No. nota', etpl_h($n['nota_no'] ?: $notaId)], ['Nilai', 'Rp' . number_format($total, 0, ',', '.')]])
-              . etpl_p('Berikan kode berikut ke kasir <b>hanya jika kamu menyetujui</b> pembatalan:')
-              . etpl_code($code)
-              . etpl_p('<span style="font-size:13px;color:#8a6f64">Berlaku 10 menit dan hanya bisa dipakai sekali. Abaikan email ini jika kamu tidak menyetujui.</span>'));
+            [$subject, $body, $html] = email_otp($staff, $bizName, $n['nota_no'] ?: $notaId, $total, $code);
             [$mh, $mbody] = etpl_multipart($body, $html);
             $headers = "From: " . mb_encode_mimeheader($bizName) . " <$from>\r\nReply-To: $from\r\n" . $mh;
             $sent = 0; foreach ($owners as $o) { if (app_mail_later($o['email'], $subject, $mbody, $headers)) $sent++; }   // dikirim di belakang layar; kasir tak perlu menunggu

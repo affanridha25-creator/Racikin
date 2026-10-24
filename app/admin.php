@@ -58,8 +58,18 @@ if ($isAdmin && in_array($do, ['activate','deactivate','delete','set_wa'], true)
 }
 
 // --- Pengaturan langganan + verifikasi bukti transfer ---
-if ($isAdmin && in_array($do, ['save_settings','approve','reject','extend','test_mail','diag_mail'], true)) {
+if ($isAdmin && in_array($do, ['save_settings','approve','reject','extend','test_mail','diag_mail','send_sample'], true)) {
     if (!isset($_POST['csrf']) || !hash_equals($csrf, $_POST['csrf'])) { $err = 'Sesi kadaluarsa, ulangi.'; }
+    elseif ($do === 'send_sample') {
+        $cat = email_samples(); $rcp = admin_recipients(); $key = (string)($_POST['key'] ?? '');
+        if (!$rcp) { $err = 'Isi dulu "Email pemberitahuan pendaftar baru" di Pengaturan, klik Simpan Pengaturan, lalu coba lagi.'; }
+        elseif ($key !== 'all' && !isset($cat[$key])) { $err = 'Jenis contoh tidak dikenal.'; }
+        else {
+            $keys = $key === 'all' ? array_keys($cat) : [$key]; $n = 0;
+            foreach ($keys as $k) { [$sj, $tx, $ht] = ($cat[$k][1])(); notify_admin('[CONTOH] ' . $sj, $tx, false, $ht); $n++; }
+            $msg = ($n > 1 ? "$n contoh email" : 'Contoh email') . ' sedang dikirim di belakang layar ke: ' . implode(', ', $rcp) . '. Tiap email bisa memakan sampai 1 menit karena server mail lambat; cek kotak masuk & folder spam. Subjeknya diawali [CONTOH].';
+        }
+    }
     elseif ($do === 'diag_mail') {
         [$okD, $infoD] = run_smtp_diagnose();
         if ($okD) { $msg = $infoD; $msgPre = true; } else $err = $infoD;
@@ -92,13 +102,8 @@ if ($isAdmin && in_array($do, ['save_settings','approve','reject','extend','test
                 $msg = "Perpanjangan \"{$r['alias']}\" disetujui (+{$mo} bulan). ✓";
                 try {   // konfirmasi ke klien
                     $bq = $m->prepare("SELECT name, paid_until FROM businesses WHERE alias=?"); $bq->execute([$r['alias']]); $bq = $bq->fetch() ?: [];
-                    $sent = mail_client_later($r['email'], 'Perpanjangan Racikin disetujui ✓',
-                        "Halo,\n\nTerima kasih! Pembayaran perpanjangan untuk usaha \"" . ($bq['name'] ?? $r['alias']) . "\" sudah kami verifikasi.\n\n"
-                      . "Masa aktif sekarang sampai: " . ($bq['paid_until'] ?? '-') . "\n\nSemua datamu tetap utuh dan aplikasi siap dipakai: " . app_base_url() . "\n\nAda pertanyaan? Balas email ini (" . support_email() . ") atau chat WhatsApp: https://wa.me/6281325523999\n\nTerima kasih sudah memakai Racikin 🙏\n— Tim Racikin",
-                        etpl_html('Perpanjangan disetujui ✓', 'Terima kasih! Langgananmu sudah diperpanjang.',
-                            etpl_p('Terima kasih! Pembayaran perpanjangan untuk usaha <b>' . etpl_h($bq['name'] ?? $r['alias']) . '</b> sudah kami verifikasi.')
-                          . etpl_facts([['Usaha', etpl_h($bq['name'] ?? $r['alias'])], ['Masa aktif sampai', etpl_h($bq['paid_until'] ?? '-')]])
-                          . etpl_p('Semua datamu tetap utuh dan aplikasi siap dipakai.') . etpl_button('Buka Racikin', app_base_url())));
+                    [$sj, $tx, $ht] = email_approved($bq['name'] ?? $r['alias'], $bq['paid_until'] ?? '');
+                    $sent = mail_client_later($r['email'], $sj, $tx, $ht);
                     $msg .= $sent ? ' Email konfirmasi ke klien sedang dikirim di belakang layar.' : ' (Alamat email klien tidak valid, konfirmasi tidak dikirim.)';
                 } catch (Throwable $e) { }
             }
@@ -111,14 +116,8 @@ if ($isAdmin && in_array($do, ['save_settings','approve','reject','extend','test
         $msg = 'Pengajuan ditolak.';
         try {   // beri tahu klien + alasannya
             $rq = $m->prepare("SELECT email, alias FROM renewal_requests WHERE id=?"); $rq->execute([$rid]); $rq = $rq->fetch();
-            if ($rq) { $why = mb_substr(trim($_POST['admin_note'] ?? ''), 0, 255);
-                if (mail_client_later($rq['email'], 'Perpanjangan Racikin belum bisa kami proses',
-                    "Halo,\n\nMaaf, bukti transfer perpanjanganmu belum bisa kami verifikasi" . ($why !== '' ? ":\n\"$why\"" : '.') . "\n\n"
-                  . "Silakan buka " . app_base_url() . " lalu ajukan perpanjangan dan unggah bukti transfer yang benar, atau hubungi kami lewat WhatsApp: https://wa.me/6281325523999 / email " . support_email() . "\n\n— Tim Racikin",
-                    etpl_html('Perpanjangan belum bisa kami proses', 'Bukti transfer belum bisa diverifikasi.',
-                        etpl_p('Maaf, bukti transfer perpanjanganmu <b>belum bisa kami verifikasi</b>.')
-                      . ($why !== '' ? '<div style="margin:12px 0;padding:14px 16px;border-radius:12px;background:#fdeceb;border-left:4px solid #D53E0F;font-size:14px;line-height:1.6;color:#7a2a1c"><b>Alasan:</b> ' . etpl_h($why) . '</div>' : '')
-                      . etpl_p('Silakan ajukan perpanjangan lagi dan unggah bukti transfer yang benar. Kalau perlu bantuan, hubungi kami kapan saja.') . etpl_button('Ajukan ulang', app_base_url())))) $msg .= ' Email pemberitahuan ke klien sedang dikirim di belakang layar.';
+            if ($rq) { [$sj, $tx, $ht] = email_rejected(mb_substr(trim($_POST['admin_note'] ?? ''), 0, 255));
+                if (mail_client_later($rq['email'], $sj, $tx, $ht)) $msg .= ' Email pemberitahuan ke klien sedang dikirim di belakang layar.';
             }
         } catch (Throwable $e) { }
     }
@@ -487,6 +486,25 @@ body.lg::after{width:46vmax;height:46vmax;right:-14vmax;bottom:-16vmax;backgroun
       <input type="hidden" name="csrf" value="<?= h($csrf) ?>"><input type="hidden" name="do" value="diag_mail">
       <button class="btn sm" style="background:#fff;color:var(--ink);border:1.5px solid #e6d9d1" title="Memeriksa kolam database trial dan mencoba beberapa jalur SMTP, tanpa mengirim email">🔍 Diagnosa SMTP &amp; kolam</button>
     </form>
+  </details>
+
+  <!-- Contoh email: kirim tiap jenis email ke emailmu untuk dilihat -->
+  <details class="card">
+    <summary><span class="ico">📨</span>Contoh Email</summary>
+    <div class="sbody">
+      <p class="fhint" style="margin:14px 0 12px">Kirim contoh tiap jenis email ke <b>emailmu</b> (penerima pemberitahuan) untuk melihat tampilannya persis seperti yang diterima pelanggan. Datanya tiruan, subjeknya diawali <b>[CONTOH]</b>, dan tidak ada email yang dikirim ke pelanggan.</p>
+      <?php foreach (email_samples() as $sk => $sv): ?>
+        <form method="post" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)">
+          <input type="hidden" name="csrf" value="<?= h($csrf) ?>"><input type="hidden" name="do" value="send_sample"><input type="hidden" name="key" value="<?= h($sk) ?>">
+          <span style="font-size:14px;font-weight:600"><?= h($sv[0]) ?></span>
+          <button class="btn sm" style="background:#fff;color:var(--red);border:1.5px solid #f0c9bb;white-space:nowrap">✉️ Kirim contoh</button>
+        </form>
+      <?php endforeach; ?>
+      <form method="post" style="margin-top:14px" onsubmit="return confirm('Kirim semua contoh email (7 buah) ke emailmu? Prosesnya di belakang layar dan bisa memakan beberapa menit.')">
+        <input type="hidden" name="csrf" value="<?= h($csrf) ?>"><input type="hidden" name="do" value="send_sample"><input type="hidden" name="key" value="all">
+        <button class="btn sm">📬 Kirim semua contoh</button>
+      </form>
+    </div>
   </details>
 
   <div class="card" id="usaha">

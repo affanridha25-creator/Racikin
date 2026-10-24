@@ -76,3 +76,5 @@ function etpl_multipart($text, $html) {
           . "--$b--\r\n";
     return ["Content-Type: multipart/alternative; boundary=\"$b\"\r\nMIME-Version: 1.0\r\n", $body];
 }
+
+require_once __DIR__ . '/emailbuilders.php';   // isi tiap jenis email + katalog contoh
