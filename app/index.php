@@ -40,28 +40,36 @@ function asset($p){return $p.'?v='.(@filemtime(__DIR__.'/'.$p)?:1);} ?>
 </head>
 <body>
 <aside class="sidebar">
+  <svg class="sb-blob" viewBox="0 0 240 900" preserveAspectRatio="none" aria-hidden="true"><path class="sb-b1" d="M0 0H240V210C196 250 262 300 214 352C168 404 250 450 206 510C170 560 238 610 196 676C160 730 220 790 190 900H0Z"/><path class="sb-b2" d="M0 520C60 548 40 600 94 628C146 656 130 720 190 748V900H0Z"/></svg>
   <div class="brand"><div class="logo"><img id="sideLogo" src="icons/logo-bowl.png" alt=""></div><img class="brand-word" src="icons/logo-word-white.png" alt="Racikin"></div>
   <nav id="nav">
-    <button data-v="dashboard" data-label="Dashboard" class="active"><span class="ic">📊</span> Dashboard</button>
-    <button data-v="pos" data-label="Kasir (POS)"><span class="ic">🛒</span> Kasir</button>
-    <button data-v="produksi" data-label="Produksi"><span class="ic">🏭</span> Produksi</button>
-    <button data-v="distribusi" data-label="Distribusi"><span class="ic">🚚</span> Distribusi</button>
-    <button data-v="pembayaran" data-label="Pembayaran"><span class="ic">💰</span> Pembayaran</button>
-    <button data-v="keuangan" data-label="Keuangan"><span class="ic">💹</span> Keuangan</button>
-    <button data-v="bahan" data-label="Bahan Baku"><span class="ic">🧂</span> Bahan Baku</button>
-    <button data-v="produk" data-label="Produk"><span class="ic">🫙</span> Produk</button>
-    <button data-v="toko" data-label="Toko"><span class="ic">🏪</span> Toko</button>
-    <button data-v="rekap" data-label="Rekap Kasir"><span class="ic">🧾</span> Rekap Kasir</button>
-    <button data-v="users" data-label="Pengguna"><span class="ic">👥</span> Pengguna</button>
-    <button data-v="profile" data-label="Profil Usaha"><span class="ic">🏷️</span> Profil Usaha</button>
-    <button data-v="backup" data-label="Export Data"><span class="ic">📤</span> Export Data</button>
+    <i class="nav-ind" aria-hidden="true"></i>
+    <div class="nav-grp">Utama</div>
+    <button data-v="dashboard" data-label="Dashboard" class="active"><span class="ic">📊</span><span class="nl">Dashboard</span></button>
+    <button data-v="pos" data-label="Kasir (POS)"><span class="ic">🛒</span><span class="nl">Kasir</span></button>
+    <div class="nav-grp">Operasional</div>
+    <button data-v="produksi" data-label="Produksi"><span class="ic">🏭</span><span class="nl">Produksi</span></button>
+    <button data-v="distribusi" data-label="Distribusi"><span class="ic">🚚</span><span class="nl">Distribusi</span></button>
+    <button data-v="pembayaran" data-label="Pembayaran"><span class="ic">💰</span><span class="nl">Pembayaran</span></button>
+    <button data-v="keuangan" data-label="Keuangan"><span class="ic">💹</span><span class="nl">Keuangan</span></button>
+    <div class="nav-grp">Katalog</div>
+    <button data-v="bahan" data-label="Bahan Baku"><span class="ic">🧂</span><span class="nl">Bahan Baku</span></button>
+    <button data-v="produk" data-label="Produk"><span class="ic">🫙</span><span class="nl">Produk</span></button>
+    <button data-v="toko" data-label="Toko"><span class="ic">🏪</span><span class="nl">Toko</span></button>
+    <div class="nav-grp">Laporan &amp; Admin</div>
+    <button data-v="rekap" data-label="Rekap Kasir"><span class="ic">🧾</span><span class="nl">Rekap Kasir</span></button>
+    <button data-v="users" data-label="Pengguna"><span class="ic">👥</span><span class="nl">Pengguna</span></button>
+    <button data-v="profile" data-label="Profil Usaha"><span class="ic">🏷️</span><span class="nl">Profil Usaha</span></button>
+    <button data-v="backup" data-label="Export Data"><span class="ic">📤</span><span class="nl">Export Data</span></button>
   </nav>
-  <button class="logout" onclick="doLogout()"><span>⏻</span> Logout</button>
-  <div class="role">ANNA Snack &amp; Kitchen</div>
+  <div class="sb-foot">
+    <div class="sb-user"><div class="sb-av">🍲</div><div class="sb-meta"><div class="role">ANNA Snack &amp; Kitchen</div><small>Usaha aktif</small></div></div>
+    <button class="logout" onclick="doLogout()"><span>⏻</span> Logout</button>
+  </div>
 </aside>
 <div class="content">
   <div id="subBanner" style="display:none"></div>
-  <div class="topbar"><div class="t-title" id="topTitle">Dashboard</div><img class="t-word-img" src="icons/logo-word.png" alt="Racikin"><div class="t-right">👋 Halo, <b>ANNA</b></div></div>
+  <div class="topbar"><div class="t-left"><div class="t-hi" id="topHi">Selamat datang kembali</div><div class="t-title" id="topTitle">Dashboard</div></div><img class="t-word-img" src="icons/logo-word.png" alt="Racikin"><div class="t-right">👋 Halo, <b>ANNA</b></div></div></div>
   <main>
     <section id="v-dashboard" class="view active"><div class="empty">Memuat data…</div></section>
     <section id="v-pos" class="view"></section>
@@ -79,7 +87,7 @@ function asset($p){return $p.'?v='.(@filemtime(__DIR__.'/'.$p)?:1);} ?>
   </main>
 </div>
 <div class="modal-bg" id="modalBg"><div class="modal" id="modal"></div></div>
-<div id="toast"></div>
+<div id="toast" role="status" aria-live="polite"></div>
 <div id="printArea"></div>
 <div class="loginbg lsplit" id="loginScreen" style="display:flex">
   <div class="lhero">
@@ -100,28 +108,49 @@ function asset($p){return $p.'?v='.(@filemtime(__DIR__.'/'.$p)?:1);} ?>
   </div>
   <div class="lpanel"><div class="loginbox intro" id="loginBox"></div></div>
 </div>
-<div class="loginbg" id="subLock" style="display:none"><div class="loginbox" id="subLockBox" style="max-width:440px"></div></div>
+<div class="loginbg lsplit sl" id="subLock" style="display:none">
+  <div class="lhero">
+    <div class="lfx" aria-hidden="true"><span style="--x:10%;--s:28px;--d:20s;--w:0s">🌶️</span><span style="--x:36%;--s:24px;--d:24s;--w:-8s">🧅</span><span style="--x:62%;--s:30px;--d:22s;--w:-13s">🍅</span><span style="--x:86%;--s:24px;--d:26s;--w:-5s">🍋</span></div>
+    <div class="lhero-in">
+      <img class="lh-word" src="icons/logo-word-white.png" alt="Racikin">
+      <div class="lh-copy"><h1>Lanjut racik, <span>tanpa putus.</span></h1><p>Perpanjang sekarang dan semua datamu langsung terbuka lagi: produksi, piutang, kasir, dan laporan untung.</p></div>
+      <div class="lh-tag">Data aman tersimpan. Tinggal perpanjang.</div>
+      <div class="sl-perks" aria-hidden="true">
+        <div class="lfc"><b>🔐</b><div><strong>Data tetap aman</strong><span>tidak ada yang hilang</span></div></div>
+        <div class="lfc"><b>⚡</b><div><strong>Aktif otomatis</strong><span>setelah admin menyetujui</span></div></div>
+        <div class="lfc"><b>💬</b><div><strong>Ada kendala?</strong><span>hubungi admin Racikin</span></div></div>
+      </div>
+    </div>
+    <svg class="lwave" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path d="M100 0 V100 H34 C12 86 58 74 38 56 C18 38 62 26 40 10 C33 4 26 2 22 0 Z" fill="#FFF8F3"/></svg>
+    <svg class="lwave-b" viewBox="0 0 400 60" preserveAspectRatio="none" aria-hidden="true"><path d="M0 34 C70 0 130 58 210 30 C290 2 340 40 400 18 V60 H0 Z" fill="#FFF8F3"/></svg>
+  </div>
+  <div class="lpanel"><div class="loginbox" id="subLockBox"></div></div>
+</div>
 <nav class="botnav" id="botnav">
-  <button data-v="dashboard" onclick="go('dashboard')"><span class="bic">📊</span>Beranda</button>
-  <button id="bnSlot2" data-v="distribusi" onclick="go('distribusi')"><span class="bic">🚚</span>Distribusi</button>
-  <button class="fab" onclick="fabAction()" aria-label="Tambah">+</button>
-  <button id="bnSlot4" data-v="produksi" onclick="go('produksi')"><span class="bic">🏭</span>Produksi</button>
-  <button id="btnMore" onclick="openMore()"><span class="bic">☰</span>Lainnya</button>
+  <i class="bn-ind" aria-hidden="true"></i>
+  <button data-v="dashboard" onclick="go('dashboard')"><span class="bic">📊</span><em>Beranda</em></button>
+  <button id="bnSlot2" data-v="distribusi" onclick="go('distribusi')"><span class="bic">🚚</span><em>Distribusi</em></button>
+  <button class="fab" onclick="fabAction()" aria-label="Tambah"><b>+</b></button>
+  <button id="bnSlot4" data-v="produksi" onclick="go('produksi')"><span class="bic">🏭</span><em>Produksi</em></button>
+  <button id="btnMore" onclick="openMore()"><span class="bic">✨</span><em>Lainnya</em></button>
 </nav>
 <div class="sheet-bg" id="sheetBg" onclick="closeMore(event)">
   <div class="sheet">
+    <div class="sheet-grab" aria-hidden="true"></div>
     <div class="sheet-h">Menu Lainnya</div>
-    <button onclick="go('pos')"><span>🛒</span> Kasir (POS)</button>
-    <button onclick="go('keuangan')"><span>💹</span> Keuangan</button>
-    <button onclick="go('pembayaran')"><span>💰</span> Pembayaran</button>
-    <button onclick="go('bahan')"><span>🧂</span> Bahan Baku</button>
-    <button onclick="go('produk')"><span>🫙</span> Produk</button>
-    <button onclick="go('toko')"><span>🏪</span> Toko</button>
-    <button onclick="go('rekap')"><span>🧾</span> Rekap Kasir</button>
-    <button onclick="go('users')"><span>👥</span> Pengguna</button>
-    <button onclick="go('profile')"><span>🏷️</span> Profil Usaha</button>
-    <button onclick="go('backup')"><span>📤</span> Export Data</button>
-    <button onclick="closeMore();doLogout()" style="color:var(--red)"><span>⏻</span> Keluar</button>
+    <div class="sheet-grid">
+      <button onclick="go('pos')"><span>🛒</span> Kasir (POS)</button>
+      <button onclick="go('keuangan')"><span>💹</span> Keuangan</button>
+      <button onclick="go('pembayaran')"><span>💰</span> Pembayaran</button>
+      <button onclick="go('bahan')"><span>🧂</span> Bahan Baku</button>
+      <button onclick="go('produk')"><span>🫙</span> Produk</button>
+      <button onclick="go('toko')"><span>🏪</span> Toko</button>
+      <button onclick="go('rekap')"><span>🧾</span> Rekap Kasir</button>
+      <button onclick="go('users')"><span>👥</span> Pengguna</button>
+      <button onclick="go('profile')"><span>🏷️</span> Profil Usaha</button>
+      <button onclick="go('backup')"><span>📤</span> Export Data</button>
+    </div>
+    <button class="sheet-out" onclick="closeMore();doLogout()"><span>⏻</span> Keluar</button>
   </div>
 </div>
 

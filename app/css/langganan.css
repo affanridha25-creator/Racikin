@@ -1,14 +1,60 @@
-/* langganan.css — langganan / perpanjangan */
-/* ---- langganan / perpanjangan ---- */
-#subBanner{position:sticky;top:0;z-index:60}
-.subbn{background:linear-gradient(90deg,var(--amber),#e07b1a);color:#fff;padding:9px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:13px;font-weight:600}
-.subbn button{background:#fff;color:var(--red);border:none;padding:6px 14px;border-radius:20px;font-weight:800;font-size:12.5px;cursor:pointer;flex-shrink:0}
+/* langganan.css — langganan / perpanjangan (v2: layar kunci gaya login terbelah, banner, paket, bukti transfer) */
+/* ---- banner H-7 ---- */
+#subBanner{position:sticky;top:0;z-index:60;padding:10px 16px 0}
+.subbn{display:flex;align-items:center;gap:10px;max-width:980px;margin:0 auto;padding:8px 8px 8px 14px;border-radius:999px;color:#fff;font-size:13px;font-weight:600;background:linear-gradient(100deg,#F59A3E,#E0701A 55%,#C2651B);box-shadow:0 10px 26px rgba(194,101,27,.32);animation:slDown .6s cubic-bezier(.34,1.4,.5,1) both}
+.subbn .sb-ic{font-size:18px;display:inline-block;animation:slWob 2.4s ease-in-out infinite;transform-origin:50% 10%}
+.subbn .sb-tx{flex:1;min-width:0;line-height:1.3}
+.subbn .sb-tx small{opacity:.85;font-weight:500}
+.subbn button{background:#fff;color:var(--red);border:none;padding:8px 18px;border-radius:999px;font-weight:800;font-size:12.5px;cursor:pointer;flex-shrink:0;transition:transform .25s cubic-bezier(.34,1.45,.5,1),box-shadow .2s}
+.subbn button:hover{transform:scale(1.06);box-shadow:0 6px 14px rgba(0,0,0,.18)}
+.subbn button:active{transform:scale(.95)}
+@keyframes slDown{from{opacity:0;transform:translateY(-18px)}to{opacity:1;transform:none}}
+@keyframes slWob{0%,60%,100%{transform:rotate(0)}70%{transform:rotate(14deg)}80%{transform:rotate(-12deg)}90%{transform:rotate(8deg)}}
+
+/* ---- layar kunci (split: hero gradasi + kartu) ---- */
+.sl .lsplit,.loginbg.sl{background:#FFF8F3}
+.sl .loginbox{max-width:452px;padding:30px 26px 22px;text-align:left}
+.sl-badge{width:74px;height:74px;border-radius:50%;margin:0 0 14px;display:grid;place-items:center;font-size:34px;background:linear-gradient(145deg,#FFF1E6,#FFD2B6);box-shadow:0 14px 30px rgba(213,62,15,.22),inset 0 0 0 4px #fff;animation:lgPop .8s .1s cubic-bezier(.3,1.5,.5,1) both}
+.sl-badge span{display:block;animation:lgBob 3.8s ease-in-out infinite}
+.sl-head h2{font-size:25px}
+.sl-head .lsub{text-align:left;margin:0;font-size:13.5px;line-height:1.55;color:var(--muted)}
+.sl-area{margin-top:6px}
+.sl-out{text-align:center;margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+.sl-perks{display:flex;flex-direction:column;gap:12px;margin-top:4px;max-width:340px}
+.sl-perks .lfc{position:relative;left:auto;top:auto;transform:none;animation:lgUp .7s both,lgFloatY 6s ease-in-out infinite}
+.sl-perks .lfc:nth-child(1){animation-delay:.4s,0s;margin-left:0}
+.sl-perks .lfc:nth-child(2){animation-delay:.55s,-2s;margin-left:26px}
+.sl-perks .lfc:nth-child(3){animation-delay:.7s,-4s;margin-left:6px}
+.sl .lh-copy h1{max-width:440px}
+
+/* ---- paket ---- */
 .renbox{margin-top:6px}
-.plans{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
-.planc{background:var(--card);border:1.5px solid var(--line);border-radius:14px;padding:14px 8px;text-align:center;cursor:pointer;transition:.15s}
-.planc:hover{border-color:var(--red);box-shadow:0 6px 16px rgba(213,62,15,.14)}
-.planc .pl{font-weight:800;font-size:13px}
-.planc .pp{font-size:12px;color:var(--red);font-weight:700;margin-top:4px}
-.planc.dis{opacity:.5;cursor:not-allowed}.planc.dis:hover{border-color:var(--line);box-shadow:none}
-.amtbox{background:var(--red);color:#fff;border-radius:14px;padding:14px;text-align:center;font-size:26px;font-weight:800;letter-spacing:.5px;margin:8px 0}
-.bankbox{background:var(--bg);border:1px dashed var(--line);border-radius:12px;padding:12px 14px;font-size:14px;line-height:1.55;white-space:pre-line}
+.plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:10px}
+.planc{position:relative;background:#fff;border:1.5px solid #F0DED3;border-radius:22px;padding:20px 8px 14px;text-align:center;cursor:pointer;font-family:inherit;transition:transform .3s cubic-bezier(.34,1.45,.5,1),border-color .2s,box-shadow .25s;animation:lgUp .5s both}
+.planc:nth-child(2){animation-delay:.07s}.planc:nth-child(3){animation-delay:.14s}
+.planc:hover{border-color:var(--red);box-shadow:0 14px 28px rgba(213,62,15,.18);transform:translateY(-4px)}
+.planc:active{transform:scale(.96)}
+.planc .pl{font-weight:800;font-size:13.5px;color:var(--ink)}
+.planc .pp{font-size:12.5px;color:var(--red);font-weight:800;margin-top:5px;font-variant-numeric:tabular-nums}
+.planc.best{border-color:var(--red);background:linear-gradient(180deg,#FFF6EF,#fff)}
+.planc.dis{opacity:.5;cursor:not-allowed}.planc.dis:hover{border-color:#F0DED3;box-shadow:none;transform:none}
+.pl-save{position:absolute;top:-9px;left:50%;transform:translateX(-50%);white-space:nowrap;font-style:normal;font-size:10px;font-weight:800;color:#fff;padding:3px 10px;border-radius:999px;background:linear-gradient(135deg,#F26A2E,#D53E0F);box-shadow:0 6px 12px rgba(213,62,15,.3)}
+
+/* ---- transfer & bukti ---- */
+.amtbox{position:relative;overflow:hidden;background:linear-gradient(135deg,#F26A2E,#D53E0F 55%,#7E0306);color:#fff;border-radius:24px;padding:18px 14px;text-align:center;font-size:28px;font-weight:800;letter-spacing:-.01em;font-variant-numeric:tabular-nums;margin:10px 0;box-shadow:0 14px 30px rgba(126,3,6,.28)}
+.amtbox::after{content:"";position:absolute;top:0;left:-70%;width:45%;height:100%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.3),transparent);transform:skewX(-18deg);animation:dShine 4.5s ease-in-out infinite}
+.bankbox{background:#FFF8F3;border:1.5px dashed #F0C9B6;border-radius:20px;padding:14px 16px;font-size:14px;line-height:1.6;white-space:pre-line}
+.rn-wait{text-align:center;padding:6px 0}
+.rn-wait p{margin:8px 0;line-height:1.55}
+.rn-ico{font-size:42px;display:inline-block;animation:slHour 2.4s ease-in-out infinite}
+.rn-pay #proofPrev img{border-radius:18px!important}
+@keyframes slHour{0%,40%{transform:rotate(0)}60%,100%{transform:rotate(180deg)}}
+
+@media (max-width:899px){
+  .sl .sl-perks{display:none}
+  .sl .loginbox{padding:24px 20px 18px}
+}
+@media (prefers-reduced-motion:reduce){
+  .subbn,.subbn .sb-ic,.sl-badge,.sl-badge span,.sl-perks .lfc,.planc,.amtbox::after,.rn-ico{animation:none!important}
+  .planc,.subbn button{transition:none!important}
+}
