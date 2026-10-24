@@ -95,6 +95,7 @@
 .pk-meths button:active{transform:scale(.96)}
 .pk-meths button.on{background:linear-gradient(145deg,#fff3ec,#ffe3d4);border-color:var(--orange);box-shadow:0 8px 20px rgba(242,106,46,.25)}
 .pk-meths button.on small{color:var(--red)}
+.pk-meths button.on,.pk-meths button.on b{color:var(--red-d)}   /* gaya .posseg .on umum memberi teks putih → hilang di latar krem */
 .pk-bayar{font-size:22px!important;font-weight:800;text-align:right;font-variant-numeric:tabular-nums;min-height:54px!important;border-radius:18px!important}
 .pk-kemb{border-radius:22px;padding:16px 20px;margin-top:10px;background:linear-gradient(145deg,#e8f7ee,#d3f0de);border:1.5px solid rgba(40,150,80,.25)}
 .pk-kemb span{font-size:14px}
