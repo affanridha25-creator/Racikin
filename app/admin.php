@@ -2,6 +2,7 @@
 // ================= PANEL ADMIN RACIKIN =================
 // Aktivasi/nonaktif/hapus usaha. Dilindungi ADMIN_PASS (set di config.php).
 require __DIR__ . '/db.php';
+require_once __DIR__ . '/mail.php';
 if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
 $m = master_pdo();
 
@@ -57,8 +58,12 @@ if ($isAdmin && in_array($do, ['activate','deactivate','delete','set_wa'], true)
 }
 
 // --- Pengaturan langganan + verifikasi bukti transfer ---
-if ($isAdmin && in_array($do, ['save_settings','approve','reject','extend'], true)) {
+if ($isAdmin && in_array($do, ['save_settings','approve','reject','extend','test_mail'], true)) {
     if (!isset($_POST['csrf']) || !hash_equals($csrf, $_POST['csrf'])) { $err = 'Sesi kadaluarsa, ulangi.'; }
+    elseif ($do === 'test_mail') {
+        [$okMail, $infoMail] = run_mail_test();
+        if ($okMail) $msg = $infoMail; else $err = $infoMail;
+    }
     elseif ($do === 'save_settings') {
         foreach (['price_1bln','price_3bln','price_1thn'] as $k) setting_set($k, max(0, (int)preg_replace('/\D/', '', $_POST[$k] ?? '0')));
         setting_set('bank_info', mb_substr(trim($_POST['bank_info'] ?? ''), 0, 1000));
@@ -441,8 +446,13 @@ body.lg::after{width:46vmax;height:46vmax;right:-14vmax;bottom:-16vmax;backgroun
       <textarea name="bank_info" rows="3" placeholder="mis. BCA 1234567890 a.n. Nama Pemilik"><?= h($settings['bank_info']??'') ?></textarea>
       <label style="display:block;margin-top:14px">Email pemberitahuan pendaftar baru <span style="font-weight:400;color:var(--muted)">(boleh beberapa, pisah koma)</span></label>
       <input type="text" name="notify_email" value="<?= h($settings['notify_email'] ?? '') ?>" placeholder="mis. kamu@gmail.com" autocomplete="off" inputmode="email">
+      <div class="mini" style="margin-top:6px;color:var(--muted);font-size:12px">Pengirim: <b><?= h((defined('SMTP_HOST') && SMTP_HOST !== '') ? ((defined('SMTP_FROM') && SMTP_FROM) ? SMTP_FROM : (defined('SMTP_USER') ? SMTP_USER : '-')) : 'mail() bawaan hosting (belum pakai SMTP)') ?></b> · simpan dulu, lalu klik <b>Kirim email tes</b> di bawah.</div>
       <label class="ck"><input type="checkbox" name="uniq_on" value="1" <?= ($settings['uniq_on']??'1')==='1'?'checked':'' ?>> <span>Aktifkan kode unik nominal (1–50) — memudahkan cek transfer</span></label>
       <button class="btn" style="margin-top:16px">Simpan Pengaturan</button>
+    </form>
+    <form method="post" style="margin-top:10px">
+      <input type="hidden" name="csrf" value="<?= h($csrf) ?>"><input type="hidden" name="do" value="test_mail">
+      <button class="btn sm" style="background:#fff;color:var(--red);border:1.5px solid #f0c9bb">✉️ Kirim email tes</button>
     </form>
   </details>
 

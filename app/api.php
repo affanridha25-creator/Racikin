@@ -2,6 +2,7 @@
 // ================== API JSON ==================
 header('Content-Type: application/json; charset=utf-8');
 require __DIR__ . '/db.php';
+require_once __DIR__ . '/mail.php';
 if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
 
 // Anti-CSRF: hanya layani request dari app (fetch mengirim header khusus).
@@ -358,86 +359,6 @@ function handle_auth($action, $in) {
     }
 }
 
-// ---- kirim email reset password (pakai mail() bawaan; di shared hosting umumnya jalan) ----
-// Host kanonik yang tepercaya — cegah Host-header injection pada link reset (CWE-640).
-// Override di config.php: define('APP_HOSTS', ['login.usahamu.com', ...]);
-function app_host() {
-    $allow = defined('APP_HOSTS') ? APP_HOSTS : ['login.racikin.com', 'racikin.com', 'localhost', '127.0.0.1'];
-    $raw  = strtolower((string)($_SERVER['HTTP_HOST'] ?? ''));
-    $bare = preg_replace('/:\d+$/', '', $raw);              // buang port utk pencocokan
-    // host asing (mis. dari Host header dipalsukan) → paksa ke host kanonik pertama
-    return in_array($bare, $allow, true) ? $raw : $allow[0];
-}
-function app_base_url() {
-    if (defined('APP_URL') && APP_URL) return rtrim(APP_URL, '/');   // paling utama: host eksplisit dari config
-    $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
-    return ($https ? 'https' : 'http') . '://' . app_host();          // jaring pengaman: hanya host di allowlist
-}
-// Beri tahu admin lewat email saat ada usaha baru mendaftar (ADMIN_EMAIL di config.php; boleh beberapa, pisah koma).
-// Defensif: gagal kirim tak boleh membatalkan pendaftaran.
-// ---- Pengirim email: SMTP (akun email asli, lebih andal & tak mudah masuk spam) atau mail() bawaan hosting ----
-// Aktifkan SMTP dengan mengisi SMTP_HOST/SMTP_USER/SMTP_PASS di config.php (buat akun email di cPanel → Email Accounts).
-// Tanda tangan kompatibel mail(): app_mail($to, $subject, $body, $headers). Return true bila diterima server.
-function smtp_read($fp) {
-    $out = '';
-    while (($line = fgets($fp, 515)) !== false) { $out .= $line; if (strlen($line) < 4 || $line[3] === ' ') break; }
-    return $out;
-}
-function smtp_cmd($fp, $cmd, $okPrefix) {
-    if ($cmd !== null) fwrite($fp, $cmd . "\r\n");
-    $r = smtp_read($fp);
-    return strpos($r, (string)$okPrefix) === 0;
-}
-function smtp_send($to, $subject, $body, $headers) {
-    $host = (string)SMTP_HOST; $port = defined('SMTP_PORT') ? (int)SMTP_PORT : 465;
-    $secure = defined('SMTP_SECURE') ? strtolower((string)SMTP_SECURE) : 'ssl';
-    $user = defined('SMTP_USER') ? (string)SMTP_USER : ''; $pass = defined('SMTP_PASS') ? (string)SMTP_PASS : '';
-    $fromAddr = defined('SMTP_FROM') && SMTP_FROM ? (string)SMTP_FROM : $user;
-    if ($host === '' || !filter_var($fromAddr, FILTER_VALIDATE_EMAIL)) return false;
-    // ambil header turunan dari string $headers; From dipaksa ke akun SMTP (server biasanya menolak From asing)
-    $name = 'Racikin'; $extra = [];
-    foreach (preg_split("/\r?\n/", (string)$headers) as $h) {
-        if ($h === '' || strpos($h, ':') === false) continue;
-        [$k, $v] = array_map('trim', explode(':', $h, 2));
-        $lk = strtolower($k);
-        if ($lk === 'from') { if (preg_match('/^"?([^"<]+?)"?\s*</', $v, $mm)) $name = trim($mm[1]); }
-        elseif (in_array($lk, ['content-type', 'mime-version', 'reply-to'], true)) $extra[] = "$k: $v";
-    }
-    $ctx = stream_context_create(['ssl' => ['verify_peer' => true, 'verify_peer_name' => true]]);
-    $fp = @stream_socket_client(($secure === 'ssl' ? 'ssl://' : 'tcp://') . $host . ':' . $port, $en, $es, 15, STREAM_CLIENT_CONNECT, $ctx);
-    if (!$fp) { error_log("smtp connect gagal: $es"); return false; }
-    stream_set_timeout($fp, 15);
-    try {
-        if (!smtp_cmd($fp, null, '220')) throw new Exception('greeting');
-        $ehlo = preg_replace('/[^A-Za-z0-9.\-]/', '', (string)($_SERVER['SERVER_NAME'] ?? 'localhost')) ?: 'localhost';
-        if (!smtp_cmd($fp, "EHLO $ehlo", '250')) throw new Exception('EHLO');
-        if ($secure === 'tls') {
-            if (!smtp_cmd($fp, 'STARTTLS', '220')) throw new Exception('STARTTLS');
-            if (!@stream_socket_enable_crypto($fp, true, STREAM_CRYPTO_METHOD_TLS_CLIENT)) throw new Exception('TLS');
-            if (!smtp_cmd($fp, "EHLO $ehlo", '250')) throw new Exception('EHLO2');
-        }
-        if ($user !== '') {
-            if (!smtp_cmd($fp, 'AUTH LOGIN', '334') || !smtp_cmd($fp, base64_encode($user), '334') || !smtp_cmd($fp, base64_encode($pass), '235')) throw new Exception('AUTH');
-        }
-        if (!smtp_cmd($fp, "MAIL FROM:<$fromAddr>", '250')) throw new Exception('MAIL FROM');
-        if (!smtp_cmd($fp, "RCPT TO:<$to>", '250')) throw new Exception('RCPT TO');
-        if (!smtp_cmd($fp, 'DATA', '354')) throw new Exception('DATA');
-        $enc = function ($t) { return preg_match('/[^\x20-\x7E]/', $t) ? '=?UTF-8?B?' . base64_encode($t) . '?=' : $t; };
-        $msg = 'From: ' . $enc($name) . " <$fromAddr>\r\nTo: <$to>\r\nSubject: " . $enc(preg_replace('/[\r\n]+/', ' ', $subject)) . "\r\nDate: " . date('r') . "\r\n"
-             . (array_filter($extra) ? implode("\r\n", $extra) . "\r\n" : "Content-Type: text/plain; charset=UTF-8\r\nMIME-Version: 1.0\r\n") . "\r\n"
-             . preg_replace('/^\./m', '..', str_replace(["\r\n", "\r"], "\n", $body));
-        $msg = str_replace("\n", "\r\n", str_replace("\r\n", "\n", $msg));
-        fwrite($fp, $msg . "\r\n.\r\n");
-        if (strpos(smtp_read($fp), '250') !== 0) throw new Exception('akhir pesan');
-        smtp_cmd($fp, 'QUIT', '221');
-        fclose($fp);
-        return true;
-    } catch (Exception $e) { error_log('smtp gagal di tahap ' . $e->getMessage()); @fclose($fp); return false; }
-}
-function app_mail($to, $subject, $body, $headers = '') {
-    if (defined('SMTP_HOST') && SMTP_HOST !== '') return smtp_send($to, $subject, $body, $headers);
-    return @mail($to, $subject, $body, $headers);
-}
 function notify_admin_signup($name, $alias, $user, $email, $status, $wa = '') {
     $list = (defined('ADMIN_EMAIL') ? (string)ADMIN_EMAIL : '');
     try { $st = settings_all(); $list .= ',' . ($st['notify_email'] ?? ''); } catch (Throwable $e) { }
