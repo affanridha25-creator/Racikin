@@ -1795,7 +1795,7 @@ function batchForm(){
       ${allocSel}
       <div class="irsub" id="matsub${i}">${rp((+m.qty||0)*(+m.price||0))}</div></div>`;}).join("");
   const opsRows=b.ops.map((o,i)=>`<div class="dynrow ops"><input placeholder="Nama biaya" value="${esc(o.name)}" oninput="_b.ops[${i}].name=this.value"><input inputmode="numeric" placeholder="Rp" value="${o.amount?grp(o.amount):""}" oninput="this.value=grp(this.value);_b.ops[${i}].amount=digits(this.value);bSum()"><button class="x" onclick="_b.ops.splice(${i},1);remo(batchForm())">×</button></div>`).join("");
-  const outRows=b.outputs.map((o,i)=>`<div class="itemrow"><div class="irtop">${combo(S.products.map(p=>({id:p.id,label:p.name})),o.productId,(id)=>{window._b.outputs[i].productId=id;remo(batchForm());},"— cari / pilih produk —")}<button class="x" onclick="_b.outputs.splice(${i},1);remo(batchForm())">×</button></div><div class="irbot one"><input type="number" inputmode="numeric" placeholder="Qty botol" value="${o.qty}" oninput="_b.outputs[${i}].qty=this.value;bSum()"></div></div>`).join("");
+  const outRows=b.outputs.map((o,i)=>`<div class="itemrow"><div class="irtop">${combo(S.products.map(p=>({id:p.id,label:p.name})),o.productId,(id)=>{window._b.outputs[i].productId=id;addReqMats(id);remo(batchForm());},"— cari / pilih produk —")}<button class="x" onclick="_b.outputs.splice(${i},1);remo(batchForm())">×</button></div><div class="irbot one"><input type="number" inputmode="numeric" placeholder="Qty botol" value="${o.qty}" oninput="_b.outputs[${i}].qty=this.value;bSum()"></div></div>`).join("");
   return `<button class="close" onclick="closeModal()">×</button><h3>${b.id?"Edit":"Tambah"} Batch Produksi${b.batchNo?` <span class="mini">${esc(b.batchNo)}</span>`:""}</h3>
   ${!b.id?`<div class="mini" style="background:var(--amber-bg);color:var(--amber);padding:7px 10px;border-radius:8px;margin-bottom:12px">📝 Batch ini belum tersimpan ke database. Klik <b>Simpan Draft</b> untuk menyimpan sementara di browser &amp; lanjut nanti (tetap ada walau modal ditutup / halaman di-refresh).</div>`:""}
   <div class="grid2" style="margin-bottom:14px"><div><label class="f">Tanggal</label><input type="date" value="${b.date}" oninput="_b.date=this.value"></div><div><label class="f">Catatan</label><input value="${esc(b.note)}" oninput="_b.note=this.value" placeholder="opsional"></div></div>
@@ -1814,6 +1814,18 @@ function batchForm(){
     <button class="btn" onclick="saveBatch()">Simpan Batch</button>
   </div>`;
 }
+// tambah bahan wajib produk ke batch (kalau belum ada) — qty dikosongkan, harga dari master
+function addReqMats(pid){const p=prod(pid);if(!p||!(p.reqMats||[]).length)return;const b=window._b;
+  const first=b.materials.length===1&&!b.materials[0].materialId&&!b.materials[0].name&&!+b.materials[0].qty&&!+b.materials[0].price;
+  if(first)b.materials=[];
+  p.reqMats.forEach(id=>{const x=mat(id);if(!x||b.materials.some(m=>m.materialId===id))return;
+    b.materials.push({materialId:x.id,name:x.name,unit:x.unit,qty:"",price:x.price,targetProduct:"",custom:false});});}
+// bahan wajib yang belum diisi (qty>0) untuk tiap produk jadi di batch
+function missingReq(b){const out=[];
+  [...new Set((b.outputs||[]).filter(o=>o.productId&&+o.qty>0).map(o=>o.productId))].forEach(pid=>{const p=prod(pid);
+    (p&&p.reqMats||[]).forEach(id=>{const ok=(b.materials||[]).some(m=>m.materialId===id&&+m.qty>0&&(!m.targetProduct||m.targetProduct===pid));
+      if(!ok){const x=mat(id);out.push(`${x?x.name:"?"} (${p.name})`);}});});
+  return out;}
 function pickMat(i,val){const m=window._b.materials[i];
   if(val==="__c"){m.custom=true;m.materialId="";}
   else if(val===""){m.custom=false;m.materialId="";m.name="";m.price="";m.unit="kg";}
@@ -1832,6 +1844,8 @@ async function saveBatch(){
   b.ops=b.ops.filter(o=>o.name&&+o.amount);
   b.outputs=b.outputs.filter(o=>o.productId&&+o.qty>0);
   if(b.outputs.length===0){toast("Isi minimal 1 produk jadi + qty.");return;}
+  const miss=missingReq(b);
+  if(miss.length&&!confirm("Bahan wajib belum diisi (qty kosong/tidak ada):\n• "+miss.join("\n• ")+"\n\nTetap simpan batch ini?"))return;
   await api("saveBatch",{batch:b});clearDraft();await reload();closeModal();toast("Batch tersimpan ✓");rProduksi();
 }
 async function delBatch(id){if(confirm("Hapus batch ini? Stok berkurang.")){await api("deleteBatch",{id});await reload();rProduksi();}}
@@ -2111,13 +2125,19 @@ function editProd(id){const p=id?S.products.find(x=>x.id===id):{id:null,name:"",
   <div class="grid2" style="margin:12px 0"><div><label class="f">Kategori</label><input id="pc" value="${esc(p.cat)}"></div><div><label class="f">Ukuran (gram)</label><input id="pg" type="number" value="${p.gram}"></div></div>
   <div class="grid2"><div><label class="f">HPP / ${uw}</label><input id="ph" inputmode="numeric" value="${p.hpp?grp(p.hpp):""}" oninput="this.value=grp(this.value)"></div><div><label class="f">Harga jual / ${uw}</label><input id="phj" inputmode="numeric" value="${p.harga?grp(p.harga):""}" oninput="this.value=grp(this.value)"></div></div>
   ${fnb?"":`<p class="mini" style="margin-top:8px">Ukuran (gram) dipakai membagi HPP antar produk dalam 1 batch (per bobot).</p>`}
+  ${fnb?"":reqMatsBox(p)}
   <label style="display:flex;align-items:center;gap:8px;margin-top:14px;cursor:pointer"><input type="checkbox" id="pTrack" ${trk?"checked":""}> <span class="f" style="margin:0">Lacak stok ${fnb?"menu":"produk"} ini</span></label>
   <p class="mini" style="margin-top:4px">${fnb?"Menu dimasak saat dipesan → biarkan mati (jual bebas). Nyalakan untuk item stok jadi (mis. air mineral, kemasan).":"Kalau dimatikan, penjualan tak dibatasi/dihitung stok (cocok untuk item pre-order / jasa)."}</p>
   <div style="margin-top:16px;text-align:right"><button class="btn gray" onclick="closeModal()">Batal</button> <button class="btn" onclick="saveProd('${id||""}')">Simpan</button></div>`);}
+function reqMatsBox(p){const sel=new Set(p.reqMats||[]);
+  if(!S.materials.length)return"";
+  return `<label class="f" style="margin-top:14px">Bahan wajib tiap batch <span class="mini">(otomatis ditambah ke batch &amp; diperingatkan kalau lupa diisi)</span></label>
+  <div style="max-height:160px;overflow:auto;border:1px solid #e3e3e3;border-radius:10px;padding:6px 10px">${S.materials.map(m=>`<label style="display:flex;align-items:center;gap:8px;padding:4px 0;cursor:pointer"><input type="checkbox" class="rqm" value="${m.id}"${sel.has(m.id)?" checked":""}> <span>${esc(m.name)}</span></label>`).join("")}</div>`;}
 function pickProdPhoto(inp){const f=inp.files[0];if(!f)return;if(!/^image\//.test(f.type)){toast("File harus gambar.");return;}if(f.size>5*1024*1024){toast("Maks 5MB.");return;}
   const rd=new FileReader();rd.onload=e=>{const img=new Image();img.onload=()=>{const max=360;let w=img.width,h=img.height;if(w>h&&w>max){h=Math.round(h*max/w);w=max;}else if(h>=w&&h>max){w=Math.round(w*max/h);h=max;}const cv=document.createElement("canvas");cv.width=w;cv.height=h;cv.getContext("2d").drawImage(img,0,0,w,h);_prodPhoto=cv.toDataURL("image/jpeg",0.82);document.getElementById("prodPhotoPrev").innerHTML=`<img src="${_prodPhoto}" alt="">`;};img.onerror=()=>toast("Gambar tak terbaca.");img.src=e.target.result;};rd.readAsDataURL(f);}
 function rmProdPhoto(){_prodPhoto="";document.getElementById("prodPhotoPrev").innerHTML=`<span>🫙</span>`;}
 async function saveProd(id){const o={id:id||null,name:document.getElementById("pn").value.trim(),cat:document.getElementById("pc").value.trim()||"Umum",gram:+document.getElementById("pg").value||1,hpp:+digits(document.getElementById("ph").value)||0,harga:+digits(document.getElementById("phj").value)||0,trackStock:document.getElementById("pTrack").checked?1:0};
+  if(document.querySelector(".rqm")||bizType()!=="fnb")o.reqMats=[...document.querySelectorAll(".rqm:checked")].map(x=>x.value);
   if(_prodPhoto!==null)o.photo=_prodPhoto;   // hanya kirim kalau diubah (biar tak terhapus saat REPLACE)
   if(!o.name){toast("Nama wajib.");return;}await api("saveProduct",{product:o});await reload();closeModal();toast("Produk tersimpan ✓");rProduk();}
 // ---- penyesuaian / opname stok produk ----

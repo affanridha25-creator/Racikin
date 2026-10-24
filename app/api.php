@@ -732,7 +732,7 @@ try {
             $p = $in['product'];
             $id = safe_id($p['id'] ?? '') ?: gid('p');
             // REPLACE bersifat destruktif → kolom yang tak dikirim klien diambil dari baris lama
-            $q = $pdo->prepare("SELECT photo, track_stock FROM products WHERE id=?"); $q->execute([$id]); $old = $q->fetch() ?: null;
+            $q = $pdo->prepare("SELECT photo, track_stock, req_mats FROM products WHERE id=?"); $q->execute([$id]); $old = $q->fetch() ?: null;
             // foto: kalau key 'photo' dikirim → pakai (boleh '' utk hapus); kalau tidak → pertahankan yang lama
             if (array_key_exists('photo', $p)) {
                 $photo = (string)$p['photo'];
@@ -744,9 +744,16 @@ try {
             }
             // lacak stok: 0 = made-to-order (F&B), penjualan tak dibatasi stok. Default 1.
             $track = array_key_exists('trackStock', $p) ? (!empty($p['trackStock']) ? 1 : 0) : (int)($old['track_stock'] ?? 1);
-            $pdo->prepare("REPLACE INTO products (id,name,cat,gram,harga,hpp,photo,track_stock) VALUES (?,?,?,?,?,?,?,?)")
+            // bahan wajib tiap batch: kalau tak dikirim → pertahankan yang lama
+            if (array_key_exists('reqMats', $p)) {
+                $ids = array_values(array_unique(array_filter(array_map('safe_id', (array)$p['reqMats']))));
+                $reqMats = $ids ? json_encode($ids) : null;
+            } else {
+                $reqMats = $old['req_mats'] ?? null;
+            }
+            $pdo->prepare("REPLACE INTO products (id,name,cat,gram,harga,hpp,photo,track_stock,req_mats) VALUES (?,?,?,?,?,?,?,?,?)")
                 ->execute([$id, $p['name'], $p['cat'] ?: 'Umum', intval($p['gram']) ?: 1,
-                    intval($p['harga']), intval($p['hpp']), $photo, $track]);
+                    intval($p['harga']), intval($p['hpp']), $photo, $track, $reqMats]);
             echo json_encode(['ok' => true, 'id' => $id]);
             break;
         }
@@ -1142,8 +1149,8 @@ function session_totals($pdo, $sid) {
 }
 
 function bootstrap($pdo) {
-    $products = $pdo->query("SELECT id,name,cat,gram,harga,hpp,photo,track_stock AS trackStock FROM products ORDER BY name")->fetchAll();
-    foreach ($products as &$p) { $p['gram']=intval($p['gram']); $p['harga']=intval($p['harga']); $p['hpp']=intval($p['hpp']); $p['trackStock']=intval($p['trackStock']); } unset($p);
+    $products = $pdo->query("SELECT id,name,cat,gram,harga,hpp,photo,track_stock AS trackStock,req_mats FROM products ORDER BY name")->fetchAll();
+    foreach ($products as &$p) { $p['gram']=intval($p['gram']); $p['harga']=intval($p['harga']); $p['hpp']=intval($p['hpp']); $p['trackStock']=intval($p['trackStock']); $p['reqMats']=json_decode($p['req_mats'] ?? '[]', true) ?: []; unset($p['req_mats']); } unset($p);
     // penyesuaian stok produk (rusak/hilang/koreksi/opname) — utk stok akurat & riwayat
     $stockAdj = [];
     foreach ($pdo->query("SELECT id,product_id AS productId,adate AS date,qty,reason,note FROM stock_adjustments ORDER BY adate DESC,id DESC") as $r) { $r['qty']=intval($r['qty']); $stockAdj[] = $r; }

@@ -211,6 +211,7 @@ function init_schema($pdo) {
     ensure_column($pdo, 'products', 'photo', "photo MEDIUMTEXT DEFAULT NULL");
     // lacak stok? 0 = made-to-order (F&B) → penjualan tak dibatasi/dihitung stok
     ensure_column($pdo, 'products', 'track_stock', "track_stock TINYINT(1) DEFAULT 1");
+    ensure_column($pdo, 'products', 'req_mats', "req_mats TEXT DEFAULT NULL");   // JSON array id bahan wajib tiap batch
 
     // Penyesuaian stok produk (rusak/hilang/pakai sendiri/koreksi/opname). qty bertanda:
     // negatif = stok berkurang, positif = bertambah. Stok = produksi − terjual + Σ penyesuaian.
