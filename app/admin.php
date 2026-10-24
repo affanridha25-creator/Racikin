@@ -66,7 +66,7 @@ if ($isAdmin && in_array($do, ['save_settings','approve','reject','extend','test
     }
     elseif ($do === 'test_mail') {
         [$okMail, $infoMail] = run_mail_test();
-        if ($okMail) $msg = $infoMail; else $err = $infoMail;
+        if ($okMail) { $msg = $infoMail; $msgPre = true; } else $err = $infoMail;
     }
     elseif ($do === 'save_settings') {
         foreach (['price_1bln','price_3bln','price_1thn'] as $k) setting_set($k, max(0, (int)preg_replace('/\D/', '', $_POST[$k] ?? '0')));
@@ -380,7 +380,7 @@ body.lg::after{width:46vmax;height:46vmax;right:-14vmax;bottom:-16vmax;backgroun
     <img src="icons/logo-bowl.png" alt="">
     <h2>Panel Admin Racikin</h2>
     <div class="lsub">Masuk dulu ya, untuk mengelola usaha &amp; langganan 🔐</div>
-    <?php if ($err): ?><div class="msg err"><span>⚠️</span><span><?= h($err) ?></span></div><?php endif; ?>
+    <?php if ($err): ?><div class="msg err"><span>⚠️</span><span<?= strpos($err, "\n") !== false ? ' style="white-space:pre-line;line-height:1.7;word-break:break-word"' : '' ?>><?= h($err) ?></span></div><?php endif; ?>
     <?php if (!$adminConfigured): ?><div class="msg err"><span>⚙️</span><span>Set <b>ADMIN_PASS</b> yang kuat di <b>config.php</b> dulu.</span></div><?php endif; ?>
     <form method="post" autocomplete="off">
       <input type="hidden" name="do" value="login">
@@ -396,7 +396,7 @@ body.lg::after{width:46vmax;height:46vmax;right:-14vmax;bottom:-16vmax;backgroun
     <a class="logout" href="admin.php?logout=1">Keluar ⏻</a>
   </div>
   <?php if ($msg): ?><div class="msg ok"><span><?= !empty($msgPre) ? '🔍' : '✅' ?></span><span<?= !empty($msgPre) ? ' style="white-space:pre-line;font-size:12.5px;font-weight:600;line-height:1.75;word-break:break-word"' : '' ?>><?= h($msg) ?></span></div><?php endif; ?>
-  <?php if ($err): ?><div class="msg err"><span>⚠️</span><span><?= h($err) ?></span></div><?php endif; ?>
+  <?php if ($err): ?><div class="msg err"><span>⚠️</span><span<?= strpos($err, "\n") !== false ? ' style="white-space:pre-line;line-height:1.7;word-break:break-word"' : '' ?>><?= h($err) ?></span></div><?php endif; ?>
 
   <!-- Hero ringkasan -->
   <section class="hero">

@@ -247,11 +247,15 @@ function run_mail_test_inner() {
     $GLOBALS['smtp_last_error'] = '';
     $body = "Ini email percobaan dari panel admin Racikin.\n\nPengirim : $from\nMetode   : " . ($smtp ? 'SMTP (' . SMTP_HOST . ':' . (defined('SMTP_PORT') ? SMTP_PORT : 465) . ')' : 'mail() bawaan hosting') . "\nWaktu    : " . gmdate('Y-m-d H:i', time() + 7 * 3600) . " WIB\n\nKalau email ini sampai, pemberitahuan pendaftar baru akan sampai juga.\n\n— Racikin";
     $headers = "From: Racikin <$from>\r\nContent-Type: text/plain; charset=UTF-8\r\nMIME-Version: 1.0\r\n";
-    $okN = 0;
-    foreach ($to as $t) if (app_mail($t, 'Tes email Racikin', $body, $headers)) $okN++;
     $via = $smtp ? 'lewat SMTP' : 'lewat mail() bawaan hosting (tanpa SMTP — kemungkinan masuk spam)';
-    $ver = ' [mail.php v' . mail_build() . ']';
-    if ($okN === count($to)) return [true, "Email tes terkirim $via ke: " . implode(', ', $to) . '. Cek kotak masuk & folder spam. ✓' . $ver];
-    $why = $smtp ? ($GLOBALS['smtp_last_error'] ?: 'tidak diketahui — cek error log hosting') : 'mail() ditolak hosting';
-    return [false, "Email tes GAGAL $via. Penyebab: $why" . $ver];
+    $ver = '[mail.php v' . mail_build() . ']';
+    $okN = 0; $rows = [];
+    foreach ($to as $t) {   // hasil PER PENERIMA, supaya jelas siapa yang berhasil
+        $GLOBALS['smtp_last_error'] = '';
+        if (app_mail($t, 'Tes email Racikin', $body, $headers)) { $okN++; $rows[] = "✓ $t — terkirim"; }
+        else $rows[] = "✗ $t — GAGAL: " . ($smtp ? ($GLOBALS['smtp_last_error'] ?: 'tidak diketahui — cek error log hosting') : 'mail() ditolak hosting');
+    }
+    $head = $okN === count($to) ? "Email tes terkirim $via. Cek kotak masuk & folder spam. ✓"
+          : ($okN > 0 ? "Email tes TERKIRIM SEBAGIAN $via ($okN dari " . count($to) . ' penerima).' : "Email tes GAGAL $via.");
+    return [$okN === count($to), $head . "\n" . implode("\n", $rows) . "\n" . $ver];
 }
